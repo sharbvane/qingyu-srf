@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sharbvane/qingyu-input-method/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/sharbvane/qingyu-input-method?label=release"></a>
+  <a href="https://github.com/sharbvane/qingyu-srf/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/sharbvane/qingyu-srf?label=release"></a>
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPL--3.0-blue.svg"></a>
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
 </p>
@@ -37,7 +37,7 @@
 
 ## 安装与使用
 
-1. 从 [GitHub Releases](https://github.com/sharbvane/qingyu-input-method/releases/latest) 下载 `Qingyu-0.1.0.apk`，适用于 Android 8.0 及以上。
+1. 从 [GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases/latest) 下载 `Qingyu-0.1.0.apk`，适用于 Android 8.0 及以上。
 2. 安装并打开「轻语输入法」，依次选择「启用轻语输入法」和「切换到轻语」。这是 Android 的系统设置步骤。
 3. 在任意输入框试试 `kaifa`、`xiangmu` 或 `sheji`。点中文候选，上屏的只有中文。
 

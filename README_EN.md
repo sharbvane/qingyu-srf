@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sharbvane/qingyu-input-method/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/sharbvane/qingyu-input-method?label=release"></a>
+  <a href="https://github.com/sharbvane/qingyu-srf/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/sharbvane/qingyu-srf?label=release"></a>
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPL--3.0-blue.svg"></a>
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
 </p>
@@ -37,7 +37,7 @@ Missing dictionary entries stay blank. Glosses are common dictionary senses, not
 
 ## Install and try it
 
-1. Download `Qingyu-0.1.0.apk` from [GitHub Releases](https://github.com/sharbvane/qingyu-input-method/releases/latest). Android 8.0 or newer is required.
+1. Download `Qingyu-0.1.0.apk` from [GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases/latest). Android 8.0 or newer is required.
 2. Install and open Qingyu. Use **Enable Qingyu Input Method**, then **Switch to Qingyu**. Android requires these system settings steps.
 3. In any text field, type `kaifa`, `xiangmu` or `sheji`. Tap a Chinese candidate to enter Chinese only.
 
