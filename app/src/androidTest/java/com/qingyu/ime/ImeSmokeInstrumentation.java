@@ -1,0 +1,128 @@
+package com.qingyu.ime;
+
+import android.app.Activity;
+import android.app.Instrumentation;
+import android.app.UiAutomation;
+import android.accessibilityservice.AccessibilityServiceInfo;
+import android.content.Intent;
+import android.graphics.Rect;
+import android.os.Bundle;
+import android.os.SystemClock;
+import android.text.InputType;
+import android.view.InputDevice;
+import android.view.MotionEvent;
+import android.view.View;
+import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityWindowInfo;
+import android.view.inputmethod.InputMethodManager;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import java.util.HashMap;
+import java.util.Map;
+
+/** Real Android IME integration tests using actual touch + InputConnection, no test hooks in production. */
+public final class ImeSmokeInstrumentation extends Instrumentation {
+    private UiAutomation automation;
+    private Activity activity;
+    private EditText editor;
+    private final Map<String,Rect> keys=new HashMap<>();
+    private final StringBuilder report=new StringBuilder();
+    @Override public void onCreate(Bundle arguments){super.onCreate(arguments);start();}
+    @Override public void onStart(){
+        Bundle result=new Bundle();
+        try{
+            automation=getUiAutomation();AccessibilityServiceInfo info=automation.getServiceInfo();
+            info.flags|=AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS|AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;automation.setServiceInfo(info);
+            // Starting instrumentation may stop an already-running target IME and
+            // make Android select its fallback. Select after the runner is alive.
+            shell("ime enable com.qingyu.ime/.QingyuImeService");shell("ime set com.qingyu.ime/.QingyuImeService");
+            getTargetContext().getSharedPreferences("qingyu",0).edit().putBoolean("english",false).putBoolean("translation",true).putBoolean("learning",false).putString("theme","light").apply();
+            Intent launch=new Intent(getTargetContext(),SettingsActivity.class);launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            activity=startActivitySync(launch);
+            newEditor(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+            keyboardReady();
+
+            type("kaifa");awaitCandidate("开发");awaitGloss("开发","develop");screenshot("ime-light.png");clickCandidate("开发");awaitText("开发");pass("candidate click commits Chinese only");
+            clear();type("kaifa");awaitCandidate("开发");
+            runOnMainSync(()->activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));SystemClock.sleep(500);keyboardReady();awaitCandidate("开发");clickCandidate("开发");awaitText("开发");
+            runOnMainSync(()->activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT));SystemClock.sleep(500);keyboardReady();pass("orientation change preserves composition");
+            clear();type("xiangmu");awaitCandidate("项目");awaitGloss("项目","project");
+            Rect original=new Rect();candidate("项目").getBoundsInScreen(original);nodeClick("annotation_toggle");SystemClock.sleep(150);
+            AccessibilityNodeInfo unchanged=candidate("项目");Rect withoutGloss=new Rect();unchanged.getBoundsInScreen(withoutGloss);
+            check(original.equals(withoutGloss),"gloss toggle moved Chinese candidate");check(!String.valueOf(unchanged.getContentDescription()).contains("project"),"gloss remained after disabling");
+            clickCandidate("项目");awaitText("项目");nodeClick("annotation_toggle");pass("local gloss toggle preserves candidate layout and Chinese input");
+            clear();type("zhongguorenmin");key("SPACE");awaitText("中国人民");pass("sentence composition");
+
+            clear();type("shi");awaitCandidate(null);nodeClick("candidate_expand");SystemClock.sleep(160);
+            check(find("candidate_8")!=null,"expanded candidates missing");nodeClick("candidate_next_page");SystemClock.sleep(100);
+            AccessibilityNodeInfo paged=find("candidate_12");check(paged!=null,"next page candidate missing");String chosen=paged.getText().toString();paged.performAction(AccessibilityNodeInfo.ACTION_CLICK);awaitText(chosen);keyboardReady();pass("candidate expand, page and choose");
+
+            clear();type("nihao");key("SPACE");key("LANG");type("abc");key("?123");SystemClock.sleep(100);collectKeys();key("1");key("2");key("ABC");SystemClock.sleep(100);collectKeys();
+            awaitText("你好abc12");pass("rapid Chinese/English/number commit order");
+            key("LANG");clear();keyboardReady();
+
+            type("nihao");key("⌫");key("o");key("SPACE");awaitText("你好");pass("composition delete and resume");
+            setText("😊X");key("⌫");key("⌫");awaitText("");pass("Unicode code point backspace");
+            setText("abcdefghijk");hold("⌫",1200);awaitText("");pass("held backspace repeats");
+            hold("q",620);awaitText("1");pass("long press number");
+            clear();type("xi");hold("，",620);type("an");awaitCandidate("西安");clickCandidate("西安");awaitText("西安");pass("explicit pinyin syllable separator");
+            clear();String repeated=new String(new char[70]).replace('\0','a');type(repeated);key("SPACE");
+            long longInputUntil=SystemClock.uptimeMillis()+4000;while(text().length()!=70&&SystemClock.uptimeMillis()<longInputUntil)SystemClock.sleep(30);
+            check(text().length()==70&&!text().contains("a"),"long input lost keystrokes: "+text());pass("70 character continuous input segments without loss");
+
+            clear();key("LANG");keyboardReady();type("abc");awaitText("abc");Rect space=keys.get("SPACE");
+            swipe(space.centerX(),space.centerY(),space.centerX()-80,space.centerY(),180);SystemClock.sleep(120);
+            type("x");String cursorText=text();check(cursorText.contains("x")&&!cursorText.endsWith("x"),"space swipe did not move cursor: "+cursorText);pass("space swipe cursor");
+
+            newEditor(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_PASSWORD);keyboardReady();key("LANG");type("kaifa");awaitText("kaifa");check(find("candidate_0")==null,"password produced Chinese candidates");pass("password direct input, language locked");
+            key("?123");SystemClock.sleep(100);collectKeys();key("!");key("SHIFT");SystemClock.sleep(100);collectKeys();key("*");key("=");key("\"");awaitText("kaifa!*=\"");pass("password ASCII punctuation accessible");
+
+            newEditor(InputType.TYPE_CLASS_NUMBER);keyboardReady();key("1");key("2");key("3");awaitText("123");pass("numeric field keypad");
+
+            newEditor(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);keyboardReady();
+            getTargetContext().getSharedPreferences("qingyu",0).edit().putBoolean("english",false).putString("theme","dark").apply();
+            runOnMainSync(()->{editor.clearFocus();editor.requestFocus();((InputMethodManager)activity.getSystemService(Activity.INPUT_METHOD_SERVICE)).restartInput(editor);});
+            SystemClock.sleep(200);keyboardReady();type("sheji");awaitCandidate("设计");awaitGloss("设计","design");screenshot("ime-dark.png");clickCandidate("设计");awaitText("设计");pass("dark theme restart and input");
+            result.putString("stream","\nALL_IME_CHECKS_PASS\n"+report);finish(Activity.RESULT_OK,result);
+        }catch(Throwable error){
+            result.putString("stream","\nIME_CHECK_FAILED: "+error+"\n"+report+"\n"+android.util.Log.getStackTraceString(error));finish(Activity.RESULT_CANCELED,result);
+        }
+    }
+    private void newEditor(int type){
+        runOnMainSync(()->{
+            LinearLayout view=new LinearLayout(activity);view.setOrientation(LinearLayout.VERTICAL);view.setPadding(30,150,30,30);
+            editor=new EditText(activity);editor.setTextSize(24);editor.setInputType(type);editor.setImeOptions(android.view.inputmethod.EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING);view.addView(editor,new LinearLayout.LayoutParams(-1,220));activity.setContentView(view);editor.requestFocus();
+            ((InputMethodManager)activity.getSystemService(Activity.INPUT_METHOD_SERVICE)).showSoftInput(editor,InputMethodManager.SHOW_IMPLICIT);
+        });waitForIdleSync();SystemClock.sleep(150);
+        runOnMainSync(()->{InputMethodManager imm=(InputMethodManager)activity.getSystemService(Activity.INPUT_METHOD_SERVICE);imm.restartInput(editor);imm.showSoftInput(editor,InputMethodManager.SHOW_IMPLICIT);});SystemClock.sleep(200);
+    }
+    private void keyboardReady(){long until=SystemClock.uptimeMillis()+5000;while(SystemClock.uptimeMillis()<until){if(find("key_SPACE")!=null||find("key_1")!=null){SystemClock.sleep(450);collectKeys();return;}SystemClock.sleep(40);}throw new AssertionError("Keyboard did not become accessible");}
+    private AccessibilityNodeInfo walk(AccessibilityNodeInfo root,String id){if(root==null)return null;String name=root.getViewIdResourceName();if(("com.qingyu.ime:id/"+id).equals(name))return root;for(int i=0;i<root.getChildCount();i++){AccessibilityNodeInfo child=root.getChild(i);AccessibilityNodeInfo found=walk(child,id);if(found!=null)return found;}return null;}
+    private AccessibilityNodeInfo find(String id){for(AccessibilityWindowInfo w:automation.getWindows()){AccessibilityNodeInfo found=walk(w.getRoot(),id);if(found!=null)return found;}return null;}
+    private void collect(AccessibilityNodeInfo node){if(node==null)return;String id=node.getViewIdResourceName();if(id!=null&&id.startsWith("com.qingyu.ime:id/key_")){Rect rect=new Rect();node.getBoundsInScreen(rect);keys.put(id.substring(id.indexOf("key_")+4),rect);}for(int i=0;i<node.getChildCount();i++)collect(node.getChild(i));}
+    private void collectKeys(){keys.clear();for(AccessibilityWindowInfo w:automation.getWindows())collect(w.getRoot());}
+    private void touch(float x,float y,boolean down,long when){MotionEvent event=MotionEvent.obtain(when,when,down?MotionEvent.ACTION_DOWN:MotionEvent.ACTION_UP,x,y,0);event.setSource(InputDevice.SOURCE_TOUCHSCREEN);check(automation.injectInputEvent(event,true),"Touch injection failed");event.recycle();}
+    private void key(String value){Rect r=keys.get(value);if(r==null){collectKeys();r=keys.get(value);}check(r!=null,"Missing key "+value);long t=SystemClock.uptimeMillis();touch(r.centerX(),r.centerY(),true,t);touch(r.centerX(),r.centerY(),false,t+8);}
+    private void type(String s){for(int i=0;i<s.length();i++)key(s.substring(i,i+1));}
+    private void hold(String value,long ms){Rect r=keys.get(value);check(r!=null,"Missing hold key "+value);long t=SystemClock.uptimeMillis();touch(r.centerX(),r.centerY(),true,t);SystemClock.sleep(ms);touch(r.centerX(),r.centerY(),false,SystemClock.uptimeMillis());}
+    private void swipe(float x,float y,float endX,float endY,long duration){long start=SystemClock.uptimeMillis();touch(x,y,true,start);for(int i=1;i<=5;i++){MotionEvent m=MotionEvent.obtain(start,start+duration*i/5,MotionEvent.ACTION_MOVE,x+(endX-x)*i/5,y+(endY-y)*i/5,0);m.setSource(InputDevice.SOURCE_TOUCHSCREEN);automation.injectInputEvent(m,true);m.recycle();}touch(endX,endY,false,start+duration);}
+    private void nodeClick(String id){AccessibilityNodeInfo node=find(id);check(node!=null,"Missing node "+id);check(node.performAction(AccessibilityNodeInfo.ACTION_CLICK),"Node click failed "+id);}
+    private AccessibilityNodeInfo candidate(String text){for(int i=0;i<128;i++){AccessibilityNodeInfo n=find("candidate_"+i);if(n==null)continue;if(text==null||text.contentEquals(n.getText()==null?"":n.getText()))return n;}return null;}
+    private void awaitCandidate(String text){long until=SystemClock.uptimeMillis()+4000;while(SystemClock.uptimeMillis()<until){if(candidate(text)!=null)return;SystemClock.sleep(30);}throw new AssertionError("Missing candidate "+text+"; editor="+text());}
+    private void awaitGloss(String word,String gloss){long until=SystemClock.uptimeMillis()+4000;while(SystemClock.uptimeMillis()<until){AccessibilityNodeInfo n=candidate(word);if(n!=null&&String.valueOf(n.getContentDescription()).contains(gloss))return;SystemClock.sleep(40);}throw new AssertionError("Missing gloss "+gloss);}
+    private void clickCandidate(String word){AccessibilityNodeInfo n=candidate(word);check(n!=null,"Missing candidate "+word);check(n.performAction(AccessibilityNodeInfo.ACTION_CLICK),"Candidate click failed");}
+    private String text(){final String[] text={""};runOnMainSync(()->text[0]=editor.getText().toString());return text[0];}
+    private void awaitText(String expected){long until=SystemClock.uptimeMillis()+3000;while(SystemClock.uptimeMillis()<until){if(expected.equals(text()))return;SystemClock.sleep(25);}throw new AssertionError("Expected '"+expected+"', actual '"+text()+"'");}
+    private void awaitNonEmpty(){long until=SystemClock.uptimeMillis()+2000;while(SystemClock.uptimeMillis()<until){if(!text().isEmpty())return;SystemClock.sleep(25);}throw new AssertionError("No committed text");}
+    private void setText(String text){runOnMainSync(()->{editor.setText(text);editor.setSelection(text.length());((InputMethodManager)activity.getSystemService(Activity.INPUT_METHOD_SERVICE)).restartInput(editor);});SystemClock.sleep(150);keyboardReady();}
+    private void clear(){setText("");}
+    private void pass(String name){report.append("PASS ").append(name).append('\n');Bundle b=new Bundle();b.putString("stream","PASS "+name+"\n");sendStatus(0,b);}
+    private void screenshot(String name)throws Exception{
+        // Accessibility state can update before the invalidated Canvas is drawn.
+        // Allow rendered frames to catch up before exporting visual evidence.
+        waitForIdleSync();SystemClock.sleep(250);
+        java.io.File file=new java.io.File(getTargetContext().getExternalFilesDir(null),name);android.graphics.Bitmap bitmap=automation.takeScreenshot();try(java.io.FileOutputStream out=new java.io.FileOutputStream(file)){bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}bitmap.recycle();
+    }
+    private void shell(String command)throws Exception{try(android.os.ParcelFileDescriptor fd=automation.executeShellCommand(command);java.io.FileInputStream input=new java.io.FileInputStream(fd.getFileDescriptor())){byte[] b=new byte[512];while(input.read(b)!=-1){}}}
+    private static void check(boolean condition,String message){if(!condition)throw new AssertionError(message);}
+}

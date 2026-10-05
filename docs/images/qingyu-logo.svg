@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" role="img" aria-labelledby="title">
+  <title id="title">Qingyu logo</title>
+  <path fill="#476B57" d="M24 4h60q20 0 20 20v60q0 20-20 20H24Q4 104 4 84V24Q4 4 24 4Z"/>
+  <path fill="#F4F5F0" fill-rule="evenodd" d="M28 32h40q12 0 12 12v20q0 12-12 12H47L32 87V76q-9-2-9-12V44q0-12 5-12Zm5 10v23h36V42H33Z"/>
+  <path fill="#BFD4A7" d="M42 50h19v7H42z"/>
+</svg>

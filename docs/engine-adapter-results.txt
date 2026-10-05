@@ -1,0 +1,8 @@
+PASS Java/JNI candidate and commit contract
+PASS Java/JNI partial selection and deletion
+PASS long composition segmentation without keystroke loss
+PASS invalid-pinyin tail preservation and deletion
+PASS bounded 64-character composition
+PASS 1000 Java/JNI type/delete cycles; 6285 searches with up to 128 candidates; total 1638.60 ms; p50 0.077 ms; p95 0.377 ms; max 4.597 ms
+PASS 100 deterministic random 64-character type/delete sequences
+ALL_ADAPTER_CHECKS_PASS

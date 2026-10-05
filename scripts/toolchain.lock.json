@@ -1,0 +1,25 @@
+{
+  "java": "17 (validated locally with 17.0.5)",
+  "androidGradlePlugin": "8.7.3",
+  "gradle": {
+    "version": "8.9",
+    "sha256": "d725d707bfabd4dfdc958c624003b3c80accc03f7037b5122c4b1d0ef15cecab",
+    "officialChecksumUrl": "https://downloads.gradle.org/distributions/gradle-8.9-bin.zip.sha256",
+    "downloadUrl": "https://mirrors.cloud.tencent.com/gradle/gradle-8.9-bin.zip"
+  },
+  "androidRepository": "https://dl.google.com/android/repository/repository2-3.xml",
+  "androidPackages": [
+    {"package": "platform-tools", "version": "37.0.1", "archive": "platform-tools_r37.0.1-win.zip", "sha1": "e03e78b1d80b396f1c3358e31251cb31740e1110"},
+    {"package": "platforms;android-35", "archive": "platform-35_r02.zip", "sha1": "0bb560a90a7a2cbd0dd8348224d518b638fe7949"},
+    {"package": "build-tools;35.0.0", "archive": "build-tools_r35_windows.zip", "sha1": "af059bb67cf7786f45ee0db85e2d24985df1b4b6"},
+    {"package": "ndk;28.1.13356709", "archive": "android-ndk-r28b-windows.zip", "sha1": "c7d82072807fcabbd6ee356476761d8729307185"},
+    {"package": "cmake;3.22.1", "archive": "cmake-3.22.1-windows.zip", "sha1": "292778f32a7d5183e1c49c7897b870653f2d2c1b"},
+    {"package": "cmdline-tools;12.0", "archive": "commandlinetools-win-11076708_latest.zip", "sha1": "3d2917302740f476999a091bc5558837c7a863c5"},
+    {"package": "emulator", "version": "37.3.2", "archive": "emulator-windows_x64-16433917.zip", "sha1": "6ac24315017357bb8d7bfeb64ca653829a57b891"},
+    {"package": "system-images;android-35;google_apis;x86_64", "revision": 9, "archive": "x86_64-35_r09.zip", "sha1": "0103e6dab21290c4b9d16550a3ce99476f884eef"}
+  ],
+  "systemImageRepository": "https://dl.google.com/android/repository/sys-img/google_apis/sys-img2-3.xml",
+  "cache": ".tools/cache",
+  "sdk": ".tools/android-sdk",
+  "gradleUserHome": ".tools/gradle-home"
+}

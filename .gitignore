@@ -1,0 +1,46 @@
+# Android / Gradle build products
+.gradle/
+**/.gradle/
+**/build/
+**/.cxx/
+local.properties
+captures/
+*.apk
+*.aab
+*.idsig
+*.mapping.txt
+
+# Local SDKs, caches, emulator images, and generated data
+.tools/
+.cache/
+*.log
+*.tmp
+releases/qa/
+release-signing/
+
+# Signing material and credentials
+*.keystore
+*.jks
+*.p12
+*.pfx
+*.pem
+*.key
+*.p8
+keystore.properties
+signing.properties
+secrets.properties
+.env
+.env.*
+!.env.example
+google-services.json
+service-account*.json
+id_rsa*
+id_ed25519*
+.ssh/
+
+# IDEs and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
