@@ -1,0 +1,119 @@
+package com.qingyu.ime;
+
+import android.content.Context;
+import android.graphics.Canvas;
+import android.graphics.ColorFilter;
+import android.graphics.Paint;
+import android.graphics.PixelFormat;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.FrameLayout;
+import android.widget.ImageButton;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.SeekBar;
+import android.widget.TextView;
+import java.util.List;
+import java.util.function.Consumer;
+
+/** Five quiet navigation actions; tools occupy the existing keyboard area. */
+final class ImePanels {
+    private final Context context;
+    private final ImePreferences prefs;
+    private final Consumer<String> action;
+    final LinearLayout toolbar;
+    final FrameLayout body;
+    private final View keyboard;
+    private Palette colors;
+    private String active="";
+    private TextView detailText,detailSource,modelStatus;
+    private ImageView detailBadge;
+    private Button detailCommit;
+    private String detailTranslation="";
+    ImePanels(Context context,ImePreferences prefs,View keyboard,Consumer<String> action){
+        this.context=context;this.prefs=prefs;this.keyboard=keyboard;this.action=action;
+        colors=new Palette(prefs.dark(context));toolbar=new LinearLayout(context);toolbar.setGravity(Gravity.CENTER_VERTICAL);
+        body=new FrameLayout(context);body.setId(R.id.panel_host);body.addView(keyboard,new FrameLayout.LayoutParams(-1,-2));
+        String[] names={"更多","文本编辑","Emoji","键盘模式","收起输入法"};String[] commands={"more","edit","emoji","mode","hide"};
+        int[] ids={R.id.toolbar_more,R.id.toolbar_edit,R.id.toolbar_emoji,R.id.toolbar_mode,R.id.toolbar_hide};
+        for(int i=0;i<names.length;i++){
+            ImageButton button=new ImageButton(context);button.setId(ids[i]);button.setContentDescription(names[i]);button.setBackgroundColor(android.graphics.Color.TRANSPARENT);button.setImageDrawable(new NavIcon(i,colors.secondary,dp(23)));button.setPadding(dp(10),dp(8),dp(10),dp(8));
+            String command=commands[i];button.setOnClickListener(v->action.accept(command));toolbar.addView(button,new LinearLayout.LayoutParams(0,dp(40),1));
+        }
+    }
+    private int dp(float n){return (int)(n*context.getResources().getDisplayMetrics().density+0.5f);}
+    String active(){return active;}
+    boolean isOpen(){return !active.isEmpty();}
+    void refresh(){colors=new Palette(prefs.dark(context));toolbar.setBackgroundColor(colors.background);for(int i=0;i<toolbar.getChildCount();i++)((ImageButton)toolbar.getChildAt(i)).setImageDrawable(new NavIcon(i,colors.secondary,dp(23)));body.setBackgroundColor(colors.background);}
+    void close(){active="";detailTranslation="";body.animate().cancel();body.setAlpha(1f);body.setTranslationY(0);if(body.getChildCount()>1)body.removeViewAt(1);keyboard.setVisibility(View.VISIBLE);body.getLayoutParams().height=-2;body.requestLayout();}
+    private LinearLayout begin(String name,String title){
+        close();active=name;keyboard.setVisibility(View.GONE);refresh();
+        boolean landscape=context.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;
+        int height=dp((landscape?136:244)*prefs.height()+8);body.getLayoutParams().height=height;
+        LinearLayout panel=new LinearLayout(context);panel.setOrientation(LinearLayout.VERTICAL);panel.setPadding(dp(10),dp(4),dp(10),dp(6));body.addView(panel,new FrameLayout.LayoutParams(-1,-1));
+        LinearLayout header=new LinearLayout(context);header.setGravity(Gravity.CENTER_VERTICAL);TextView heading=text(title,14,colors.text);header.addView(heading,new LinearLayout.LayoutParams(0,dp(30),1));Button back=button("返回键盘",()->action.accept("keyboard"));back.setTextSize(11);header.addView(back,new LinearLayout.LayoutParams(dp(78),dp(30)));panel.addView(header);
+        body.setAlpha(.85f);body.setTranslationY(dp(3));body.animate().alpha(1f).translationY(0).setDuration(110).start();return panel;
+    }
+    private TextView text(String value,int size,int color){TextView v=new TextView(context);v.setText(value);v.setTextSize(size);v.setTextColor(color);v.setGravity(Gravity.CENTER_VERTICAL);return v;}
+    private Button button(String title,Runnable click){
+        Button b=new Button(context);b.setText(title);b.setTextSize(13);b.setAllCaps(false);b.setTextColor(colors.text);b.setContentDescription(title);GradientDrawable background=new GradientDrawable();background.setColor(colors.key);background.setCornerRadius(dp(10));b.setBackground(background);b.setPadding(dp(5),0,dp(5),0);b.setOnClickListener(v->click.run());return b;
+    }
+    private void row(LinearLayout parent,String[] names,String[] commands){
+        LinearLayout row=new LinearLayout(context);for(int i=0;i<names.length;i++){String cmd=commands[i];Button b=button(names[i],()->action.accept(cmd));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,0,1);lp.height=-1;lp.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(b,lp);}parent.addView(row,new LinearLayout.LayoutParams(-1,0,1));
+    }
+    void more(){LinearLayout p=begin("more","更多");row(p,new String[]{"释义显示语言 · "+languageName(),"设置"},new String[]{"languages","settings"});row(p,new String[]{"键盘高度","键盘风格"},new String[]{"height","style"});row(p,new String[]{"打字震动 · "+(prefs.haptic()?"开":"关")},new String[]{"haptic"});}
+    String languageName(){String lang=prefs.glossLanguage();return lang.equals("ja")?"日语":lang.equals("fr")?"法语":"英语";}
+    void languages(String status){LinearLayout p=begin("languages","释义显示语言");row(p,new String[]{"英语","日语","法语"},new String[]{"language_en","language_ja","language_fr"});row(p,new String[]{prefs.translation()?"隐藏释义":"显示释义","下载离线翻译模型"},new String[]{"toggle_gloss","download_models"});modelStatus=text(status,11,colors.secondary);modelStatus.setPadding(dp(5),dp(4),0,0);p.addView(modelStatus,new LinearLayout.LayoutParams(-1,dp(48)));}
+    void modelStatus(String value){if(modelStatus!=null&&active.equals("languages"))modelStatus.setText(value);}
+    void height(){
+        LinearLayout p=begin("height","键盘高度");TextView value=text("左右滑动调节 · "+Math.round(prefs.height()*100)+"%",13,colors.secondary);p.addView(value,new LinearLayout.LayoutParams(-1,dp(48)));
+        SeekBar seek=new SeekBar(context);seek.setId(R.id.height_slider);seek.setContentDescription("键盘高度");seek.setMax(1000);seek.setProgress(Math.round((prefs.height()-.78f)/.46f*1000));p.addView(seek,new LinearLayout.LayoutParams(-1,dp(54)));
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar v){}public void onStopTrackingTouch(SeekBar v){action.accept("height_changed");}public void onProgressChanged(SeekBar v,int n,boolean user){if(!user)return;prefs.store.edit().putFloat("height",.78f+.46f*n/1000f).apply();value.setText("左右滑动调节 · "+Math.round(prefs.height()*100)+"%");boolean landscape=context.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;body.getLayoutParams().height=dp((landscape?136:244)*prefs.height()+8);body.requestLayout();}});
+        TextView note=text("紧凑 78%                                      宽松 124%",11,colors.secondary);p.addView(note,new LinearLayout.LayoutParams(-1,dp(32)));
+    }
+    void styles(){LinearLayout p=begin("style","键盘风格");row(p,new String[]{"柔和圆角","清简平面"},new String[]{"style_classic","style_flat"});p.addView(text("保持墨绿色，仅调整键帽与间距",12,colors.secondary),new LinearLayout.LayoutParams(-1,dp(38)));}
+    void modes(){LinearLayout p=begin("mode","键盘模式");row(p,new String[]{"中文 · 全键拼音","中文 · 九键拼音"},new String[]{"mode_full","mode_t9"});row(p,new String[]{"English"},new String[]{"mode_english"});}
+    void edit(boolean secure,boolean selecting){LinearLayout p=begin("edit","文本编辑");row(p,new String[]{"←","→","行首","行尾"},new String[]{"left","right","home","end"});row(p,new String[]{selecting?"结束选择":"选择","全选","复制","剪切"},new String[]{"select","select_all","copy","cut"});row(p,new String[]{"粘贴","剪贴板"},new String[]{"paste","clipboard"});if(secure){for(int i=2;i<((LinearLayout)p.getChildAt(2)).getChildCount();i++)((LinearLayout)p.getChildAt(2)).getChildAt(i).setEnabled(false);}}
+    void clipboard(List<String> entries,Consumer<String> paste,Consumer<String> remove){
+        LinearLayout p=begin("clipboard","剪贴板 · "+entries.size()+" / 100");Button clear=button("清空历史",()->action.accept("clear_clipboard"));p.addView(clear,new LinearLayout.LayoutParams(-1,dp(32)));
+        ScrollView scroll=new ScrollView(context);LinearLayout list=new LinearLayout(context);list.setOrientation(LinearLayout.VERTICAL);scroll.addView(list);p.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        if(entries.isEmpty())list.addView(text("复制或剪切后，最近内容会保存在这里。\n内容仅在本机保存，长按条目可删除。",12,colors.secondary));
+        for(String entry:entries){String label=entry.length()>100?entry.substring(0,100)+"…":entry;Button b=button(label,()->paste.accept(entry));b.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);b.setMaxLines(2);b.setPadding(dp(12),0,dp(12),0);b.setOnLongClickListener(v->{remove.accept(entry);return true;});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,dp(48));lp.topMargin=dp(4);list.addView(b,lp);}
+    }
+    void emoji(){showEmoji("常用");}
+    private void showEmoji(String category){
+        LinearLayout p=begin("emoji","Emoji");LinearLayout tabs=new LinearLayout(context);for(String name:new String[]{"常用","表情","自然","生活"}){Button b=button(name,()->showEmoji(name));tabs.addView(b,new LinearLayout.LayoutParams(0,dp(30),1));}p.addView(tabs);
+        String source=category.equals("表情")?"😀 😃 😄 😁 😆 😅 😂 🤣 😊 😇 🙂 🙃 😉 😌 😍 🥰 😘 😋 😎 🤩 🥳 😏 😒 😞 😔 😢 😭 😤 😠 🤔 🫡 🤫 🤗 🥺 😴 🤤 😷 🤒 🤕 😵":category.equals("自然")?"🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🦋 🐝 🐢 🐬 🐳 🦄 🌸 🌷 🌹 🌻 🌿 🍀 🌱 🌳 🌲 ☀️ 🌤️ 🌧️ ⛈️ 🌈 ⭐ 🌙 🔥 💧 ❄️":category.equals("生活")?"🍎 🍊 🍋 🍌 🍉 🍇 🍓 🍒 🥑 🍔 🍕 🍜 🍚 🍣 🍰 ☕ 🍵 🥤 🚗 🚕 🚌 🚲 🚄 ✈️ 🚀 🏠 🏢 🎉 🎁 🎈 🎂 ⚽ 🏀 🎮 🎵 📚 💻 📱 💡 ⏰":"😊 😂 🥰 😍 😎 🤔 😭 🥳 👍 👎 👏 🙌 🤝 🙏 💪 👌 ✌️ 🤞 ❤️ 💚 💙 💛 💜 💖 💯 ✅ ❌ ⭐ 🔥 🎉 🌹 ☀️ ☕ 🍀 🫶 🤗 😅 😴 👀 💐";
+        ScrollView scroll=new ScrollView(context);LinearLayout grid=new LinearLayout(context);grid.setOrientation(LinearLayout.VERTICAL);scroll.addView(grid);p.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));String[] emojis=source.split(" ");
+        for(int i=0;i<emojis.length;i+=8){LinearLayout row=new LinearLayout(context);for(int j=i;j<Math.min(i+8,emojis.length);j++){String emoji=emojis[j];Button b=button(emoji,()->action.accept("emoji_"+emoji));b.setTextSize(23);row.addView(b,new LinearLayout.LayoutParams(0,dp(43),1));}grid.addView(row);}
+    }
+    void detail(String source,String subtitle){
+        LinearLayout p=begin("detail","释义与整句翻译");ScrollView scroll=new ScrollView(context);LinearLayout reading=new LinearLayout(context);reading.setOrientation(LinearLayout.VERTICAL);reading.setPadding(dp(8),dp(8),dp(8),dp(8));
+        detailSource=text(source,15,colors.text);detailSource.setTextIsSelectable(true);reading.addView(detailSource,new LinearLayout.LayoutParams(-1,-2));
+        detailBadge=new ImageView(context);detailBadge.setId(R.id.translation_attribution);detailBadge.setContentDescription("powered by Google Translate");detailBadge.setScaleType(ImageView.ScaleType.FIT_CENTER);detailBadge.setImageResource(prefs.dark(context)?R.drawable.google_translate_badge_dark:R.drawable.google_translate_badge);detailBadge.setVisibility(View.INVISIBLE);LinearLayout.LayoutParams badgeLayout=new LinearLayout.LayoutParams(dp(176),dp(16));badgeLayout.topMargin=dp(8);badgeLayout.bottomMargin=dp(8);reading.addView(detailBadge,badgeLayout);
+        detailText=text(subtitle,15,colors.text);detailText.setId(R.id.translation_detail);detailText.setTextIsSelectable(true);reading.addView(detailText,new LinearLayout.LayoutParams(-1,-2));scroll.addView(reading);p.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout row=new LinearLayout(context);detailCommit=button("输入译文",()->action.accept("commit_translation"));detailCommit.setId(R.id.translation_commit);detailCommit.setEnabled(false);row.addView(detailCommit,new LinearLayout.LayoutParams(0,dp(36),1));Button copy=button("复制译文",()->{if(!detailTranslation.isEmpty())action.accept("copy_translation");});row.addView(copy,new LinearLayout.LayoutParams(0,dp(36),1));p.addView(row);
+    }
+    void detailResult(String source,String translation,String note){
+        if(android.os.Looper.myLooper()!=android.os.Looper.getMainLooper()){body.post(()->detailResult(source,translation,note));return;}
+        if(!active.equals("detail"))return;detailTranslation=translation;detailSource.setText(source);detailText.setText(translation.isEmpty()?note:translation+"\n\n"+note);
+        boolean google=!translation.isEmpty()&&note!=null&&note.startsWith("Google Translate");detailBadge.setImageResource(prefs.dark(context)?R.drawable.google_translate_badge_dark:R.drawable.google_translate_badge);detailBadge.setVisibility(google?View.VISIBLE:View.INVISIBLE);
+        detailCommit.setText(google?"Translate with Google":"输入译文");detailCommit.setContentDescription(google?"Translate with Google，输入译文":"输入译文");detailCommit.setEnabled(!translation.isEmpty());
+    }
+    private static final class NavIcon extends Drawable {
+        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);private final int kind,size;
+        NavIcon(int kind,int color,int size){this.kind=kind;this.size=size;paint.setColor(color);paint.setStrokeWidth(1.65f);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStyle(Paint.Style.STROKE);}
+        @Override public void draw(Canvas canvas){canvas.save();canvas.translate(getBounds().left,getBounds().top);canvas.scale(getBounds().width()/24f,getBounds().height()/24f);
+            if(kind==0){paint.setStyle(Paint.Style.FILL);for(int y=6;y<=18;y+=6)for(int x=6;x<=18;x+=6)canvas.drawCircle(x,y,1.35f,paint);paint.setStyle(Paint.Style.STROKE);}
+            if(kind==1){canvas.drawLine(7,4,17,4,paint);canvas.drawLine(7,20,17,20,paint);canvas.drawLine(12,4,12,20,paint);canvas.drawLine(4,9,4,15,paint);canvas.drawLine(20,9,20,15,paint);}
+            if(kind==2){canvas.drawCircle(12,12,9,paint);paint.setStyle(Paint.Style.FILL);canvas.drawCircle(9,9,1,paint);canvas.drawCircle(15,9,1,paint);paint.setStyle(Paint.Style.STROKE);canvas.drawArc(7,9,17,17,25,130,false,paint);}
+            if(kind==3){canvas.drawRoundRect(2,5,22,19,3,3,paint);for(int y=9;y<=12;y+=3)for(int x=6;x<=18;x+=4)canvas.drawPoint(x,y,paint);canvas.drawLine(7,16,17,16,paint);}
+            if(kind==4){canvas.drawLine(5,9,12,16,paint);canvas.drawLine(12,16,19,9,paint);}
+            canvas.restore();}
+        @Override public void setAlpha(int alpha){paint.setAlpha(alpha);}@Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}@Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}@Override public int getIntrinsicWidth(){return size;}@Override public int getIntrinsicHeight(){return size;}
+    }
+}

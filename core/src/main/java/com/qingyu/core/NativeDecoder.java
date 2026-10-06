@@ -17,4 +17,5 @@ final class NativeDecoder {
     static native int[] syllableStarts();
     static native void flush();
     static native void setLearningEnabled(boolean enabled);
+    static native String[] predict(String context);
 }

@@ -16,3 +16,13 @@ own header; some older web pages still describe earlier 3.0 snapshots.
 
 Glosses describe dictionary senses, not contextual sentence translations.
 Missing words deliberately have no annotation.
+
+Version 0.2 also ships `translation/zh-en-details.db` under CC BY-SA 4.0.
+It retains complete original English senses and pronunciations, indexed by
+simplified headword, merging duplicate senses and alternate pronunciations.
+`tools/build_dictionary_details.py` reproduces it; `details-manifest.json`
+records its source and hash. Detailed senses are displayed for reading and
+are never committed as a translated candidate.
+
+`translation/phrase-gloss.tsv` is separately authored Qingyu data. Its
+Japanese and French phrases are not derived from CC-CEDICT.

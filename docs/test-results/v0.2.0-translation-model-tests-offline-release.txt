@@ -1,0 +1,33 @@
+UTC: 2026-10-06T00:58:40.9161655Z
+Version: 0.2.0
+Variant: Release
+Runner: TranslationModelInstrumentation
+Serial: emulator-5554
+APK SHA256: 29B11C99EF6E31A45E2CDFBE650D58161C8060DE0D26E66C89188C0E0A919801
+Network disabled before runner:
+wifi_on=0 mobile_data=0
+Wi-Fi is disabled
+mWifiInfo SSID: <unknown ssid>, BSSID: <none>, MAC: 02:15:b2:00:00:00, IP: null, Security type: -1, Supplicant state: DISCONNECTED, Wi-Fi standard: legacy, RSSI: -127, Link speed: -1Mbps, Tx Link speed: -1Mbps, Max Supported Tx Link speed: -1Mbps, Rx Link speed: -1Mbps, Max Supported Rx Link speed: -1Mbps, Frequency: -1MHz, Net ID: -1, Metered hint: false, score: 0, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 0, Trusted: false, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none><none>MLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+Active default network: none
+
+MODEL en DOWNLOADING
+MODEL en READY
+MODEL ja DOWNLOADING
+MODEL ja READY
+MODEL fr DOWNLOADING
+MODEL fr READY
+PASS model ABI/page-size guard
+MODEL en READY
+TRANSLATED en I would like to drink coffee with my friends this afternoon. | Google Translate · 端侧翻译
+MODEL ja READY
+TRANSLATED ja 今日の友達とコーヒーを飲みたいのですが。 | Google Translate · 端侧翻译
+MODEL fr READY
+TRANSLATED fr J'aimerais boire du café avec mes amis cet après-midi. | Google Translate · 端侧翻译
+TRANSLATED en-zh 绿色键盘每天都会打字舒适。
+ALL_MODEL_CHECKS_PASS
+
+
+Network after runner:
+Active default network: none
+wifi_on=0
+mobile_data=0

@@ -1,5 +1,5 @@
 PASS full-pinyin dictionary and selection
 PASS partial selection, backspace and candidate zero
 PASS field-level learning privacy
-PASS 1000 rapid type/delete cycles; 6285 key searches; total 792.01 ms; p50 0.029 ms; p95 0.219 ms; max 4.218 ms
+PASS 1000 rapid type/delete cycles; 6285 key searches; total 990.86 ms; p50 0.030 ms; p95 0.251 ms; max 1.949 ms
 ALL_ENGINE_CHECKS_PASS

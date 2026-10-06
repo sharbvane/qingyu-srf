@@ -1,0 +1,12 @@
+<resources>
+    <item name="toolbar_more" type="id" />
+    <item name="toolbar_edit" type="id" />
+    <item name="toolbar_emoji" type="id" />
+    <item name="toolbar_mode" type="id" />
+    <item name="toolbar_hide" type="id" />
+    <item name="panel_host" type="id" />
+    <item name="height_slider" type="id" />
+    <item name="translation_detail" type="id" />
+    <item name="translation_commit" type="id" />
+    <item name="translation_attribution" type="id" />
+</resources>

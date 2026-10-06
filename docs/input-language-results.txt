@@ -1,0 +1,3 @@
+ALL_ENGLISH_ENGINE_CHECKS_PASS: 121167 words, 1000 completion/correction/prediction calls 1125.65 ms
+Nine-key sentence first=开发项目 pinyin=kai'fa'xiang'mu digits=12
+ALL_INPUT_DICTIONARY_CHECKS_PASS: actual Android SQLite, 200 nine-key calls 97.45 ms

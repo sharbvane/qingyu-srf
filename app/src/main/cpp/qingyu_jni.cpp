@@ -26,6 +26,44 @@ private:
 };
 }
 
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_qingyu_core_NativeDecoder_predict(JNIEnv* env, jclass, jstring context) {
+    jclass stringClass = env->FindClass("java/lang/String");
+    if (!stringClass) return nullptr;
+    auto empty = [&]() { return env->NewObjectArray(0, stringClass, nullptr); };
+    if (!context) return empty();
+    jsize length = env->GetStringLength(context);
+    if (length <= 0) return empty();
+    // Upstream im_get_predicts computes fixed_ptr but passes his_buf. Pass a
+    // bounded, nul-terminated BMP Chinese suffix to avoid that upstream bug.
+    jchar history[kMaxPredictSize + 1] = {};
+    jsize take = length < static_cast<jsize>(kMaxPredictSize) ? length : static_cast<jsize>(kMaxPredictSize);
+    env->GetStringRegion(context, length - take, take, history);
+    if (env->ExceptionCheck()) return nullptr;
+    jsize start = take;
+    while (start > 0 && history[start - 1] >= 0x3400 && history[start - 1] <= 0x9fff) --start;
+    if (start == take) return empty();
+    jsize size = take - start;
+    for (jsize i = 0; i < size; ++i) history[i] = history[start + i];
+    history[size] = 0;
+    char16 (*predictions)[kMaxPredictSize + 1] = nullptr;
+    size_t count = im_get_predicts(reinterpret_cast<const char16*>(history), predictions);
+    if (!predictions || count == 0) return empty();
+    if (count > 64) count = 64;
+    jobjectArray result = env->NewObjectArray(static_cast<jsize>(count), stringClass, nullptr);
+    if (!result) return nullptr;
+    for (size_t i = 0; i < count; ++i) {
+        jsize actual = 0;
+        while (actual < static_cast<jsize>(kMaxPredictSize) && predictions[i][actual] != 0) ++actual;
+        jstring word = env->NewString(reinterpret_cast<const jchar*>(predictions[i]), actual);
+        if (!word) return nullptr;
+        env->SetObjectArrayElement(result, static_cast<jsize>(i), word);
+        env->DeleteLocalRef(word);
+        if (env->ExceptionCheck()) return nullptr;
+    }
+    return result;
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_com_qingyu_core_NativeDecoder_open(JNIEnv* env, jclass, jstring system, jstring user) {
     UtfChars dict(env, system), personal(env, user);

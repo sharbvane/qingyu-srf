@@ -27,6 +27,19 @@ public final class EngineAdapterSmoke {
         check(engine.select(id(state, "开发")).committedText.equals("开发"), "Chinese selection commits only Chinese");
         System.out.println("PASS Java/JNI candidate and commit contract");
 
+        check(!engine.predict("中国").isEmpty(), "Chinese context predicts a continuation");
+        String[] contexts={"中国","我","今天","开发","你好","人民","abc中国","😀中国","中国😀","abc","",null};
+        for(int i=0;i<100;i++) {
+            List<String> predictions=engine.predict(contexts[i%contexts.length]);
+            check(predictions.size()<=64,"bounded native prediction result");
+            for(String prediction:predictions) check(prediction.length()<=7,"bounded native prediction string");
+        }
+        state=engine.search("kaifa");
+        check(engine.predict("中国").isEmpty(),"prediction cannot run during active composition");
+        check(engine.search("kaifa")==state,"prediction leaves active composition unchanged");
+        engine.reset();
+        System.out.println("PASS 100 Chinese prediction contexts, mixed/emoji tails and active-composition isolation");
+
         state = engine.search("zhongguorenmin");
         state = engine.select(id(state, "中国"));
         check(state.composing.equals("中国renmin"), "partial selection composing");
@@ -72,6 +85,48 @@ public final class EngineAdapterSmoke {
         while (state.committedText.isEmpty() && !state.candidates.isEmpty() && rounds++ < 20) state = engine.select(0);
         check(state.committedText.length() == 64, "maximum-length composition commits every syllable");
         System.out.println("PASS bounded 64-character composition");
+
+        engine.reset();
+        String sentenceInput="zhongguorenminnihaonihaonihaonihao";
+        state=engine.search(sentenceInput);
+        state=engine.select(id(state,"中国"));
+        EngineSnapshot beforePreview=state;
+        String fullPreview=engine.previewCandidate(state.candidates.get(0).id);
+        check(fullPreview.startsWith("中国人民") && fullPreview.length()==12,"full preview includes selected prefix and native nine-syllable tail");
+        check(engine.search(sentenceInput)==beforePreview,"preview restores the exact immutable snapshot");
+        state=engine.select(beforePreview.candidates.get(0).id);
+        while(state.committedText.isEmpty()&&!state.candidates.isEmpty()) state=engine.select(state.candidates.get(0).id);
+        check(state.committedText.equals(fullPreview),"original candidate ids remain valid after preview");
+
+        engine.reset();state=engine.search(sentenceInput);state=engine.select(0);
+        check(!state.rawPinyin.isEmpty() && state.composing.length()>state.rawPinyin.length(),"preview fixture has a completed native segment");
+        beforePreview=state;fullPreview=engine.previewCandidate(0);
+        check(fullPreview.length()==12,"preview retains completed segment prefix");
+        check(engine.search(beforePreview.rawPinyin)==beforePreview,"segmented preview restores the exact snapshot");
+        state=engine.select(0);
+        while(state.committedText.isEmpty()&&!state.candidates.isEmpty()) state=engine.select(0);
+        check(state.committedText.equals(fullPreview),"completed segments survive preview and final selection");
+
+        engine.reset();state=engine.search("nihaovvv");beforePreview=state;
+        check(engine.previewCandidate(0).equals("你好vvv"),"preview preserves unresolved letters");
+        check(engine.search("nihaovvv")==beforePreview,"invalid tail preview restores the exact snapshot");
+
+        List<String> baselineUndo=new ArrayList<>();
+        for(int pass=0;pass<2;pass++) {
+            engine.reset();state=engine.search("zhongguorenmin");state=engine.select(id(state,"中"));state=engine.select(id(state,"国"));
+            if(pass==1) check(engine.previewCandidate(0).equals("中国人民"),"separate chosen words resolve as a sentence");
+            for(int step=0;step<7;step++) {
+                state=engine.backspace();
+                if(pass==0) baselineUndo.add(state.composing);else check(state.composing.equals(baselineUndo.get(step)),"preview preserves selection-group backspace behavior");
+            }
+        }
+        engine.reset();engine.setLearningEnabled(true);state=engine.search("zhongguorenmin");state=engine.select(id(state,"中国"));
+        engine.flush();byte[] learningBefore=java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(args[1]));
+        beforePreview=state;check(engine.previewCandidate(0).equals("中国人民"),"learning-enabled preview");
+        engine.flush();check(java.util.Arrays.equals(learningBefore,java.nio.file.Files.readAllBytes(java.nio.file.Paths.get(args[1]))),"preview never mutates learned dictionary");
+        check(engine.search("zhongguorenmin")==beforePreview,"learning-enabled preview keeps candidate state");
+        engine.setLearningEnabled(false);engine.reset();
+        System.out.println("PASS non-destructive complete candidate preview: nine-syllable tail, chosen prefix, completed segments, invalid letters, candidate ids, grouped undo and no learning");
 
         String[] stressWords = {"nihao", "kaifa", "xiangmu", "sheji", "zhongwen", "shurufa", "zaijian"};
         List<Long> timings = new ArrayList<>();

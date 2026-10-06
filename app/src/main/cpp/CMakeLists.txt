@@ -13,7 +13,9 @@ target_compile_options(qingyu_pinyin PRIVATE -O2 -fvisibility=hidden)
 if(ANDROID)
     target_link_libraries(qingyu_pinyin PRIVATE log)
     # Android 15+ supports devices using 16 KiB pages.
-    target_link_options(qingyu_pinyin PRIVATE "-Wl,-z,max-page-size=16384")
+    target_link_options(qingyu_pinyin PRIVATE
+        "-Wl,-z,max-page-size=16384"
+        "-Wl,-z,common-page-size=16384")
 else()
     find_package(JNI REQUIRED)
     target_include_directories(qingyu_pinyin PRIVATE ${JNI_INCLUDE_DIRS})

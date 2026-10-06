@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <instrumentation android:name="com.qingyu.ime.ImeSmokeInstrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu baseline IME checks" />
+    <instrumentation android:name="com.qingyu.ime.ImeV2Instrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu v0.2 interaction checks" />
+    <instrumentation android:name="com.qingyu.ime.TranslationModelInstrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu on-device translation checks" />
+</manifest>

@@ -21,27 +21,30 @@
 
 | Light theme | Dark theme |
 | --- | --- |
-| ![Qingyu light keyboard with kaifa candidates and English glosses](docs/images/keyboard-light.png) | ![Qingyu dark keyboard with sheji candidates and English glosses](docs/images/keyboard-dark.png) |
+| ![Qingyu light keyboard with kaifa candidates and English glosses](docs/images/keyboard-v0.2.0-light.png) | ![Qingyu dark keyboard with sheji candidates and English glosses](docs/images/keyboard-v0.2.0-dark.png) |
 
 Captured from a running Android 15 emulator.
 
 ## Features
 
-- **Full pinyin:** AOSP PinyinIME native decoder, sentence and segment candidates, candidate paging and expansion.
-- **Quiet English glosses:** A bundled CC-CEDICT dictionary annotates candidates asynchronously. Candidate taps commit Chinese only; annotations can be turned off.
+- **Full pinyin and nine-key:** AOSP native full-pinyin decoder plus a local nine-key reading index with frequency ranking, sentence and segment candidates.
+- **English candidates:** Over 121,000 word forms, completions, explicit spelling suggestions and contextual next-word prediction, with Chinese glosses.
+- **Quiet language learning:** English, Japanese or French Chinese-candidate glosses. Tap enters the original word, hold opens details, swipe up enters its translation.
+- **Phrases and sentences:** Local phrases first; downloaded on-device models translate other sentences asynchronously. Failure preserves normal input.
+- **Icon navigation:** More, text editing, Emoji, keyboard modes and hide. Selection, select all, copy, cut, paste and 100 recent clipboard items.
 - **Everyday typing:** Chinese punctuation, English, numbers and mixed input; repeat backspace, long-press numbers, spacebar cursor gestures and candidate browsing.
-- **Simple keyboard:** Light and dark themes, keyboard height, haptic feedback and key preview settings.
-- **Offline by design:** No network permission or cloud translation. Input and optional user frequency data stay on device. Password fields use direct input and disable candidates and learning.
+- **Simple keyboard:** Sage light and dark themes, continuous 78%–124% height, two styles, haptics and previews.
+- **Local input:** Input and learned frequencies stay on device. Password fields disable candidates, glosses, learning and clipboard history; sensitive system clips are excluded.
 
-Missing dictionary entries stay blank. Glosses are common dictionary senses, not contextual translations. The bundled AOSP lexicon is old, so newer words and complex sentence ranking need improvement.
+Missing glosses stay blank when no model is ready. Dictionary senses and model translations can be inaccurate. The older AOSP lexicon, nine-key ambiguities and modern English prediction still need real-device feedback.
 
 ## Install and try it
 
-1. Download `Qingyu-0.1.0.apk` from [GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases/latest). Android 8.0 or newer is required.
+1. Install the local `releases/Qingyu-0.2.0.apk`. Android 8.0 or newer is required. Published historical versions are available from [GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases).
 2. Install and open Qingyu. Use **Enable Qingyu Input Method**, then **Switch to Qingyu**. Android requires these system settings steps.
 3. In any text field, type `kaifa`, `xiangmu` or `sheji`. Tap a Chinese candidate to enter Chinese only.
 
-Version **v0.1.0** passed 17 automated system-input checks on an Android 15 / x86_64 emulator. This release uses a development signing key for community testing; a dedicated release key will be established before a production-stable release.
+Version **v0.2.0** uses the same testing signature as the preceding release. See the [current validation record](docs/validation-v0.2.0.md). Long-term physical-device use remains unverified.
 
 ## Android support
 
@@ -64,7 +67,11 @@ See the [upstream and architecture research](docs/research.md).
 
 ## Offline and privacy
 
-Qingyu requests no network permission and uses no ads, analytics, cloud translation or telemetry. Pinyin and candidates are processed on device. Optional user frequency data is stored locally. Password input is excluded from Chinese candidates, glosses and learning.
+Input, candidates, translation inference and clipboard processing run on device. No remote text translation endpoint is called. Broader sentence translation requires a user-initiated Wi-Fi model download under More → annotation language. Typing never initiates a download.
+
+The app has network permission. Google ML Kit can contact Google for models, configuration, compatibility and diagnostics, sending device/installation identifiers, language configuration, input/output size and performance metadata; it does not send input or output text. See [SDK provenance and privacy](third_party/mlkit/SOURCE.md). Clipboard history can be cleared or disabled and is not uploaded. No advertising is integrated.
+
+On ARM64 devices using 16 KiB memory pages, model translation is currently disabled because of the official SDK binary's RELRO alignment. Normal input, local dictionary definitions and original three-language phrases remain available; settings show the limitation.
 
 ## Build from source
 
@@ -75,7 +82,7 @@ pwsh -File scripts/setup-toolchain.ps1
 pwsh -File scripts/build.ps1 -Variant Release -Test
 ```
 
-Build output goes to `releases/`. Local tools and signing files are excluded by `.gitignore`. See the [validation log](docs/validation.md) for test scope and results.
+Build output goes to `releases/`. Local tools and signing files are excluded by `.gitignore`. See the [validation log](docs/validation-v0.2.0.md) for test scope and results.
 
 ## Roadmap
 
@@ -85,7 +92,9 @@ Build output goes to `releases/`. Local tools and signing files are excluded by 
 - [ ] Evaluate a more modern Simplified Chinese lexicon and ranking with clear source licenses
 - [ ] Review gloss quality and expand local dictionary coverage
 - [ ] Design a separate iOS Keyboard Extension
-- [ ] Evaluate Japanese, Korean and Spanish translation providers
+- [x] English, Japanese and French annotations and on-device sentence translation
+- [x] English candidates, nine-key, text editing and next-word prediction
+- [ ] Evaluate Korean and Spanish translation providers
 
 ## Contributing
 

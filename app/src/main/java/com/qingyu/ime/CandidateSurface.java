@@ -6,10 +6,16 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.TextPaint;
 import android.text.TextUtils;
+import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -19,205 +25,241 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-/** Width depends only on Chinese. Gloss arrival repaints; it never changes geometry. */
+/** Candidate geometry depends on the word, never on a delayed annotation. */
 final class CandidateSurface extends View {
-    interface Listener { void choose(int index); void expand(); void settings(); void toggleTranslation(); void punctuation(String text); }
+    interface Listener {
+        void choose(int index); void detail(int index); void translate(int index); void expand();
+        void settings(); void toggleTranslation(); void punctuation(String text);
+        default void visibleWordsChanged(){}
+    }
+    private static final int EXPAND=3, GOOGLE_ATTRIBUTION=4, CANDIDATE=100, PREVIOUS_PAGE=1000, NEXT_PAGE=1001;
+    private static final int ACTION_TRANSLATE=0x02000001;
     private final Listener listener;
     private final ImePreferences prefs;
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final TextPaint textPaint=new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final RectF rect=new RectF();
+    private final Handler timer=new Handler(Looper.getMainLooper());
     private final float density;
     private Palette colors;
+    private boolean dark;
+    private boolean googleTranslation;
+    private Drawable googleBadge;
     private List<String> words=Collections.emptyList();
     private Map<String,String> glosses=Collections.emptyMap();
     private final List<Float> offsets=new ArrayList<>();
-    private String composing="", status="";
-    private boolean translations=true, expanded=false;
-    private float scroll, downX, startScroll, totalWidth;
-    private boolean swiped;
-    private int page;
+    private String composing="";
+    private boolean translations=true, expanded=false, interactiveComposition=true;
+    private float scroll, downX, downY, startScroll, totalWidth;
+    private boolean swiped, swipeTranslation, longFired, moved;
+    private int page, pressed=NO_ID;
     private long generation, touchGeneration;
-    private static final int TRANSLATION=1, SETTINGS=2, EXPAND=3, STATUS=4, PUNCTUATION=10, CANDIDATE=100, PREVIOUS_PAGE=1000, NEXT_PAGE=1001;
-    private static final String[] PUNCTUATION_WORDS={"，","。","？","！","、","："};
     private final AccessibilityManager accessibility;
     private final AccessibilityNodeProvider nodeProvider=new CandidateNodeProvider();
     private int accessibilityFocus=NO_ID, hoveredNode=NO_ID;
+    private final Runnable longPress=new Runnable(){
+        @Override public void run(){
+            if(pressed<CANDIDATE||pressed>=CANDIDATE+words.size()||touchGeneration!=generation||moved)return;
+            longFired=true;feedback();int index=pressed-CANDIDATE;
+            sendVirtualEvent(pressed,AccessibilityEvent.TYPE_VIEW_LONG_CLICKED,virtualName(pressed));
+            listener.detail(index);invalidate();
+        }
+    };
     CandidateSurface(Context c,ImePreferences prefs,Listener listener) {
         super(c);this.prefs=prefs;this.listener=listener;density=c.getResources().getDisplayMetrics().density;
         accessibility=(AccessibilityManager)c.getSystemService(Context.ACCESSIBILITY_SERVICE);
-        colors=new Palette(prefs.dark(c));setFocusable(false);setContentDescription("中文候选词，上方为英文释义，左右滑动浏览");
+        dark=prefs.dark(c);colors=new Palette(dark);googleBadge=c.getDrawable(dark?R.drawable.google_translate_badge_dark:R.drawable.google_translate_badge);setFocusable(false);
+        setContentDescription("候选词，上方为释义；左右滑动浏览，长按查看详情，上滑输入翻译");
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
     }
     private float dp(float n){return n*density;}
     private boolean landscape(){return getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE;}
     void update(String composing,List<String> words,boolean translate,String status) {
-        boolean changed=!this.words.equals(words);
-        if(changed)clearVirtualFocus();
-        this.composing=composing;this.words=new ArrayList<>(words);this.translations=translate;this.status=status;
-        this.glosses=Collections.emptyMap(); colors=new Palette(prefs.dark(getContext()));
-        if(changed){generation++;scroll=0;page=0;calculate();} invalidate();accessibilityChanged();
+        boolean wordsChanged=!this.words.equals(words);
+        boolean changed=wordsChanged||!this.composing.equals(composing);
+        boolean resized=this.composing.isEmpty()!=composing.isEmpty();
+        if(changed){cancelTouch();clearVirtualFocus();generation++;scroll=0;page=0;}
+        this.composing=composing;if(wordsChanged)this.words=new ArrayList<>(words);translations=translate;
+        if(words.isEmpty()&&expanded){expanded=false;resized=true;}
+        // Retain matching annotations while the next asynchronous batch is loading.
+        boolean nextDark=prefs.dark(getContext());if(nextDark!=dark){dark=nextDark;colors=new Palette(dark);googleBadge=getContext().getDrawable(dark?R.drawable.google_translate_badge_dark:R.drawable.google_translate_badge);}
+        if(wordsChanged)calculate();if(resized)requestLayout();invalidate();accessibilityChanged();
     }
     void glosses(Map<String,String> glosses){this.glosses=glosses;invalidate();accessibilityChanged();}
-    void expanded(boolean value){if(expanded==value)return;clearVirtualFocus();generation++;expanded=value;page=0;scroll=0;requestLayout();invalidate();accessibilityChanged();}
+    /** Describes the current gloss batch's source; toggling attribution never changes candidate geometry. */
+    void setGoogleTranslation(boolean value){
+        if(Looper.myLooper()!=Looper.getMainLooper()){post(()->setGoogleTranslation(value));return;}
+        if(googleTranslation==value)return;googleTranslation=value;invalidate();accessibilityChanged();
+    }
+    void setInteractiveComposition(boolean value){
+        if(interactiveComposition==value)return;
+        cancelTouch();clearVirtualFocus();generation++;interactiveComposition=value;
+        if(!value&&expanded){expanded=false;page=0;scroll=0;requestLayout();}
+        invalidate();accessibilityChanged();
+    }
+    void expanded(boolean value){
+        value=value&&interactiveComposition&&!words.isEmpty();if(expanded==value)return;
+        cancelTouch();clearVirtualFocus();generation++;expanded=value;page=0;scroll=0;requestLayout();invalidate();accessibilityChanged();
+        listener.visibleWordsChanged();
+    }
     boolean expanded(){return expanded;}
     List<String> words(){return Collections.unmodifiableList(words);}
-    private void calculate(){offsets.clear();totalWidth=0;paint.setTextSize(dp(19));for(String word:words){offsets.add(totalWidth);totalWidth+=Math.min(dp(166),Math.max(dp(76),paint.measureText(word)+dp(30)));}}
-    @Override protected void onMeasure(int w,int h){setMeasuredDimension(MeasureSpec.getSize(w),(int)dp(expanded?(landscape()?184:330):(landscape()?64:86)));}
-    private float compositionHeight(){return dp(landscape()?21:26);}
-    private float controlWidth(){return dp(42);}
-    private void text(Canvas c,String value,float x,float y,float size,int color,Paint.Align align){paint.setTextSize(dp(size));paint.setColor(color);paint.setTextAlign(align);paint.setTypeface(android.graphics.Typeface.DEFAULT);c.drawText(value,x,y,paint);}
-    @Override protected void onDraw(Canvas c) {
-        c.drawColor(colors.background);float compH=compositionHeight();
-        paint.setTextSize(dp(12));String composition=TextUtils.ellipsize(composing.isEmpty()?"轻语  /  中英随行":composing,new android.text.TextPaint(paint),Math.max(0,getWidth()-dp(132)),TextUtils.TruncateAt.END).toString();
-        text(c,composition,dp(12),compH-dp(7),12,colors.secondary,Paint.Align.LEFT);
-        text(c,translations?"EN":"—",getWidth()-dp(92),compH-dp(7),11,colors.secondary,Paint.Align.CENTER);
-        text(c,"⚙",getWidth()-dp(52),compH-dp(7),17,colors.secondary,Paint.Align.CENTER);
-        text(c,expanded?"⌄":"⌃",getWidth()-dp(18),compH-dp(7),20,colors.text,Paint.Align.CENTER);
-        if(words.isEmpty()) {
-            if(!status.isEmpty())text(c,status,dp(12),compH+dp(30),13,colors.secondary,Paint.Align.LEFT);
-            else {
-                String[] punct={"，","。","？","！","、","："};float width=getWidth()/6f;
-                for(int i=0;i<punct.length;i++)text(c,punct[i],width*(i+0.5f),compH+dp(35),22,colors.text,Paint.Align.CENTER);
-            }
-            return;
+    List<String> visibleWords(){
+        List<String> result=new ArrayList<>(12);if(getVisibility()!=VISIBLE||getWidth()<=0)return result;
+        if(expanded){for(int i=page*12;i<Math.min(words.size(),page*12+12);i++)result.add(words.get(i));}
+        else for(int i=0;i<words.size();i++){
+            float left=offsets.get(i)-scroll,right=(i+1<offsets.size()?offsets.get(i+1):totalWidth)-scroll;
+            if(right>0&&left<listWidth())result.add(words.get(i));
         }
+        return result;
+    }
+    private void calculate(){
+        offsets.clear();totalWidth=0;textPaint.setTextSize(dp(19));
+        for(String word:words){offsets.add(totalWidth);totalWidth+=Math.min(dp(166),Math.max(dp(76),textPaint.measureText(word)+dp(30)));}
+    }
+    @Override protected void onMeasure(int w,int h){
+        setMeasuredDimension(MeasureSpec.getSize(w),(int)(compositionHeight()+dp(expanded?(landscape()?160:300):(landscape()?44:58))+dp(16)));
+    }
+    @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){cancelTouch();clearVirtualFocus();generation++;scroll=Math.min(scroll,maxScroll());listener.visibleWordsChanged();}
+    private float compositionHeight(){return dp(landscape()?18:22);}
+    // Fixed slot: an asynchronous model result must not move the word row or keyboard.
+    private float candidateBottom(){return getHeight()-dp(16);}
+    private boolean hasGoogleAttribution(){return googleTranslation&&translations&&!words.isEmpty();}
+    private boolean hasExpand(){return interactiveComposition&&!words.isEmpty();}
+    private float listWidth(){return getWidth()-(hasExpand()&&!expanded?dp(42):0);}
+    private float expandLeft(){return Math.min(Math.max(0,totalWidth-scroll),getWidth()-dp(42));}
+    private float maxScroll(){return Math.max(0,totalWidth-listWidth());}
+    private void text(Canvas c,String value,float x,float y,float size,int color,Paint.Align align){
+        paint.setTextSize(dp(size));paint.setColor(color);paint.setTextAlign(align);c.drawText(value,x,y,paint);
+    }
+    private String ellipsize(String value,float size,float width){
+        textPaint.setTextSize(dp(size));return TextUtils.ellipsize(value,textPaint,Math.max(0,width),TextUtils.TruncateAt.END).toString();
+    }
+    @Override protected void onDraw(Canvas c) {
+        c.drawColor(colors.background);float compH=compositionHeight(),bottom=candidateBottom();
+        if(compH>0)text(c,ellipsize(composing,12,getWidth()-dp(24)),dp(12),compH-dp(5),12,colors.secondary,Paint.Align.LEFT);
+        if(words.isEmpty())return;
         if(expanded) {
-            float footer=dp(35), height=(getHeight()-compH-footer)/4;
-            float width=getWidth()/3f;
+            float footer=dp(36),height=(bottom-compH-footer)/4,width=getWidth()/3f;
             for(int slot=0;slot<12;slot++){
                 int index=page*12+slot;if(index>=words.size())break;
                 rect.set((slot%3)*width+dp(4),compH+(slot/3)*height,(slot%3+1)*width-dp(4),compH+(slot/3+1)*height);
-                drawWord(c,index,rect,true);
+                drawWord(c,index,rect);
             }
-            int count=(words.size()+11)/12;
-            text(c,"‹",getWidth()*0.2f,getHeight()-dp(10),24,colors.text,Paint.Align.CENTER);
-            text(c,(page+1)+" / "+count,getWidth()*0.5f,getHeight()-dp(13),12,colors.secondary,Paint.Align.CENTER);
-            text(c,"›",getWidth()*0.8f,getHeight()-dp(10),24,colors.text,Paint.Align.CENTER);
+            text(c,"‹",getWidth()*0.14f,bottom-dp(10),24,page>0?colors.text:colors.secondary,Paint.Align.CENTER);
+            text(c,(page+1)+" / "+((words.size()+11)/12),getWidth()*0.38f,bottom-dp(13),12,colors.secondary,Paint.Align.CENTER);
+            text(c,"›",getWidth()*0.62f,bottom-dp(10),24,page<(words.size()-1)/12?colors.text:colors.secondary,Paint.Align.CENTER);
+            text(c,"⌄",getWidth()*0.88f,bottom-dp(11),24,colors.text,Paint.Align.CENTER);
         } else {
-            c.save();c.clipRect(0,compH,getWidth(),getHeight());
+            c.save();c.clipRect(0,compH,listWidth(),bottom);
             for(int i=0;i<words.size();i++) {
-                float left=offsets.get(i)-scroll;
-                float right=(i+1<offsets.size()?offsets.get(i+1):totalWidth)-scroll;
-                if(right<0 || left>getWidth())continue;
-                rect.set(left+dp(2),compH,right-dp(2),getHeight()-dp(3));drawWord(c,i,rect,false);
+                float left=offsets.get(i)-scroll,right=(i+1<offsets.size()?offsets.get(i+1):totalWidth)-scroll;
+                if(right<=0||left>=listWidth())continue;
+                rect.set(left+dp(2),compH,right-dp(2),bottom-dp(3));drawWord(c,i,rect);
             }c.restore();
+            if(hasExpand()) {
+                float expandX=expandLeft();
+                if(pressed==EXPAND){paint.setColor(colors.pressed);c.drawRoundRect(expandX+dp(2),compH+dp(3),expandX+dp(39),bottom-dp(4),dp(9),dp(9),paint);}
+                text(c,"⌃",expandX+dp(21),compH+(bottom-compH)/2+dp(6),24,colors.text,Paint.Align.CENTER);
+            }
         }
+        if(accessibilityFocus!=NO_ID){
+            RectF bounds=virtualBounds(accessibilityFocus);
+            if(bounds!=null){paint.setColor(colors.accent);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(2));c.drawRoundRect(bounds,dp(9),dp(9),paint);paint.setStyle(Paint.Style.FILL);}
+        }
+        if(hasGoogleAttribution()&&googleBadge!=null){RectF badge=virtualBounds(GOOGLE_ATTRIBUTION);googleBadge.setBounds(Math.round(badge.left),Math.round(badge.top),Math.round(badge.right),Math.round(badge.bottom));googleBadge.draw(c);}
     }
-    private void drawWord(Canvas c,int index,RectF bounds,boolean grid) {
-        String word=words.get(index);float center=bounds.centerX();
-        if(index==0){paint.setColor(colors.function);c.drawRoundRect(bounds,dp(9),dp(9),paint);}
-        float width=bounds.width()-dp(12);String gloss=translations?glosses.get(word):null;
-        // Both lines keep their baseline even with translation disabled, absent, or delayed.
-        float mid=bounds.centerY();
-        if(gloss!=null){paint.setTextSize(dp(11));String label=TextUtils.ellipsize(gloss, new android.text.TextPaint(paint),width,TextUtils.TruncateAt.END).toString();text(c,label,center,mid-dp(6),11,colors.secondary,Paint.Align.CENTER);}
-        paint.setTextSize(dp(19));String label=TextUtils.ellipsize(word,new android.text.TextPaint(paint),width,TextUtils.TruncateAt.END).toString();
-        text(c,label,center,mid+dp(18),19,colors.text,Paint.Align.CENTER);
+    private void drawWord(Canvas c,int index,RectF bounds) {
+        String word=words.get(index);float center=bounds.centerX(),mid=bounds.centerY();
+        if(pressed==CANDIDATE+index||index==0){paint.setColor(pressed==CANDIDATE+index?colors.pressed:colors.function);c.drawRoundRect(bounds,dp(9),dp(9),paint);}
+        String gloss=translations?glosses.get(word):null;float width=bounds.width()-dp(12);
+        if(gloss!=null&&!gloss.isEmpty())text(c,ellipsize(gloss,11,width),center,mid-dp(6),11,colors.secondary,Paint.Align.CENTER);
+        text(c,ellipsize(word,19,width),center,mid+dp(18),19,colors.text,Paint.Align.CENTER);
+        if(pressed==CANDIDATE+index&&swipeTranslation)text(c,"↑",bounds.right-dp(10),bounds.top+dp(12),12,colors.accent,Paint.Align.RIGHT);
+    }
+    private int hitNode(float x,float y) {
+        if(x<0||x>=getWidth()||y<compositionHeight()||y>=candidateBottom())return NO_ID;
+        if(expanded) {
+            if(y>=candidateBottom()-dp(36))return x<getWidth()*0.26f?PREVIOUS_PAGE:x>getWidth()*0.75f?EXPAND:x>getWidth()*0.5f?NEXT_PAGE:NO_ID;
+            float h=(candidateBottom()-compositionHeight()-dp(36))/4;
+            int index=page*12+(int)((y-compositionHeight())/h)*3+Math.min(2,(int)(x/(getWidth()/3f)));
+            return index<words.size()?CANDIDATE+index:NO_ID;
+        }
+        if(hasExpand()&&x>=expandLeft()&&x<expandLeft()+dp(42))return EXPAND;
+        float target=x+scroll;
+        for(int i=words.size()-1;i>=0;i--)if(target>=offsets.get(i)&&target<totalWidth)return CANDIDATE+i;
+        return NO_ID;
     }
     @Override public boolean onTouchEvent(MotionEvent e) {
         float x=e.getX(),y=e.getY();
         switch(e.getActionMasked()){
-            case MotionEvent.ACTION_DOWN:downX=x;startScroll=scroll;swiped=false;touchGeneration=generation;return true;
+            case MotionEvent.ACTION_DOWN:
+                cancelTouch();pressed=hitNode(x,y);if(pressed==NO_ID)return false;
+                downX=x;downY=y;startScroll=scroll;touchGeneration=generation;
+                if(pressed>=CANDIDATE&&pressed<CANDIDATE+words.size())timer.postDelayed(longPress,ViewConfiguration.getLongPressTimeout());
+                invalidate();return true;
             case MotionEvent.ACTION_MOVE:
-                if(!expanded && y>compositionHeight() && Math.abs(x-downX)>dp(6)){swiped=true;scroll=Math.max(0,Math.min(Math.max(0,totalWidth-getWidth()),startScroll+downX-x));invalidate();}return true;
+                if(pressed==NO_ID||longFired||touchGeneration!=generation)return true;
+                float dx=x-downX,dy=y-downY;
+                if(Math.max(Math.abs(dx),Math.abs(dy))>dp(8)){moved=true;timer.removeCallbacks(longPress);}
+                if(!swiped&&dy<-dp(24)&&Math.abs(dy)>Math.abs(dx)*1.3f&&pressed>=CANDIDATE&&pressed<CANDIDATE+words.size())swipeTranslation=true;
+                if(!swipeTranslation&&!expanded&&Math.abs(dx)>dp(8)&&Math.abs(dx)>Math.abs(dy)){swiped=true;scroll=Math.max(0,Math.min(maxScroll(),startScroll-dx));}
+                invalidate();return true;
             case MotionEvent.ACTION_UP:
-                if(swiped){clearVirtualFocus();accessibilityChanged();return true;}
-                if(x<0||x>=getWidth()||y<0||y>=getHeight()||touchGeneration!=generation)return true;
-                if(y<compositionHeight()){
-                    if(x>getWidth()-dp(34))listener.expand();
-                    else if(x>getWidth()-dp(72))listener.settings();
-                    else if(x>getWidth()-dp(114))listener.toggleTranslation();
-                }else if(words.isEmpty()){
-                    if(status.isEmpty()){String[] punct={"，","。","？","！","、","："};listener.punctuation(punct[Math.min(5,(int)(x/(getWidth()/6f)))]);}
-                }else if(expanded){
-                    if(y>getHeight()-dp(35)){changePage(x<getWidth()/2f?-1:1);}
-                    else{float h=(getHeight()-compositionHeight()-dp(35))/4;int index=page*12+(int)((y-compositionHeight())/h)*3+Math.min(2,(int)(x/(getWidth()/3f)));if(index<words.size())listener.choose(index);}
-                }else{
-                    float target=x+scroll;for(int i=words.size()-1;i>=0;i--){if(target>=offsets.get(i)){listener.choose(i);break;}}
-                }performClick();return true;
-            case MotionEvent.ACTION_CANCEL:return true;
+                int selected=pressed;boolean valid=selected!=NO_ID&&touchGeneration==generation&&!longFired;
+                if(valid&&swipeTranslation){feedback();listener.translate(selected-CANDIDATE);}
+                else if(valid&&!moved&&hitNode(x,y)==selected){feedback();activateNode(selected);performClick();}
+                if(swiped){clearVirtualFocus();accessibilityChanged();listener.visibleWordsChanged();}cancelTouch();return true;
+            case MotionEvent.ACTION_CANCEL:case MotionEvent.ACTION_POINTER_DOWN:cancelTouch();return true;
             default:return true;
         }
     }
-    private boolean secure(){return status.equals("安全输入");}
+    private void feedback(){if(prefs.haptic())performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);}
+    void cancelTouch(){timer.removeCallbacks(longPress);pressed=NO_ID;swiped=false;swipeTranslation=false;longFired=false;moved=false;invalidate();}
     private RectF virtualBounds(int id) {
-        float width=getWidth(),height=getHeight(),top=compositionHeight();
-        if(width<=0||height<=0)return null;
-        if(id==TRANSLATION)return new RectF(Math.max(0,width-dp(114)),0,width-dp(72),top);
-        if(id==SETTINGS)return new RectF(Math.max(0,width-dp(72)),0,width-dp(34),top);
-        if(id==EXPAND)return new RectF(Math.max(0,width-dp(34)),0,width,top);
-        if(id==STATUS&&!status.isEmpty())return new RectF(0,top,width,height);
-        if(words.isEmpty()) {
-            int slot=id-PUNCTUATION;
-            if(status.isEmpty()&&slot>=0&&slot<PUNCTUATION_WORDS.length)return new RectF(slot*width/6,top,(slot+1)*width/6,height);
-            return null;
-        }
-        if(expanded&&(id==PREVIOUS_PAGE||id==NEXT_PAGE))return new RectF(id==PREVIOUS_PAGE?0:width/2,height-dp(35),id==PREVIOUS_PAGE?width/2:width,height);
+        float width=getWidth(),height=candidateBottom(),top=compositionHeight();if(width<=0||height<=0)return null;
+        if(id==GOOGLE_ATTRIBUTION&&hasGoogleAttribution()){float badgeWidth=Math.min(dp(176),width),badgeHeight=badgeWidth/11f;return new RectF((width-badgeWidth)/2,height,(width+badgeWidth)/2,height+badgeHeight);}
+        if(id==EXPAND&&hasExpand())return expanded?new RectF(width*0.75f,height-dp(36),width,height):new RectF(expandLeft(),top,expandLeft()+dp(42),height);
+        if(expanded&&(id==PREVIOUS_PAGE||id==NEXT_PAGE))return new RectF(id==PREVIOUS_PAGE?0:width*0.5f,height-dp(36),id==PREVIOUS_PAGE?width*0.26f:width*0.75f,height);
         int index=id-CANDIDATE;if(index<0||index>=words.size())return null;
         if(expanded) {
-            int slot=index-page*12;if(slot<0||slot>=12)return null;
-            float rowHeight=(height-top-dp(35))/4;
+            int slot=index-page*12;if(slot<0||slot>=12)return null;float rowHeight=(height-top-dp(36))/4;
             return new RectF((slot%3)*width/3,top+(slot/3)*rowHeight,(slot%3+1)*width/3,top+(slot/3+1)*rowHeight);
         }
         if(index>=offsets.size())return null;
         float left=offsets.get(index)-scroll,right=(index+1<offsets.size()?offsets.get(index+1):totalWidth)-scroll;
-        if(right<=0||left>=width)return null;
-        return new RectF(Math.max(0,left),top,Math.min(width,right),height);
+        if(right<=0||left>=listWidth())return null;
+        return new RectF(Math.max(0,left),top,Math.min(listWidth(),right),height);
     }
     private List<Integer> visibleNodes() {
-        List<Integer> ids=new ArrayList<>();ids.add(TRANSLATION);ids.add(SETTINGS);ids.add(EXPAND);
-        if(!status.isEmpty()&&words.isEmpty())ids.add(STATUS);
-        if(words.isEmpty()&&status.isEmpty())for(int i=0;i<PUNCTUATION_WORDS.length;i++)ids.add(PUNCTUATION+i);
-        else for(int i=0;i<words.size();i++)if(virtualBounds(CANDIDATE+i)!=null)ids.add(CANDIDATE+i);
-        if(expanded&&!words.isEmpty()){ids.add(PREVIOUS_PAGE);ids.add(NEXT_PAGE);}
-        return ids;
+        List<Integer> ids=new ArrayList<>();
+        for(int i=0;i<words.size();i++)if(virtualBounds(CANDIDATE+i)!=null)ids.add(CANDIDATE+i);
+        if(hasExpand())ids.add(EXPAND);if(expanded&&!words.isEmpty()){ids.add(PREVIOUS_PAGE);ids.add(NEXT_PAGE);}if(hasGoogleAttribution())ids.add(GOOGLE_ATTRIBUTION);return ids;
     }
     private String virtualName(int id) {
-        if(id==TRANSLATION)return translations?"关闭英文释义":"显示英文释义";
-        if(id==SETTINGS)return "输入法设置";
+        if(id==GOOGLE_ATTRIBUTION)return "powered by Google Translate";
         if(id==EXPAND)return expanded?"收起候选":"展开候选";
-        if(id==STATUS)return status;
-        if(id==PREVIOUS_PAGE)return "上一页候选";
-        if(id==NEXT_PAGE)return "下一页候选";
-        if(id>=PUNCTUATION&&id<PUNCTUATION+6)return PUNCTUATION_WORDS[id-PUNCTUATION];
+        if(id==PREVIOUS_PAGE)return "上一页候选";if(id==NEXT_PAGE)return "下一页候选";
         int index=id-CANDIDATE;
-        if(index>=0&&index<words.size()) {
-            String word=words.get(index),gloss=translations?glosses.get(word):null;
-            return gloss==null||gloss.isEmpty()?word:word+"，英文释义 "+gloss;
-        }
-        return "";
+        if(index>=0&&index<words.size()){String word=words.get(index),gloss=translations?glosses.get(word):null;return gloss==null||gloss.isEmpty()?word:word+"，释义 "+gloss;}return "";
     }
     private boolean virtualEnabled(int id) {
-        if(id==STATUS)return false;
-        if(id==TRANSLATION)return !secure();
-        if(id==EXPAND)return !words.isEmpty();
-        if(id==PREVIOUS_PAGE)return page>0;
-        if(id==NEXT_PAGE)return page<(words.size()-1)/12;
-        return isEnabled();
+        if(id==PREVIOUS_PAGE)return page>0;if(id==NEXT_PAGE)return page<(words.size()-1)/12;return isEnabled();
     }
     private boolean activateNode(int id) {
         if(virtualBounds(id)==null||!virtualEnabled(id))return false;
-        String name=virtualName(id);sendVirtualEvent(id,AccessibilityEvent.TYPE_VIEW_CLICKED,name);
-        if(id==TRANSLATION)listener.toggleTranslation();
-        else if(id==SETTINGS)listener.settings();
-        else if(id==EXPAND)listener.expand();
-        else if(id==PREVIOUS_PAGE)return changePage(-1);
-        else if(id==NEXT_PAGE)return changePage(1);
-        else if(id>=PUNCTUATION&&id<PUNCTUATION+6)listener.punctuation(PUNCTUATION_WORDS[id-PUNCTUATION]);
-        else if(id>=CANDIDATE&&id<CANDIDATE+words.size())listener.choose(id-CANDIDATE);
-        else return false;
-        return true;
+        sendVirtualEvent(id,AccessibilityEvent.TYPE_VIEW_CLICKED,virtualName(id));
+        if(id==EXPAND)listener.expand();else if(id==PREVIOUS_PAGE)return changePage(-1);else if(id==NEXT_PAGE)return changePage(1);
+        else if(id>=CANDIDATE&&id<CANDIDATE+words.size())listener.choose(id-CANDIDATE);else return false;return true;
     }
     private boolean changePage(int direction) {
         int next=Math.max(0,Math.min((words.size()-1)/12,page+direction));if(next==page)return false;
-        clearVirtualFocus();page=next;generation++;invalidate();accessibilityChanged();
-        sendVirtualEvent(NO_ID,AccessibilityEvent.TYPE_VIEW_SCROLLED,null);return true;
+        cancelTouch();clearVirtualFocus();page=next;generation++;invalidate();accessibilityChanged();sendVirtualEvent(NO_ID,AccessibilityEvent.TYPE_VIEW_SCROLLED,null);listener.visibleWordsChanged();return true;
     }
     private boolean scrollCandidates(int direction) {
-        if(words.isEmpty())return false;
-        if(expanded)return changePage(direction);
-        float next=Math.max(0,Math.min(Math.max(0,totalWidth-getWidth()),scroll+direction*getWidth()*0.8f));
-        if(next==scroll)return false;
-        clearVirtualFocus();scroll=next;generation++;invalidate();accessibilityChanged();sendVirtualEvent(NO_ID,AccessibilityEvent.TYPE_VIEW_SCROLLED,null);return true;
+        if(words.isEmpty())return false;if(expanded)return changePage(direction);
+        float next=Math.max(0,Math.min(maxScroll(),scroll+direction*listWidth()*0.8f));if(next==scroll)return false;
+        cancelTouch();clearVirtualFocus();scroll=next;generation++;invalidate();accessibilityChanged();sendVirtualEvent(NO_ID,AccessibilityEvent.TYPE_VIEW_SCROLLED,null);listener.visibleWordsChanged();return true;
     }
     private void sendVirtualEvent(int id,int type,String name) {
         if(!accessibility.isEnabled()||getParent()==null)return;
@@ -234,38 +276,34 @@ final class CandidateSurface extends View {
     }
     private void clearVirtualFocus() {
         if(accessibilityFocus!=NO_ID)sendVirtualEvent(accessibilityFocus,AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED,null);
-        if(hoveredNode!=NO_ID)sendVirtualEvent(hoveredNode,AccessibilityEvent.TYPE_VIEW_HOVER_EXIT,null);
-        accessibilityFocus=NO_ID;hoveredNode=NO_ID;
+        if(hoveredNode!=NO_ID)sendVirtualEvent(hoveredNode,AccessibilityEvent.TYPE_VIEW_HOVER_EXIT,null);accessibilityFocus=NO_ID;hoveredNode=NO_ID;
     }
     @Override public AccessibilityNodeProvider getAccessibilityNodeProvider(){return nodeProvider;}
     @Override public boolean dispatchHoverEvent(MotionEvent event) {
         if(accessibility.isEnabled()&&accessibility.isTouchExplorationEnabled()) {
-            int next=NO_ID;
-            if(event.getActionMasked()!=MotionEvent.ACTION_HOVER_EXIT)for(int id:visibleNodes()){RectF bounds=virtualBounds(id);if(bounds!=null&&bounds.contains(event.getX(),event.getY())){next=id;break;}}
-            int previous=hoveredNode;
-            if(next!=previous){hoveredNode=next;if(next!=NO_ID)sendVirtualEvent(next,AccessibilityEvent.TYPE_VIEW_HOVER_ENTER,virtualName(next));if(previous!=NO_ID)sendVirtualEvent(previous,AccessibilityEvent.TYPE_VIEW_HOVER_EXIT,null);}
+            int next=NO_ID;if(event.getActionMasked()!=MotionEvent.ACTION_HOVER_EXIT)for(int id:visibleNodes()){RectF bounds=virtualBounds(id);if(bounds!=null&&bounds.contains(event.getX(),event.getY())){next=id;break;}}
+            int previous=hoveredNode;if(next!=previous){hoveredNode=next;if(next!=NO_ID)sendVirtualEvent(next,AccessibilityEvent.TYPE_VIEW_HOVER_ENTER,virtualName(next));if(previous!=NO_ID)sendVirtualEvent(previous,AccessibilityEvent.TYPE_VIEW_HOVER_EXIT,null);}
             if(next!=NO_ID||previous!=NO_ID)return true;
-        }
-        return super.dispatchHoverEvent(event);
+        }return super.dispatchHoverEvent(event);
     }
     private final class CandidateNodeProvider extends AccessibilityNodeProvider {
         @Override public AccessibilityNodeInfo createAccessibilityNodeInfo(int id) {
             if(id==HOST_VIEW_ID) {
                 AccessibilityNodeInfo node=AccessibilityNodeInfo.obtain(CandidateSurface.this);onInitializeAccessibilityNodeInfo(node);
-                for(int child:visibleNodes())if(virtualBounds(child)!=null)node.addChild(CandidateSurface.this,child);
-                node.setScrollable(!words.isEmpty());
+                for(int child:visibleNodes())if(virtualBounds(child)!=null)node.addChild(CandidateSurface.this,child);node.setScrollable(!words.isEmpty());
                 if(!words.isEmpty()){node.addAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);node.addAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);}return node;
             }
             RectF box=virtualBounds(id);if(box==null)return null;
             AccessibilityNodeInfo node=AccessibilityNodeInfo.obtain();node.setSource(CandidateSurface.this,id);node.setParent(CandidateSurface.this);
-            node.setPackageName(getContext().getPackageName());node.setClassName(id==STATUS?"android.widget.TextView":"android.widget.Button");
-            String resourceId=id==TRANSLATION?"annotation_toggle":id==SETTINGS?"ime_settings":id==EXPAND?"candidate_expand":id==STATUS?"input_status":id==PREVIOUS_PAGE?"candidate_previous_page":id==NEXT_PAGE?"candidate_next_page":id>=PUNCTUATION&&id<PUNCTUATION+6?"punctuation_"+(id-PUNCTUATION):"candidate_"+(id-CANDIDATE);
-            node.setViewIdResourceName(getContext().getPackageName()+":id/"+resourceId);
-            node.setContentDescription(virtualName(id));node.setText(id>=CANDIDATE&&id<CANDIDATE+words.size()?words.get(id-CANDIDATE):virtualName(id));
-            node.setEnabled(virtualEnabled(id));node.setFocusable(true);node.setClickable(id!=STATUS&&virtualEnabled(id));node.setVisibleToUser(isShown());
+            boolean attribution=id==GOOGLE_ATTRIBUTION;node.setPackageName(getContext().getPackageName());node.setClassName(attribution?"android.widget.TextView":"android.widget.Button");
+            String resourceId=attribution?"candidate_attribution":id==EXPAND?"candidate_expand":id==PREVIOUS_PAGE?"candidate_previous_page":id==NEXT_PAGE?"candidate_next_page":"candidate_"+(id-CANDIDATE);
+            node.setViewIdResourceName(getContext().getPackageName()+":id/"+resourceId);node.setContentDescription(virtualName(id));
+            boolean candidate=id>=CANDIDATE&&id<CANDIDATE+words.size();node.setText(candidate?words.get(id-CANDIDATE):virtualName(id));
+            node.setEnabled(virtualEnabled(id));node.setFocusable(true);node.setClickable(!attribution&&virtualEnabled(id));node.setVisibleToUser(isShown());
             Rect bounds=new Rect();box.roundOut(bounds);node.setBoundsInParent(bounds);int[] screen=new int[2];getLocationOnScreen(screen);bounds.offset(screen[0],screen[1]);node.setBoundsInScreen(bounds);
             node.setAccessibilityFocused(accessibilityFocus==id);node.addAction(accessibilityFocus==id?AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS:AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS);
-            if(node.isClickable())node.addAction(AccessibilityNodeInfo.ACTION_CLICK);return node;
+            if(node.isClickable())node.addAction(AccessibilityNodeInfo.ACTION_CLICK);
+            if(candidate){node.setLongClickable(true);node.setHintText(hasGoogleAttribution()?"长按查看完整释义，上滑输入翻译；机器译文 Translate with Google":"长按查看完整释义，上滑输入翻译");node.addAction(AccessibilityNodeInfo.ACTION_LONG_CLICK);node.addAction(new AccessibilityNodeInfo.AccessibilityAction(ACTION_TRANSLATE,hasGoogleAttribution()?"Translate with Google，输入此候选的翻译":"输入此候选的翻译"));}return node;
         }
         @Override public AccessibilityNodeInfo findFocus(int focus){return focus==AccessibilityNodeInfo.FOCUS_ACCESSIBILITY&&accessibilityFocus!=NO_ID?createAccessibilityNodeInfo(accessibilityFocus):null;}
         @Override public boolean performAction(int id,int action,Bundle arguments) {
@@ -274,13 +312,16 @@ final class CandidateSurface extends View {
             if(virtualBounds(id)==null)return false;
             if(action==AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS){if(accessibilityFocus==id)return false;if(accessibilityFocus!=NO_ID)sendVirtualEvent(accessibilityFocus,AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED,null);accessibilityFocus=id;invalidate();sendVirtualEvent(id,AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED,virtualName(id));return true;}
             if(action==AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS){if(accessibilityFocus!=id)return false;accessibilityFocus=NO_ID;invalidate();sendVirtualEvent(id,AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED,null);return true;}
-            return action==AccessibilityNodeInfo.ACTION_CLICK&&activateNode(id);
+            if(id>=CANDIDATE&&id<CANDIDATE+words.size()){
+                if(action==AccessibilityNodeInfo.ACTION_LONG_CLICK){cancelTouch();listener.detail(id-CANDIDATE);return true;}
+                if(action==ACTION_TRANSLATE){cancelTouch();listener.translate(id-CANDIDATE);return true;}
+            }return action==AccessibilityNodeInfo.ACTION_CLICK&&activateNode(id);
         }
         @Override public List<AccessibilityNodeInfo> findAccessibilityNodeInfosByText(String query,int id) {
             List<AccessibilityNodeInfo> result=new ArrayList<>();if(query==null)return result;String needle=query.toLowerCase(java.util.Locale.ROOT);
             for(int child:visibleNodes())if((id==HOST_VIEW_ID||id==child)&&virtualName(child).toLowerCase(java.util.Locale.ROOT).contains(needle))result.add(createAccessibilityNodeInfo(child));return result;
         }
     }
-    @Override protected void onDetachedFromWindow(){clearVirtualFocus();super.onDetachedFromWindow();}
+    @Override protected void onDetachedFromWindow(){cancelTouch();clearVirtualFocus();super.onDetachedFromWindow();}
     @Override public boolean performClick(){super.performClick();return true;}
 }

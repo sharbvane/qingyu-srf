@@ -13,13 +13,19 @@ import java.io.FileOutputStream;
 final class LocalEnglishProvider implements TranslationProvider {
     private final Context context;
     private SQLiteDatabase database;
+    private SQLiteDatabase details;
     private final LruCache<String, String> cache = new LruCache<>(1024);
     LocalEnglishProvider(Context context) { this.context = context.getApplicationContext(); }
     void open() throws Exception {
-        File file = new File(context.getFilesDir(), "gloss-en-v1.db");
+        database = openAsset("translation/zh-en.db", "gloss-en-v1.db");
+        try { details = openAsset("translation/zh-en-details.db", "gloss-en-details-v1.db"); }
+        catch (Exception ignored) { /* Detailed senses never block the compact candidate glosses. */ }
+    }
+    private SQLiteDatabase openAsset(String asset, String name) throws Exception {
+        File file = new File(context.getFilesDir(), name);
         if (!file.exists()) {
-            File temp = new File(context.getFilesDir(), "gloss-en-v1.tmp");
-            try (InputStream in = context.getAssets().open("translation/zh-en.db");
+            File temp = new File(context.getFilesDir(), name+".tmp");
+            try (InputStream in = context.getAssets().open(asset);
                  FileOutputStream out = new FileOutputStream(temp)) {
                 byte[] bytes = new byte[32768];
                 int n;
@@ -28,7 +34,7 @@ final class LocalEnglishProvider implements TranslationProvider {
             }
             if (!temp.renameTo(file)) throw new java.io.IOException("Dictionary install failed");
         }
-        database = SQLiteDatabase.openDatabase(file.getPath(), null, SQLiteDatabase.OPEN_READONLY);
+        return SQLiteDatabase.openDatabase(file.getPath(), null, SQLiteDatabase.OPEN_READONLY);
     }
     @Override public String targetLanguage() { return "en"; }
     @Override public String lookup(String chinese) {
@@ -42,9 +48,16 @@ final class LocalEnglishProvider implements TranslationProvider {
         cache.put(chinese, result);
         return result;
     }
+    String lookupDetails(String chinese) {
+        if (details == null) return "";
+        try (Cursor c = details.rawQuery("SELECT pinyin,meanings FROM details WHERE zh=?", new String[]{chinese})) {
+            return c.moveToFirst() ? c.getString(0) + "\n\n" + c.getString(1) : "";
+        }
+    }
     @Override public void close() {
         cache.evictAll();
         if (database != null) { database.close(); database = null; }
+        if (details != null) { details.close(); details = null; }
     }
 }
 

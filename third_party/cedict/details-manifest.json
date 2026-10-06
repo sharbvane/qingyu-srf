@@ -1,0 +1,8 @@
+{
+  "source": "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz",
+  "source_sha256": "fd16b26f991724564037d7eb19105397c5f1b17938ebda95bbbe67d642cf5fda",
+  "license": "CC-BY-SA-4.0",
+  "entry_count": 121423,
+  "database_sha256": "b8018ec67372cd8c39bb27fecf21761b4c14f5e405af7130ad35353aba736529",
+  "modifications": "Simplified headword index; merged alternate pronunciations and full, deduplicated original senses. Display only; never committed as translation."
+}

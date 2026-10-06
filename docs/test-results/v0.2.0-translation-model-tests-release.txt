@@ -1,0 +1,23 @@
+UTC: 2026-10-06T00:54:33.0913285Z
+Version: 0.2.0
+Variant: Release
+Runner: TranslationModelInstrumentation
+Models available branch: False
+Serial: emulator-5554
+APK SHA256: 29B11C99EF6E31A45E2CDFBE650D58161C8060DE0D26E66C89188C0E0A919801
+
+MODEL en DOWNLOADING
+MODEL en READY
+MODEL ja DOWNLOADING
+MODEL ja READY
+MODEL fr DOWNLOADING
+MODEL fr READY
+PASS model ABI/page-size guard
+MODEL en READY
+TRANSLATED en I would like to drink coffee with my friends this afternoon. | Google Translate · 端侧翻译
+MODEL ja READY
+TRANSLATED ja 今日の友達とコーヒーを飲みたいのですが。 | Google Translate · 端侧翻译
+MODEL fr READY
+TRANSLATED fr J'aimerais boire du café avec mes amis cet après-midi. | Google Translate · 端侧翻译
+TRANSLATED en-zh 绿色键盘每天都会打字舒适。
+ALL_MODEL_CHECKS_PASS
