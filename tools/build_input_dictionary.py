@@ -1,8 +1,8 @@
-"""Generate v2 input data from saved upstream snapshots; Python stdlib only.
+"""Generate v3 input data from saved upstream snapshots; Python stdlib only.
 
 SCOWL supplies spelling and inflected forms. Public-domain nineteenth-century
 books supply frequency/bigrams; small original modern phrases improve chat.
-CC-CEDICT supplies real pinyin coverage and reverse glosses; jieba ranks Chinese.
+CC-CEDICT supplies real pinyin coverage/reverse glosses; jieba ranks and tags Chinese.
 No network or corpus parsing occurs while typing.
 """
 from collections import Counter, defaultdict
@@ -42,7 +42,7 @@ def fetch(name, url):
 
 dictionary = fetch('en_US.dic', 'https://raw.githubusercontent.com/LibreOffice/dictionaries/master/en/en_US.dic')
 affix = fetch('en_US.aff', 'https://raw.githubusercontent.com/LibreOffice/dictionaries/master/en/en_US.aff')
-scowl_notice = fetch('SCOWL-README.txt', 'https://raw.githubusercontent.com/LibreOffice/dictionaries/master/en/README_en_US.txt')
+scowl_notice = '\n'.join(line.rstrip() for line in fetch('SCOWL-README.txt', 'https://raw.githubusercontent.com/LibreOffice/dictionaries/master/en/README_en_US.txt').splitlines())+'\n'
 jieba = fetch('jieba-dict.txt', 'https://raw.githubusercontent.com/fxsjy/jieba/master/jieba/dict.txt')
 jieba_notice = fetch('jieba-LICENSE.txt', 'https://raw.githubusercontent.com/fxsjy/jieba/master/LICENSE')
 (NOTICE / 'SCOWL-README.txt').write_text(scowl_notice, encoding='utf-8')
@@ -150,10 +150,13 @@ for (previous, word), count in pairs.items():
     for word, count in sorted(grouped[previous], key=lambda item: (-item[1], item[0]))[:24]), encoding='utf-8')
 
 zh_frequency = {}
+zh_pos = {}
 for line in jieba.splitlines():
     fields = line.split()
     if len(fields) >= 2:
         zh_frequency[fields[0]] = int(fields[1])
+        if len(fields) >= 3 and re.fullmatch('[a-z]+', fields[2]):
+            zh_pos[fields[0]] = fields[2]
 cedict = gzip.open(ROOT / '.cache/cedict.gz', 'rt', encoding='utf-8').read()
 pattern = re.compile(r'^(\S+) (\S+) \[(.*?)\] /(.+)/$')
 digits_map = str.maketrans({char: digit for digit, letters in zip('23456789', ['abc','def','ghi','jkl','mno','pqrs','tuv','wxyz']) for char in letters})
@@ -205,30 +208,45 @@ overrides = {'hello':'你好', 'world':'世界', 'i':'我', 'you':'你', 'we':'�
  'translation':'翻译', 'dictionary':'词典', 'local':'本地', 'copy':'复制', 'paste':'粘贴', 'text':'文字',
  'dark':'深色', 'light':'浅色/光', 'mode':'模式', 'change':'改变', 'open':'打开', 'source':'来源/源代码',
  'code':'代码', 'test':'测试', 'application':'应用', 'update':'更新', 'version':'版本', 'experience':'体验'}
-database = ASSETS / 'input-v2.db'
+database = ASSETS / 'input-v3.db'
 if database.exists():
     database.unlink()
 db = sqlite3.connect(database)
 db.execute('PRAGMA journal_mode=OFF')
+db.execute('PRAGMA user_version=3')
 db.execute('CREATE TABLE nine (digits TEXT, text TEXT, pinyin TEXT, weight INTEGER, PRIMARY KEY(digits,text,pinyin)) WITHOUT ROWID')
 db.executemany('INSERT INTO nine VALUES (?,?,?,?)', [(digits, text, pinyin, weight) for (digits,text,pinyin),weight in sorted(nine.items())])
 db.execute('CREATE INDEX nine_rank ON nine(digits, weight DESC)')
-db.execute('CREATE TABLE chinese (text TEXT PRIMARY KEY,weight INTEGER NOT NULL) WITHOUT ROWID')
-db.executemany('INSERT INTO chinese VALUES (?,?)', sorted({text:weight for (_,text,_),weight in nine.items()}.items()))
+db.execute("CREATE TABLE chinese (text TEXT PRIMARY KEY,weight INTEGER NOT NULL,pos TEXT NOT NULL DEFAULT '') WITHOUT ROWID")
+chinese = {text:weight for (_,text,_),weight in nine.items()}
+db.executemany('INSERT INTO chinese VALUES (?,?,?)', [(text,weight,zh_pos.get(text,'')) for text,weight in sorted(chinese.items())])
 db.execute('CREATE TABLE english_gloss (word TEXT PRIMARY KEY, zh TEXT NOT NULL) WITHOUT ROWID')
 glosses = {word:'；'.join(zh for zh,_ in sorted(values.items(), key=lambda item:(-item[1], len(item[0]), item[0]))[:2]) for word,values in reverse.items()}
 glosses.update(overrides)
 db.executemany('INSERT INTO english_gloss VALUES (?,?)', sorted(glosses.items()))
 db.commit()
 db.execute('VACUUM')
+# One runnable check follows the new schema path: lexical tags are copied
+# exactly, all requested families exist, and an unknown word has no fake tag.
+tagged = dict(db.execute("SELECT text,pos FROM chinese WHERE pos<>''"))
+assert tagged and all(zh_pos[word] == tag for word,tag in tagged.items())
+for word in ('项目', '开发', '美丽', '非常', '的'):
+    assert tagged.get(word) == zh_pos[word], (word, tagged.get(word), zh_pos[word])
+assert all(any(tag.startswith(family) for tag in tagged.values()) for family in 'nvadu')
+assert not db.execute('SELECT pos FROM chinese WHERE text=?', ('轻语未收录词性检查',)).fetchone()
+assert db.execute('PRAGMA user_version').fetchone()[0] == 3
 db.close()
+# Ship one schema snapshot. Previously installed private v2 databases and
+# learning files are untouched; runtime installs the separate v3 filename.
+(ASSETS / 'input-v2.db').unlink(missing_ok=True)
 manifest = {'sources':sources, 'english_words':len(words), 'english_bigrams':sum(min(24,len(v)) for v in grouped.values()),
- 'nine_key_readings':len(nine), 'english_chinese_glosses':len(glosses), 'editorial_modifications':
- 'Hunspell flag expansion; lowercase forms; taboo suggestion flags omitted; ASCII English filtering; prose-body unigram/bigram counts only; original everyday phrase/count weighting; jieba frequency join; tone-free CEDICT T9 digit index; single-word English CEDICT reverse senses plus explicit editorial overrides.',
+ 'nine_key_readings':len(nine), 'english_chinese_glosses':len(glosses), 'chinese_words':len(chinese), 'chinese_words_with_pos':len(tagged),
+ 'pos_tags':dict(sorted(Counter(tagged.values()).items())), 'editorial_modifications':
+ 'Hunspell flag expansion; lowercase forms; taboo suggestion flags omitted; ASCII English filtering; prose-body unigram/bigram counts only; original everyday phrase/count weighting; jieba frequency and exact lexical tag joins; tone-free CEDICT T9 digit index; single-word English CEDICT reverse senses plus explicit editorial overrides. Unknown Chinese words and English candidates have no invented part of speech; no contextual POS inference.',
  'english_gloss_overrides':overrides, 'modern_phrases':modern,
  'outputs':{file.name:{'bytes':file.stat().st_size,'sha256':hashlib.sha256(file.read_bytes()).hexdigest()} for file in ASSETS.iterdir()}}
 (NOTICE / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
-(NOTICE / 'README.md').write_text('''# Qingyu v2 offline input data
+(NOTICE / 'README.md').write_text('''# Qingyu v3 offline input data
 
 SCOWL English dictionary and affix expansion: upstream LibreOffice en_US,
 49,568 base entries. Upstream SCOWL permission notices are retained in
@@ -236,10 +254,13 @@ SCOWL-README.txt and embedded in the APK. The generated word list is modified.
 
 Chinese digit/readings and reverse English glosses: CC-CEDICT by MDBG and
 community contributors, CC BY-SA 4.0; see ../cedict. These portions of
-input-v2.db are modified CC-CEDICT derivatives and retain CC BY-SA 4.0.
+input-v3.db are modified CC-CEDICT derivatives and retain CC BY-SA 4.0.
 
-Chinese frequency ranking: jieba dict.txt, Copyright 2013 Sun Junyi,
-MIT; its complete permission notice is retained and embedded in the APK.
+Chinese frequency ranking and lexical part-of-speech tags: jieba dict.txt,
+Copyright 2013 Sun Junyi, MIT; its complete permission notice is retained
+and embedded in the APK. Tags are joined only for exact Chinese dictionary
+words. Unknown words and English words remain neutral; tags describe the
+dictionary reading, not contextual disambiguation.
 
 English frequency and bigram counts: original English public-domain works
 by Lewis Carroll (1865), Jane Austen (1813), Arthur Conan Doyle (1892),
@@ -253,5 +274,6 @@ Rebuild: python tools/build_input_dictionary.py. Saved snapshots in project
 .cache/input-v2 are reused. Output hashes, counts and all editorial changes
 are documented in manifest.json. Runtime requires no network.
 ''', encoding='utf-8')
-(licenses / 'input-v2-sources.txt').write_text((NOTICE/'README.md').read_text(encoding='utf-8'), encoding='utf-8')
-print(json.dumps({key:manifest[key] for key in ('english_words','english_bigrams','nine_key_readings','english_chinese_glosses','outputs')}, ensure_ascii=True))
+(licenses / 'input-v3-sources.txt').write_text((NOTICE/'README.md').read_text(encoding='utf-8'), encoding='utf-8')
+(licenses / 'input-v2-sources.txt').unlink(missing_ok=True)
+print(json.dumps({key:manifest[key] for key in ('english_words','english_bigrams','nine_key_readings','english_chinese_glosses','chinese_words','chinese_words_with_pos','outputs')}, ensure_ascii=True))

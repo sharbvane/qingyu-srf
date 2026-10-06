@@ -1,0 +1,85 @@
+UTC: 2026-10-06T03:36:02.4642976Z
+Version: 0.3.0
+Variant: Debug
+Runner: ImeV3Instrumentation
+Models available branch: True
+Models only branch: False
+Serial: emulator-5554
+APK SHA256: BF27BCC9B9903686D2BE4F703F97CCE617E67AAE98830F362C4ECC05B8266D2D
+
+PASS letter hold-slide, case, cancellation, cursor and repeat touch state check
+PASS fixed candidate/grid bounds, prediction X and readable POS colors
+PASS all panel owners, continuous height and constrained window geometry
+PASS candidate expansion fills fixed keyboard body, reserves app space and collapses safely
+PASS rapid expand/collapse and cleared composition never lose the keyboard
+PASS Chinese Shift once outputs one literal uppercase; double Shift locks; lowercase resumes pinyin
+PASS real letter hold-slide commits upper/lower/digit once and cancellation commits nothing
+PASS all navigation icons toggle their panels; height, clipboard and detail retain owner without return buttons
+PASS English predictions stop after 3 picks; X cancels pending predictions until manual input
+PASS English temporary uppercase and caps lock preserve candidate casing
+PASS upward translated prediction picks obey the same 3-round limit
+PASS Chinese prediction X clears immediately and manual pinyin reactivates candidates
+PASS model attribution reserves stable geometry and preserves local source
+PASS five icon navigation actions, no persistent punctuation or empty expand
+PASS expand only within an active candidate row
+PASS nine-key 52432 selects 开发, long press commits digit without pinyin
+PASS English completion and contextual next word both show Chinese gloss
+PASS English correction is explicit and never replaces typed spelling implicitly
+PASS unlisted English spelling survives a normal space commit
+PASS Chinese contextual prediction displays a gloss and continues 中国 to 中国人
+PASS candidate hold opens full definition, upward swipe inputs translated word
+PASS horizontal candidate browsing never selects a word
+PASS downloaded Japanese model definition shows attribution and upward gesture commits its translation
+PASS continuous 97.3 percent keyboard height persists and remains usable
+PASS both quiet keyboard styles switch without losing input
+PASS typing haptic preference toggles within More
+PASS Emoji panel inserts one Unicode emoji and backspace removes it
+PASS editor select all, copy, cut and paste use actual system InputConnection
+PASS selection mode extends with the cursor and copies only the selection
+PASS actual system clipboard retains the most recent 100 distinct copied texts
+PASS sensitive system clips and password-field clips are excluded from history
+PASS clipboard item pastes, clear survives reopening and IME service restart
+PASS hide and reopen retain a working IME
+PASS dark theme with new navigation and candidate learning gestures
+PASS model manager shows 3 languages and actual sizes; SDK deletion clears cached Japanese gloss without blocking Chinese
+PASS user-initiated model download restores Japanese candidate/detail translation after deletion
+PASS complete seven-syllable French model translation survives detail and upward sentence commit
+
+ALL_V3_IME_CHECKS_PASS
+PASS letter hold-slide, case, cancellation, cursor and repeat touch state check
+PASS fixed candidate/grid bounds, prediction X and readable POS colors
+PASS all panel owners, continuous height and constrained window geometry
+PASS candidate expansion fills fixed keyboard body, reserves app space and collapses safely
+PASS rapid expand/collapse and cleared composition never lose the keyboard
+PASS Chinese Shift once outputs one literal uppercase; double Shift locks; lowercase resumes pinyin
+PASS real letter hold-slide commits upper/lower/digit once and cancellation commits nothing
+PASS all navigation icons toggle their panels; height, clipboard and detail retain owner without return buttons
+PASS English predictions stop after 3 picks; X cancels pending predictions until manual input
+PASS English temporary uppercase and caps lock preserve candidate casing
+PASS upward translated prediction picks obey the same 3-round limit
+PASS Chinese prediction X clears immediately and manual pinyin reactivates candidates
+PASS model attribution reserves stable geometry and preserves local source
+PASS five icon navigation actions, no persistent punctuation or empty expand
+PASS expand only within an active candidate row
+PASS nine-key 52432 selects 开发, long press commits digit without pinyin
+PASS English completion and contextual next word both show Chinese gloss
+PASS English correction is explicit and never replaces typed spelling implicitly
+PASS unlisted English spelling survives a normal space commit
+PASS Chinese contextual prediction displays a gloss and continues 中国 to 中国人
+PASS candidate hold opens full definition, upward swipe inputs translated word
+PASS horizontal candidate browsing never selects a word
+PASS downloaded Japanese model definition shows attribution and upward gesture commits its translation
+PASS continuous 97.3 percent keyboard height persists and remains usable
+PASS both quiet keyboard styles switch without losing input
+PASS typing haptic preference toggles within More
+PASS Emoji panel inserts one Unicode emoji and backspace removes it
+PASS editor select all, copy, cut and paste use actual system InputConnection
+PASS selection mode extends with the cursor and copies only the selection
+PASS actual system clipboard retains the most recent 100 distinct copied texts
+PASS sensitive system clips and password-field clips are excluded from history
+PASS clipboard item pastes, clear survives reopening and IME service restart
+PASS hide and reopen retain a working IME
+PASS dark theme with new navigation and candidate learning gestures
+PASS model manager shows 3 languages and actual sizes; SDK deletion clears cached Japanese gloss without blocking Chinese
+PASS user-initiated model download restores Japanese candidate/detail translation after deletion
+PASS complete seven-syllable French model translation survives detail and upward sentence commit

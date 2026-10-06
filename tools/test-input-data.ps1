@@ -29,8 +29,8 @@ function Invoke-InputAdb([string[]]$Arguments) {
 }
 Invoke-InputAdb @('shell','mkdir','-p','/data/local/tmp/qingyu-engine') | Out-Null
 Invoke-InputAdb @('push',$inputJar,'/data/local/tmp/qingyu-engine/input-checks.jar')
-Invoke-InputAdb @('push',(Join-Path $inputProjectRoot 'app/src/main/assets/input/input-v2.db'),'/data/local/tmp/qingyu-engine/input-v2.db')
-$sqliteResult=Invoke-InputAdb @('shell','CLASSPATH=/data/local/tmp/qingyu-engine/input-checks.jar app_process /system/bin com.qingyu.ime.InputDictionarySmoke /data/local/tmp/qingyu-engine/input-v2.db')
+Invoke-InputAdb @('push',(Join-Path $inputProjectRoot 'app/src/main/assets/input/input-v3.db'),'/data/local/tmp/qingyu-engine/input-v3.db')
+$sqliteResult=Invoke-InputAdb @('shell','CLASSPATH=/data/local/tmp/qingyu-engine/input-checks.jar app_process /system/bin com.qingyu.ime.InputDictionarySmoke /data/local/tmp/qingyu-engine/input-v3.db')
 $sqliteResult
 if(($englishResult -join "`n") -notmatch 'ALL_ENGLISH_ENGINE_CHECKS_PASS' -or ($sqliteResult -join "`n") -notmatch 'ALL_INPUT_DICTIONARY_CHECKS_PASS') {throw 'Input data success marker missing'}
 @($englishResult;$sqliteResult) | Set-Content -LiteralPath (Join-Path $inputProjectRoot 'docs/input-language-results.txt') -Encoding utf8

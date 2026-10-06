@@ -50,6 +50,7 @@ public class ImeSmokeInstrumentation extends Instrumentation {
         }
     }
     protected String successMarker(){return "ALL_IME_CHECKS_PASS";}
+    protected boolean debugTarget(){return (getTargetContext().getApplicationInfo().flags&android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE)!=0;}
     protected void runChecks() throws Exception{
             Rect idleKey=new Rect();awaitNode("key_a").getBoundsInScreen(idleKey);type("kaifa");awaitCandidate("开发");Rect typingKey=new Rect();awaitNode("key_a").getBoundsInScreen(typingKey);check(idleKey.equals(typingKey),"First candidate changed keyboard geometry");awaitGloss("开发","develop");screenshot("ime-light.png");clickCandidate("开发");awaitText("开发");pass("candidate click commits Chinese only and first candidate preserves key geometry");
             clear();type("kaifa");awaitCandidate("开发");
@@ -73,7 +74,7 @@ public class ImeSmokeInstrumentation extends Instrumentation {
             type("nihao");key("⌫");key("o");key("SPACE");awaitText("你好");pass("composition delete and resume");
             setText("😊X");key("⌫");key("⌫");awaitText("");pass("Unicode code point backspace");
             setText("abcdefghijk");hold("⌫",1200);awaitText("");pass("held backspace repeats");
-            hold("q",620);awaitText("1");pass("long press number");
+            holdSlide("q",1,false);awaitText("1");pass("long press number");
             clear();type("xi");hold("，",620);type("an");awaitCandidate("西安");clickCandidate("西安");awaitText("西安");pass("explicit pinyin syllable separator");
             clear();String repeated=new String(new char[70]).replace('\0','a');type(repeated);key("SPACE");
             long longInputUntil=SystemClock.uptimeMillis()+4000;while(text().length()!=70&&SystemClock.uptimeMillis()<longInputUntil)SystemClock.sleep(30);
@@ -110,8 +111,10 @@ public class ImeSmokeInstrumentation extends Instrumentation {
     protected void key(String value){Rect r=keys.get(value);AccessibilityNodeInfo current=find("key_"+value);if(current!=null){Rect fresh=new Rect();current.getBoundsInScreen(fresh);r=fresh;keys.put(value,fresh);}if(r==null){collectKeys();r=keys.get(value);}check(r!=null,"Missing key "+value);long t=SystemClock.uptimeMillis();touch(r.centerX(),r.centerY(),true,t);touch(r.centerX(),r.centerY(),false,t+8);}
     protected void type(String s){for(int i=0;i<s.length();i++)key(s.substring(i,i+1));}
     protected void hold(String value,long ms){Rect r=keys.get(value);check(r!=null,"Missing hold key "+value);long t=SystemClock.uptimeMillis();touch(r.centerX(),r.centerY(),true,t);SystemClock.sleep(ms);touch(r.centerX(),r.centerY(),false,SystemClock.uptimeMillis());}
+    protected void holdSlide(String value,int direction,boolean cancel){Rect r=new Rect();awaitNode("key_"+value).getBoundsInScreen(r);long start=SystemClock.uptimeMillis();touch(r.centerX(),r.centerY(),true,start);SystemClock.sleep(620);float endX=r.centerX()+direction*Math.max(r.width()*.45f,45f);MotionEvent move=MotionEvent.obtain(start,SystemClock.uptimeMillis(),MotionEvent.ACTION_MOVE,endX,r.centerY(),0);move.setSource(InputDevice.SOURCE_TOUCHSCREEN);check(automation.injectInputEvent(move,true),"Long-slide move failed");move.recycle();SystemClock.sleep(60);MotionEvent end=MotionEvent.obtain(start,SystemClock.uptimeMillis(),cancel?MotionEvent.ACTION_CANCEL:MotionEvent.ACTION_UP,endX,r.centerY(),0);end.setSource(InputDevice.SOURCE_TOUCHSCREEN);check(automation.injectInputEvent(end,true),"Long-slide end failed");end.recycle();}
+    protected void closePanel(){for(String id:new String[]{"toolbar_more","toolbar_edit","toolbar_emoji","toolbar_mode"}){AccessibilityNodeInfo n=find(id);if(n!=null&&n.isSelected()){check(n.performAction(AccessibilityNodeInfo.ACTION_CLICK),"Panel navigation close failed");SystemClock.sleep(180);return;}}throw new AssertionError("Open panel has no selected owning navigation icon");}
     protected void swipe(float x,float y,float endX,float endY,long duration){long start=SystemClock.uptimeMillis();touch(x,y,true,start);for(int i=1;i<=5;i++){MotionEvent m=MotionEvent.obtain(start,start+duration*i/5,MotionEvent.ACTION_MOVE,x+(endX-x)*i/5,y+(endY-y)*i/5,0);m.setSource(InputDevice.SOURCE_TOUCHSCREEN);automation.injectInputEvent(m,true);m.recycle();}touch(endX,endY,false,start+duration);}
-    protected void toggleGloss(){nodeClick("toolbar_more");buttonClick("释义显示语言 · 英语");buttonClick(findButton("隐藏释义")!=null?"隐藏释义":"显示释义");buttonClick("返回键盘");keyboardReady();}
+    protected void toggleGloss(){nodeClick("toolbar_more");buttonClick("释义显示语言 · 英语");buttonClick(findButton("隐藏释义")!=null?"隐藏释义":"显示释义");closePanel();keyboardReady();}
     protected AccessibilityNodeInfo buttonIn(AccessibilityNodeInfo node,String title){
         if(node==null)return null;String value=String.valueOf(node.getText()),description=String.valueOf(node.getContentDescription());
         if("android.widget.Button".equals(String.valueOf(node.getClassName()))&&node.isClickable()&&node.isVisibleToUser()&&(title.equals(value)||title.equals(description)))return node;
@@ -132,6 +135,7 @@ public class ImeSmokeInstrumentation extends Instrumentation {
     protected void setText(String text){runOnMainSync(()->{editor.setText(text);editor.setSelection(text.length());((InputMethodManager)activity.getSystemService(Activity.INPUT_METHOD_SERVICE)).restartInput(editor);});SystemClock.sleep(150);keyboardReady();}
     protected void clear(){setText("");}
     protected void pass(String name){report.append("PASS ").append(name).append('\n');Bundle b=new Bundle();b.putString("stream","PASS "+name+"\n");sendStatus(0,b);}
+    protected void mainCheck(Runnable action){Throwable[] failure={null};runOnMainSync(()->{try{action.run();}catch(Throwable error){failure[0]=error;}});if(failure[0]!=null)throw new AssertionError("Main-thread check failed",failure[0]);}
     protected void screenshot(String name)throws Exception{
         // Accessibility state can update before the invalidated Canvas is drawn.
         // Allow rendered frames to catch up before exporting visual evidence.

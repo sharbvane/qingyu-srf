@@ -13,6 +13,7 @@ import com.google.mlkit.nl.translate.Translator;
 import com.google.mlkit.nl.translate.TranslatorOptions;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,9 +26,10 @@ import java.util.function.Function;
 
 /** Local lookups and model work stay off the IME thread. Downloads require an explicit action. */
 final class TranslationRepository implements AutoCloseable {
-    enum State { CHECKING, MISSING, DOWNLOADING, READY, FAILED, UNSUPPORTED }
+    enum State { CHECKING, MISSING, DOWNLOADING, DELETING, READY, FAILED, UNSUPPORTED }
     interface Callback { void onResult(String translation, String note); }
     interface StateCallback { void onState(State state); }
+    interface SizeCallback { void onSize(long bytes); }
 
     private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -43,6 +45,7 @@ final class TranslationRepository implements AutoCloseable {
     private volatile Function<String, String> englishLookup;
     private volatile boolean closed;
     private final boolean modelPlatformSupported;
+    private long modelGeneration;
 
     TranslationRepository(Context context) { this(context, null); }
     TranslationRepository(Context context, Handler existingWorker) {
@@ -72,7 +75,7 @@ final class TranslationRepository implements AutoCloseable {
             while ((line = reader.readLine()) != null) {
                 if (line.trim().isEmpty() || line.startsWith("#")) continue;
                 String[] fields = line.split("\t", -1);
-                if (fields.length == 4 && !fields[0].trim().isEmpty()) phrases.put(fields[0], fields);
+                if (fields.length == 2 && !fields[0].trim().isEmpty()) phrases.put(fields[0], fields);
             }
         } catch (Exception phraseFailure) {
             if (dictionaryFailure != null) throw dictionaryFailure;
@@ -105,8 +108,7 @@ final class TranslationRepository implements AutoCloseable {
         if (source.equals(target)) return text;
         if (source.equals("zh")) {
             String[] phrase = phrases.get(text);
-            int index = target.equals("en") ? 1 : target.equals("ja") ? 2 : target.equals("fr") ? 3 : -1;
-            if (phrase != null && index > 0) return phrase[index];
+            if (phrase != null && target.equals("en")) return phrase[1];
             if (target.equals("en")) return english.lookup(text);
         }
         Function<String, String> lookup = englishLookup;
@@ -132,21 +134,22 @@ final class TranslationRepository implements AutoCloseable {
                 result(callback, local, phrases.containsKey(text) ? "本地短语" : "本地词典"); return;
             }
             String key = source + "\n" + target + "\n" + text;
-            String cached = cache.get(key);
-            if (cached != null) { result(callback, cached, "Google Translate · 端侧翻译"); return; }
             String language = target.equals("zh") ? source : target;
             State state = status(language);
             if (state != State.READY) { result(callback, "", stateText(state)); return; }
+            String cached = cache.get(key);
+            if (cached != null) { result(callback, cached, "Google Translate · 端侧翻译"); return; }
             ArrayList<Callback> listeners = pending.get(key);
             if (listeners != null) { if (listeners.size() < 8) listeners.add(callback); else result(callback, "", "翻译处理中"); return; }
             // ponytail: cap in-flight inference at eight; add priority cancellation only if measured contention warrants it.
             if (pending.size() >= 8) { result(callback, "", "翻译处理中，请稍后再试"); return; }
             listeners = new ArrayList<>(); listeners.add(callback); pending.put(key, listeners);
+            long generation=modelGeneration;
             try {
                 client(source, target).translate(text)
-                    .addOnSuccessListener(executor, value -> complete(key, value == null ? "" : value.trim(), value == null || value.trim().isEmpty() ? "没有查到译文" : "Google Translate · 端侧翻译"))
-                    .addOnFailureListener(executor, failure -> complete(key, "", "端侧翻译暂不可用，请稍后重试"));
-            } catch (RuntimeException failure) { complete(key, "", "端侧翻译暂不可用，请稍后重试"); }
+                    .addOnSuccessListener(executor, value -> {if(generation==modelGeneration)complete(key, value == null ? "" : value.trim(), value == null || value.trim().isEmpty() ? "没有查到译文" : "Google Translate · 端侧翻译");})
+                    .addOnFailureListener(executor, failure -> {if(generation==modelGeneration)complete(key, "", "端侧翻译暂不可用，请稍后重试");});
+            } catch (RuntimeException failure) { if(generation==modelGeneration)complete(key, "", "端侧翻译暂不可用，请稍后重试"); }
         });
     }
 
@@ -163,20 +166,22 @@ final class TranslationRepository implements AutoCloseable {
             if (closed) return;
             if (!modelPlatformSupported) { stateResult(callback, State.UNSUPPORTED); return; }
             String key = modelKey(language);
-            if (status(key) == State.DOWNLOADING) { stateResult(callback, State.DOWNLOADING); return; }
+            if (status(key) == State.DOWNLOADING || status(key) == State.DELETING) { stateResult(callback, status(key)); return; }
+            long generation=modelGeneration;
             try {
                 RemoteModelManager.getInstance().getDownloadedModels(TranslateRemoteModel.class)
                     .addOnSuccessListener(executor, models -> {
+                        if(closed||generation!=modelGeneration)return;
                         Set<String> downloaded = new HashSet<>();
                         for (TranslateRemoteModel model : models) downloaded.add(model.getLanguage());
                         for (String target : new String[]{"en", "ja", "fr"}) {
-                            if (status(target) == State.DOWNLOADING) continue;
+                            if (status(target) == State.DOWNLOADING || status(target) == State.DELETING) continue;
                             // English is the built-in pivot; other language files translate to/from English.
                             states.put(target, downloaded.contains("zh") && (target.equals("en") || downloaded.contains(target)) ? State.READY : State.MISSING);
                         }
                         stateResult(callback, status(key));
                     })
-                    .addOnFailureListener(executor, failure -> { states.put(key, State.FAILED); stateResult(callback, State.FAILED); });
+                    .addOnFailureListener(executor, failure -> { if(closed||generation!=modelGeneration)return;states.put(key, State.FAILED); stateResult(callback, State.FAILED); });
             } catch (RuntimeException failure) { states.put(key, State.FAILED); stateResult(callback, State.FAILED); }
         });
     }
@@ -187,21 +192,52 @@ final class TranslationRepository implements AutoCloseable {
             if (closed) return;
             if (!modelPlatformSupported) { stateResult(callback, State.UNSUPPORTED); return; }
             String key = modelKey(language);
-            if (status(key) == State.DOWNLOADING) { stateResult(callback, State.DOWNLOADING); return; }
+            if (status(key) == State.DOWNLOADING || status(key) == State.DELETING) { stateResult(callback, status(key)); return; }
             states.put(key, State.DOWNLOADING); stateResult(callback, State.DOWNLOADING);
+            long generation=modelGeneration;
             try {
                 client("zh", key).downloadModelIfNeeded(new DownloadConditions.Builder().requireWifi().build())
-                    .addOnSuccessListener(executor, unused -> { states.put(key, State.READY); stateResult(callback, State.READY); refreshModels(key, null); })
-                    .addOnFailureListener(executor, failure -> { states.put(key, State.FAILED); stateResult(callback, State.FAILED); });
+                    .addOnSuccessListener(executor, unused -> { if(closed||generation!=modelGeneration)return;states.put(key, State.READY);modelsChanged();stateResult(callback, State.READY); refreshModels(key, callback); })
+                    .addOnFailureListener(executor, failure -> { if(closed||generation!=modelGeneration)return;states.put(key, State.FAILED); stateResult(callback, State.FAILED); });
             } catch (RuntimeException failure) { states.put(key, State.FAILED); stateResult(callback, State.FAILED); }
         });
     }
+
+    /** SDK-managed deletion; removing English's shared Chinese model disables all model pairs. */
+    void deleteModels(String language,StateCallback callback){
+        worker.post(()->{
+            if(closed)return;if(!modelPlatformSupported){stateResult(callback,State.UNSUPPORTED);return;}
+            String key=modelKey(language);
+            for(State state:states.values())if(state==State.DOWNLOADING||state==State.DELETING){stateResult(callback,status(key));return;}
+            modelGeneration++;invalidateModelClients();states.put(key,State.DELETING);stateResult(callback,State.DELETING);
+            String fileLanguage=key.equals("en")?"zh":key;
+            try{RemoteModelManager.getInstance().deleteDownloadedModel(new TranslateRemoteModel.Builder(fileLanguage).build())
+                .addOnSuccessListener(executor,unused->{if(closed)return;states.put(key,State.MISSING);if(key.equals("en"))for(String target:new String[]{"ja","fr"})states.put(target,State.MISSING);modelsChanged();refreshModels(key,callback);})
+                .addOnFailureListener(executor,failure->{if(closed)return;states.put(key,State.FAILED);stateResult(callback,State.FAILED);});
+            }catch(RuntimeException failure){states.put(key,State.FAILED);stateResult(callback,State.FAILED);}
+        });
+    }
+    void refreshAfterModelChange(String language,StateCallback callback){worker.post(()->{if(closed)return;modelGeneration++;invalidateModelClients();states.clear();refreshModels(language,callback);});}
+    private void invalidateModelClients(){for(ArrayList<Callback> callbacks:pending.values())for(Callback callback:callbacks)result(callback,"","翻译模型已更改，请重新查看");pending.clear();cache.evictAll();for(Translator translator:clients.values())translator.close();clients.clear();}
+    private void modelsChanged(){cache.evictAll();android.content.SharedPreferences prefs=context.getSharedPreferences("qingyu",Context.MODE_PRIVATE);prefs.edit().putLong("models_revision",prefs.getLong("models_revision",0)+1).apply();}
+    /** Installed file bytes, not a download estimate. SDK layout changes produce unknown (-1). */
+    void modelSize(String language,SizeCallback callback){
+        worker.post(()->{if(closed)return;long bytes=-1;
+            try{String fileLanguage=modelKey(language).equals("en")?"zh":modelKey(language);TranslateRemoteModel model=new TranslateRemoteModel.Builder(fileLanguage).build();
+                File folder=new File(new File(context.getNoBackupFilesDir(),"com.google.mlkit.translate.models"),model.getModelNameForBackend());
+                bytes=folder.isDirectory()?folderBytes(folder):status(language)==State.MISSING?0:-1;
+            }catch(RuntimeException ignored){}
+            long measured=bytes;main.post(()->{if(!closed)callback.onSize(measured);});
+        });
+    }
+    private static long folderBytes(File file){if(file.isFile())return file.length();File[] children=file.listFiles();if(children==null)return -1;long bytes=0;for(File child:children){long size=folderBytes(child);if(size<0)return -1;bytes+=size;}return bytes;}
 
     static String languageName(String language) { return "ja".equals(language) ? "日语" : "fr".equals(language) ? "法语" : "英语"; }
     static String stateText(State state) {
         switch (state) {
             case READY: return "模型已就绪 · 可离线翻译";
             case DOWNLOADING: return "等待 Wi-Fi 或正在下载模型";
+            case DELETING: return "正在删除模型";
             case FAILED: return "模型不可用 · 请检查网络后重试下载";
             case MISSING: return "模型未下载 · 本地词典仍可使用";
             case UNSUPPORTED: return "此 16KB ARM64 设备暂不支持模型翻译 · 本地释义仍可使用";

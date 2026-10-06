@@ -30,13 +30,16 @@ final class LocalInputDictionary implements AutoCloseable {
     private final LinkedHashMap<String,Integer> chineseLearning=new LinkedHashMap<>();
     private final Map<String,List<Row>> nineCache=new LinkedHashMap<>();
     private final Map<String,String> glossCache=new LinkedHashMap<>();
+    private final Map<String,String> posCache=new LinkedHashMap<>();
 
     static LocalInputDictionary open(Context context) throws Exception {
         LocalInputDictionary dictionary=new LocalInputDictionary();
-        File target=new File(context.getFilesDir(),"input-v2.db");
+        // The filename is the asset schema version; v0.2's installed database
+        // cannot be reused because it does not contain lexical tags.
+        File target=new File(context.getFilesDir(),"input-v3.db");
         if(!target.exists()) {
-            File temp=new File(context.getFilesDir(),"input-v2.tmp");
-            try(InputStream in=context.getAssets().open("input/input-v2.db");FileOutputStream out=new FileOutputStream(temp)) {
+            File temp=new File(context.getFilesDir(),"input-v3.tmp");
+            try(InputStream in=context.getAssets().open("input/input-v3.db");FileOutputStream out=new FileOutputStream(temp)) {
                 byte[] buffer=new byte[32768];int count;
                 while((count=in.read(buffer))!=-1) out.write(buffer,0,count);
                 out.getFD().sync();
@@ -92,6 +95,26 @@ final class LocalInputDictionary implements AutoCloseable {
         try(Cursor cursor=database.rawQuery("SELECT zh FROM english_gloss WHERE word=?",new String[]{word})) {
             return cursor.moveToFirst()?cursor.getString(0):"";
         }
+    }
+    /** Batch lookup on the existing data/gloss worker; unknown words stay neutral. */
+    synchronized Map<String,String> partsOfSpeech(List<String> words) {
+        if(database==null||words==null||words.isEmpty())return Collections.emptyMap();
+        List<String> missing=new ArrayList<>();Map<String,String> result=new HashMap<>();
+        for(String word:words) {
+            if(word==null||word.isEmpty()||word.length()>64||missing.size()>=128)continue;
+            String cached=posCache.get(word);
+            if(cached!=null){if(!cached.isEmpty())result.put(word,cached);}
+            else if(!missing.contains(word))missing.add(word);
+        }
+        if(!missing.isEmpty()) {
+            String placeholders=String.join(",",Collections.nCopies(missing.size(),"?"));
+            try(Cursor cursor=database.rawQuery("SELECT text,pos FROM chinese WHERE text IN ("+placeholders+") AND pos<>''",missing.toArray(new String[0]))) {
+                while(cursor.moveToNext())result.put(cursor.getString(0),cursor.getString(1));
+                for(String word:missing)posCache.put(word,result.getOrDefault(word,""));
+                while(posCache.size()>1024)posCache.remove(posCache.keySet().iterator().next());
+            }catch(android.database.SQLException ignored){return Collections.emptyMap();}
+        }
+        return result;
     }
 
     List<NineKeyCandidate> suggestNineKey(String digits) {
@@ -229,7 +252,7 @@ final class LocalInputDictionary implements AutoCloseable {
     @Override public synchronized void close() {
         try{flush();}catch(Exception ignored){} // Learning persistence can never suppress input.
         if(database!=null) {database.close();database=null;}
-        english=null;nineCache.clear();glossCache.clear();chineseLearning.clear();
+        english=null;nineCache.clear();glossCache.clear();posCache.clear();chineseLearning.clear();
     }
     private static final class Row {
         final String text,pinyin;final int weight;

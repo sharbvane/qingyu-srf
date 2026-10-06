@@ -14,6 +14,7 @@ import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
+import android.view.animation.DecelerateInterpolator;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -46,6 +47,10 @@ final class KeyboardSurface extends View {
     private boolean dragged, longFired, cursorMode;
     private boolean english, shifted, capsLock, symbols, secondSymbols, numeric, secure;
     private boolean nineKey, dark;
+    private String[] holdChoices;
+    private int holdChoice;
+    private final RectF holdBounds = new RectF();
+    private long holdStarted;
     private String style="classic";
     private long lastShift;
     private String enterLabel = "↵";
@@ -66,7 +71,7 @@ final class KeyboardSurface extends View {
             if (pressed == null || dragged || !hasLongAction(pressed)) return;
             longFired = true;
             feedback();
-            activateLongKey(pressed);
+            if(letterKey(pressed)) openLetterChoices(pressed); else activateLongKey(pressed);
             invalidate();
         }
     };
@@ -80,6 +85,7 @@ final class KeyboardSurface extends View {
     void configure(boolean english, boolean numeric, String action, boolean secure) {
         boolean nextNineKey=prefs.keyboardMode().equals("t9");
         boolean switchLayout=this.english!=english||this.numeric!=numeric||this.nineKey!=nextNineKey;
+        if(switchLayout){shifted=false;capsLock=false;lastShift=0;}
         this.english=english; this.numeric=numeric; enterLabel=action;
         this.secure=secure;this.nineKey=nextNineKey;style=prefs.style();
         if (numeric) symbols=false;
@@ -88,12 +94,12 @@ final class KeyboardSurface extends View {
         if(switchLayout)animateSwitch();
     }
     void toggleSymbols() { cancelTouch();symbols=!symbols; secondSymbols=false; layoutKeys(); invalidate();animateSwitch(); }
-    private void animateSwitch(){animate().cancel();setAlpha(.88f);animate().alpha(1f).setDuration(100).start();}
+    private void animateSwitch(){animate().cancel();setAlpha(.94f);animate().alpha(1f).setDuration(140).setInterpolator(new DecelerateInterpolator()).start();}
     private boolean isNineKey(){return nineKey&&!english&&!numeric&&!secure&&!symbols;}
     void shift() {
         if (symbols) { secondSymbols=!secondSymbols; layoutKeys(); invalidate(); return; }
         long now=android.os.SystemClock.uptimeMillis();
-        if (shifted && now-lastShift<350) capsLock=true;
+        if (shifted && !capsLock && now-lastShift<350) capsLock=true;
         else { shifted=!shifted; capsLock=false; }
         lastShift=now; invalidate(); accessibilityChanged();
     }
@@ -105,7 +111,7 @@ final class KeyboardSurface extends View {
     private boolean landscape() { return getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE; }
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
         int height=(int)dp((landscape()?136:244)*prefs.height()+8);
-        setMeasuredDimension(MeasureSpec.getSize(widthSpec), height);
+        setMeasuredDimension(MeasureSpec.getSize(widthSpec), resolveSize(height,heightSpec));
     }
     @Override protected void onSizeChanged(int w,int h,int oldw,int oldh) { cancelTouch();layoutKeys(); }
     private void row(String[] labels, String[] alternates, float top, float height, float indent, float[] weights) {
@@ -169,10 +175,11 @@ final class KeyboardSurface extends View {
             boolean enter=k.value.equals("ENTER");
             boolean function=k.value.length()>1 || k.value.equals("⌫");
             int base=enter?colors.accent:(function?colors.function:colors.key);
+            if(k.value.equals("SHIFT") && shifted && !symbols)base=blend(base,colors.accent,.14f);
             paint.setColor(k==pressed?colors.pressed:k==released&&release>0?blend(base,colors.pressed,release):base);
             c.drawRoundRect(k.bounds,radius,radius,paint);
             paint.setTypeface(android.graphics.Typeface.create("sans-serif",android.graphics.Typeface.NORMAL));
-            paint.setColor(enter?colors.accentText:colors.text);
+            paint.setColor(enter?colors.accentText:k.value.equals("SHIFT") && shifted && !symbols?colors.accent:colors.text);
             paint.setTextSize(dp(k.value.equals("SPACE")?12:(k.value.length()>1?14:(isT9Digit(k)?(landscape()?19:23):(landscape()?17:22)))));
             paint.setTextAlign(Paint.Align.CENTER);
             c.drawText(label(k),k.bounds.centerX(),k.bounds.centerY()-(paint.ascent()+paint.descent())/2,paint);
@@ -183,8 +190,9 @@ final class KeyboardSurface extends View {
             }
         }
         if(release>0)postInvalidateOnAnimation();else released=null;
-        if(pressed!=null && prefs.preview() && !secure && pressed.value.length()==1 && !pressed.value.equals("⌫") && !cursorMode) {
-            float x=pressed.bounds.centerX(), y=Math.max(dp(2),pressed.bounds.top-dp(48));
+        if(holdChoices!=null) drawLetterChoices(c);
+        else if(pressed!=null && prefs.preview() && !secure && pressed.value.length()==1 && !pressed.value.equals("⌫") && !cursorMode) {
+            float x=Math.max(dp(24),Math.min(getWidth()-dp(24),pressed.bounds.centerX())), y=Math.max(dp(2),pressed.bounds.top-dp(48));
             paint.setColor(colors.accent);
             c.drawRoundRect(x-dp(24),y,x+dp(24),y+dp(48),dp(12),dp(12),paint);
             paint.setColor(colors.accentText); paint.setTextSize(dp(26)); paint.setTextAlign(Paint.Align.CENTER);
@@ -211,16 +219,58 @@ final class KeyboardSurface extends View {
         int id=keys.indexOf(key)+1;
         String name=secure && characterKey(key)?"已输入密码字符":accessibilityName(key);
         released=key;releaseTime=android.os.SystemClock.uptimeMillis();
-        listener.key(key.value);
+        if(!english && shifted && letterKey(key)) {
+            listener.longKey("DIRECT_"+key.value.toUpperCase(java.util.Locale.ROOT));
+            consumedLetter();
+        } else listener.key(key.value);
         if(id>0) sendVirtualEvent(id,AccessibilityEvent.TYPE_VIEW_CLICKED,name);
     }
     private boolean characterKey(Key key) { return key.value.length()==1 && !key.value.equals("⌫"); }
+    private boolean letterKey(Key key) { return key.value.length()==1 && key.value.charAt(0)>='a' && key.value.charAt(0)<='z'; }
+    private void openLetterChoices(Key key) {
+        String lower=key.value, upper=lower.toUpperCase(java.util.Locale.ROOT);
+        holdChoices=key.alternate.isEmpty()?new String[]{upper,lower}:new String[]{upper,lower,key.alternate};
+        holdChoice=1;holdStarted=android.os.SystemClock.uptimeMillis();
+        float width=Math.min(getWidth()-dp(8),dp(44)*holdChoices.length);
+        float left=Math.max(dp(4),Math.min(getWidth()-dp(4)-width,key.bounds.centerX()-width/2));
+        float top=Math.max(dp(4),key.bounds.top-dp(59));
+        holdBounds.set(left,top,left+width,Math.min(getHeight()-dp(4),top+dp(56)));
+    }
+    private void drawLetterChoices(Canvas c) {
+        float progress=Math.min(1f,(android.os.SystemClock.uptimeMillis()-holdStarted)/90f);
+        int save=c.save();c.translate(0,dp(3)*(1f-progress));
+        paint.setColor(colors.function);paint.setAlpha((int)(255*progress));
+        c.drawRoundRect(holdBounds,dp(10),dp(10),paint);
+        float width=holdBounds.width()/holdChoices.length;
+        for(int i=0;i<holdChoices.length;i++) {
+            float left=holdBounds.left+i*width;
+            if(i==holdChoice) {
+                paint.setColor(colors.accent);paint.setAlpha((int)(255*progress));
+                c.drawRoundRect(left+dp(3),holdBounds.top+dp(3),left+width-dp(3),holdBounds.bottom-dp(3),dp(7),dp(7),paint);
+            }
+            paint.setColor(i==holdChoice?colors.accentText:colors.text);paint.setAlpha((int)(255*progress));
+            paint.setTextAlign(Paint.Align.CENTER);paint.setTextSize(dp(23));
+            c.drawText(holdChoices[i],left+width/2,holdBounds.top+dp(29),paint);
+            paint.setTextSize(dp(9));
+            c.drawText(i==0?"大写":i==1?"小写":"数字",left+width/2,holdBounds.bottom-dp(8),paint);
+        }
+        paint.setAlpha(255);c.restoreToCount(save);
+        if(progress<1f)postInvalidateOnAnimation();
+    }
+    private void selectLetterChoice(float x) {
+        // Edge keys need a shorter travel distance so the finger can stay inside the keyboard.
+        float delta=x-downX;
+        float left=Math.min(dp(16),downX*.6f), right=Math.min(dp(16),(getWidth()-downX)*.6f);
+        int next=delta < -left?0:holdChoices.length==3 && delta>right?2:1;
+        if(next!=holdChoice){holdChoice=next;feedback();invalidate();}
+    }
     private boolean hasLongAction(Key key) {
-        return isT9Digit(key) || !key.alternate.isEmpty() || key.value.equals("SPACE") || key.value.equals("LANG") || key.value.equals("SHIFT")
+        return letterKey(key) || isT9Digit(key) || !key.alternate.isEmpty() || key.value.equals("SPACE") || key.value.equals("LANG") || key.value.equals("SHIFT")
             || key.value.equals("ENTER") || key.value.equals(",") || key.value.equals("，") || key.value.equals(".") || key.value.equals("。");
     }
     private void activateLongKey(Key key) {
-        if(isT9Digit(key))listener.longKey("DIRECT_"+key.value);
+        if(letterKey(key)){listener.longKey("DIRECT_"+key.value);consumedLetter();}
+        else if(isT9Digit(key))listener.longKey("DIRECT_"+key.value);
         else if(!key.alternate.isEmpty())listener.key(key.alternate);
         else if(key.value.equals("SPACE")){cursorMode=true;cursorX=downX;}
         else if(!english && !numeric && !secure && (key.value.equals(",")||key.value.equals("，")))listener.longKey("APOSTROPHE");
@@ -242,6 +292,7 @@ final class KeyboardSurface extends View {
     }
     private String longHint(Key key) {
         if(isT9Digit(key))return "长按输入数字 "+key.value;
+        if(letterKey(key))return key.alternate.isEmpty()?"长按后左滑输入大写，右侧输入小写":"长按后左滑大写，中间小写，右滑数字 "+key.alternate;
         if(!key.alternate.isEmpty())return "长按输入 "+key.alternate;
         if(key.value.equals("SPACE"))return "长按进入光标操作，更多操作可左右移动光标";
         if(key.value.equals("LANG"))return "长按选择系统输入法";
@@ -363,6 +414,8 @@ final class KeyboardSurface extends View {
             invalidate(); return true;
         }
         if(action==MotionEvent.ACTION_MOVE && pressed!=null) {
+            if(x<0 || x>=getWidth() || y<0 || y>=getHeight()){cancelTouch();return true;}
+            if(holdChoices!=null){selectLetterChoice(x);return true;}
             float dx=x-downX,dy=y-downY;
             if(pressed.value.equals("SPACE") && (cursorMode || Math.abs(dx)>dp(18))) {
                 cursorMode=true; dragged=true; timer.removeCallbacks(longPress);
@@ -374,15 +427,21 @@ final class KeyboardSurface extends View {
             if(pressed.value.equals("⌫") && dx < -dp(44) && !dragged) {
                 dragged=true; timer.removeCallbacks(repeat); listener.longKey("DELETE_WORD"); invalidate();return true;
             }
-            if(!longFired && !dragged) { Key next=hit(x,y); if(next!=null && next!=pressed){pressed=next;invalidate();} }
+            if(!longFired && !dragged) { Key next=hit(x,y); if(next!=null && next!=pressed){timer.removeCallbacks(longPress);pressed=next;invalidate();} }
             return true;
         }
         if(action==MotionEvent.ACTION_UP) {
-            if(pressed!=null && !longFired && !dragged && !cursorMode) { releaseKey(pressed); performClick(); }
+            if(holdChoices!=null && x>=0 && x<getWidth() && y>=0 && y<getHeight()) {
+                selectLetterChoice(x);String chosen=holdChoices[holdChoice];Key key=pressed;
+                holdChoices=null;released=key;releaseTime=android.os.SystemClock.uptimeMillis();
+                listener.longKey("DIRECT_"+chosen);if(chosen.length()==1 && Character.isLetter(chosen.charAt(0)))consumedLetter();
+                performClick();
+            } else if(pressed!=null && !longFired && !dragged && !cursorMode && x>=0 && x<getWidth() && y>=0 && y<getHeight()) { releaseKey(pressed); performClick(); }
             cancelTouch(); return true;
         }
         if(action==MotionEvent.ACTION_CANCEL) { cancelTouch(); return true; }
         if(action==MotionEvent.ACTION_POINTER_DOWN) {
+            if(holdChoices!=null){cancelTouch();return true;}
             // Commit the first finger before switching so rapid two-thumb typing doesn't drop it.
             if(pressed!=null && !longFired && !dragged) releaseKey(pressed);
             cancelTouch(); int index=event.getActionIndex();
@@ -393,7 +452,7 @@ final class KeyboardSurface extends View {
         return true;
     }
     @Override public boolean performClick(){super.performClick();return true;}
-    void cancelTouch(){timer.removeCallbacks(repeat);timer.removeCallbacks(longPress);pressed=null;cursorMode=false;invalidate();}
+    void cancelTouch(){timer.removeCallbacks(repeat);timer.removeCallbacks(longPress);pressed=null;holdChoices=null;cursorMode=false;invalidate();}
     @Override protected void onDetachedFromWindow(){animate().cancel();setAlpha(1f);cancelTouch();released=null;clearVirtualFocus();super.onDetachedFromWindow();}
 }
 

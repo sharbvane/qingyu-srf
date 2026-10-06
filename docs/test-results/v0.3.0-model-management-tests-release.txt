@@ -1,0 +1,17 @@
+UTC: 2026-10-06T03:37:21.9251021Z
+Version: 0.3.0
+Variant: Release
+Runner: ImeV3Instrumentation
+Models available branch: True
+Models only branch: True
+Serial: emulator-5554
+APK SHA256: 363D182A1B498FAEA8E1DA0F97D77D6FD11CDE25A2C020EE27E3CF287EB3F4E0
+
+PASS model manager shows 3 languages and actual sizes; SDK deletion clears cached Japanese gloss without blocking Chinese
+PASS user-initiated model download restores Japanese candidate/detail translation after deletion
+PASS complete seven-syllable French model translation survives detail and upward sentence commit
+
+ALL_MODEL_MANAGEMENT_CHECKS_PASS
+PASS model manager shows 3 languages and actual sizes; SDK deletion clears cached Japanese gloss without blocking Chinese
+PASS user-initiated model download restores Japanese candidate/detail translation after deletion
+PASS complete seven-syllable French model translation survives detail and upward sentence commit

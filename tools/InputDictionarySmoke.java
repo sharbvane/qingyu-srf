@@ -25,6 +25,11 @@ public final class InputDictionarySmoke {
         check(!longSentence.isEmpty() && longSentence.get(0).consumedDigits==40,"long digit sentence retains every input key");
         check(dictionary.lookupEnglish("hello").equals("你好"),"reverse Chinese gloss");
         check(dictionary.lookupEnglish("developers").contains("开发"),"reverse gloss inflection");
+        java.util.Map<String,String> tags=dictionary.partsOfSpeech(java.util.Arrays.asList("项目","开发","美丽","非常","的","hello","未知词性词组"));
+        check(tags.get("项目").equals("n") && tags.get("开发").equals("v") && tags.get("美丽").equals("ns"),"exact source tags, including ambiguous lexical readings");
+        check(tags.get("非常").equals("d") && tags.get("的").equals("uj"),"adverb/particle tags");
+        check(!tags.containsKey("hello") && !tags.containsKey("未知词性词组"),"unknown and English words stay neutral");
+        check(dictionary.partsOfSpeech(java.util.Arrays.asList("项目","未知词性词组")).get("项目").equals("n"),"cached POS batch");
         check(dictionary.predictChinese("中国").contains("人民"),"Chinese context continuation");
         dictionary.setLearningEnabled(false);dictionary.learnChinese("绝密内容","上下文");
         Field learning=LocalInputDictionary.class.getDeclaredField("chineseLearning");learning.setAccessible(true);

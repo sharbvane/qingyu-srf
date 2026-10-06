@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sharbvane/qingyu-srf/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/sharbvane/qingyu-srf?label=release"></a>
+  <a href="https://github.com/sharbvane/qingyu-srf/releases/download/v0.3.0/Qingyu-0.3.0.apk"><img alt="Download APK v0.3.0" src="https://img.shields.io/badge/Android_APK-v0.3.0-476B57"></a>
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPL--3.0-blue.svg"></a>
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
 </p>
@@ -21,18 +21,21 @@
 
 | Light theme | Dark theme |
 | --- | --- |
-| ![Qingyu light keyboard with kaifa candidates and English glosses](docs/images/keyboard-v0.2.0-light.png) | ![Qingyu dark keyboard with sheji candidates and English glosses](docs/images/keyboard-v0.2.0-dark.png) |
+| ![Qingyu light keyboard with its fixed candidate area and English glosses](docs/images/keyboard-v0.3.0-light.png) | ![Qingyu dark keyboard with its fixed candidate area and English glosses](docs/images/keyboard-v0.3.0-dark.png) |
 
-Captured from a running Android 15 emulator.
+See the [v0.3.0 validation record](docs/validation-v0.3.0.md) for screenshots and the actual check scope.
 
 ## Features
 
 - **Full pinyin and nine-key:** AOSP native full-pinyin decoder plus a local nine-key reading index with frequency ranking, sentence and segment candidates.
 - **English candidates:** Over 121,000 word forms, completions, explicit spelling suggestions and contextual next-word prediction, with Chinese glosses.
-- **Quiet language learning:** English, Japanese or French Chinese-candidate glosses. Tap enters the original word, hold opens details, swipe up enters its translation.
+- **Fixed candidate area:** Candidates and predictions remain within reserved keyboard space. The expanded grid replaces the keys, and a prediction chain stops after at most three selections. The rightmost X clears current predictions.
+- **Quiet language learning:** Chinese and English dictionaries and local meanings are included. Japanese and French require optional model downloads. Tap enters the original word, hold opens details, swipe up enters its translation.
 - **Phrases and sentences:** Local phrases first; downloaded on-device models translate other sentences asynchronously. Failure preserves normal input.
-- **Icon navigation:** More, text editing, Emoji, keyboard modes and hide. Selection, select all, copy, cut, paste and 100 recent clipboard items.
-- **Everyday typing:** Chinese punctuation, English, numbers and mixed input; repeat backspace, long-press numbers, spacebar cursor gestures and candidate browsing.
+- **Icon navigation:** More, text editing, Emoji, keyboard modes and hide. Tap the same icon again to close its panel. Selection, select all, copy, cut, paste and 100 recent clipboard items.
+- **Case and letter shortcuts:** Chinese full pinyin starts lowercase. Tap Shift once for one directly committed uppercase English letter; double-tap quickly to lock uppercase. These letters bypass pinyin. Hold a letter and slide left for uppercase or right for lowercase; digit-bearing letters offer uppercase on the left, lowercase in the middle and the digit on the right. Release to enter the highlighted character.
+- **Quiet part-of-speech colors:** Exact jieba Chinese dictionary tags select muted noun, verb, adjective, adverb and function-word tones. Unknown and English words remain neutral. These are lexical defaults, not contextual disambiguation.
+- **Everyday typing:** Chinese punctuation, English, numbers and mixed input; repeat backspace, spacebar cursor gestures and candidate browsing.
 - **Simple keyboard:** Sage light and dark themes, continuous 78%–124% height, two styles, haptics and previews.
 - **Local input:** Input and learned frequencies stay on device. Password fields disable candidates, glosses, learning and clipboard history; sensitive system clips are excluded.
 
@@ -40,11 +43,13 @@ Missing glosses stay blank when no model is ready. Dictionary senses and model t
 
 ## Install and try it
 
-1. Install the local `releases/Qingyu-0.2.0.apk`. Android 8.0 or newer is required. Published historical versions are available from [GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases).
+1. Download the APK from [GitHub Release v0.3.0](https://github.com/sharbvane/qingyu-srf/releases/download/v0.3.0/Qingyu-0.3.0.apk). Android 8.0 or newer is required. See [all GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases) for earlier versions.
 2. Install and open Qingyu. Use **Enable Qingyu Input Method**, then **Switch to Qingyu**. Android requires these system settings steps.
 3. In any text field, type `kaifa`, `xiangmu` or `sheji`. Tap a Chinese candidate to enter Chinese only.
 
-Version **v0.2.0** uses the same testing signature as the preceding release. See the [current validation record](docs/validation-v0.2.0.md). Long-term physical-device use remains unverified.
+Version **v0.3.0** uses the same testing signature as the preceding release. See the [current validation record](docs/validation-v0.3.0.md). Long-term physical-device use remains unverified.
+
+Choose English, Japanese or French under More → annotation language, then open Translation model management to download, inspect or delete models. The same management page is available in app settings. Downloads require Wi-Fi and an explicit action; selecting a language or typing does not download a model. Chinese and English keyboards remain available.
 
 ## Android support
 
@@ -62,16 +67,17 @@ Version **v0.2.0** uses the same testing signature as the preceding release. See
 - Android-independent interfaces for candidate snapshots, input engines and translation providers live in `core/` to keep future platform work decoupled.
 - A separate low-priority translation worker queries a local SQLite index with an in-memory cache. Lookup failures never block Chinese input.
 - Candidate geometry depends on Chinese text; late English glosses do not change candidate width.
+- The candidate header has a fixed height and the expanded grid fills the existing keyboard body. Lexical tag lookup shares the auxiliary worker; missing tags do not affect input.
 
 See the [upstream and architecture research](docs/research.md).
 
 ## Offline and privacy
 
-Input, candidates, translation inference and clipboard processing run on device. No remote text translation endpoint is called. Broader sentence translation requires a user-initiated Wi-Fi model download under More → annotation language. Typing never initiates a download.
+Input, candidates, translation inference and clipboard processing run on device. No remote text translation endpoint is called. The APK includes only Chinese and English dictionaries and local meanings. Broader sentence translation and Japanese/French glosses require a user-initiated Wi-Fi download under More → annotation language → Translation model management, or the corresponding app settings page. Typing never initiates a download.
 
 The app has network permission. Google ML Kit can contact Google for models, configuration, compatibility and diagnostics, sending device/installation identifiers, language configuration, input/output size and performance metadata; it does not send input or output text. See [SDK provenance and privacy](third_party/mlkit/SOURCE.md). Clipboard history can be cleared or disabled and is not uploaded. No advertising is integrated.
 
-On ARM64 devices using 16 KiB memory pages, model translation is currently disabled because of the official SDK binary's RELRO alignment. Normal input, local dictionary definitions and original three-language phrases remain available; settings show the limitation.
+On ARM64 devices using 16 KiB memory pages, model translation is currently disabled because of the official SDK binary's RELRO alignment. Normal input, local Chinese/English dictionary definitions and Chinese/English phrases remain available; settings show the limitation.
 
 ## Build from source
 
@@ -82,7 +88,7 @@ pwsh -File scripts/setup-toolchain.ps1
 pwsh -File scripts/build.ps1 -Variant Release -Test
 ```
 
-Build output goes to `releases/`. Local tools and signing files are excluded by `.gitignore`. See the [validation log](docs/validation-v0.2.0.md) for test scope and results.
+Build output goes to `releases/`. Local tools and signing files are excluded by `.gitignore`. See the [validation log](docs/validation-v0.3.0.md) for test scope and results.
 
 ## Roadmap
 

@@ -1,14 +1,20 @@
 package com.qingyu.ime;
 
 import android.content.Context;
+import android.animation.ValueAnimator;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.ColorFilter;
 import android.graphics.Paint;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.content.res.ColorStateList;
 import android.view.Gravity;
 import android.view.View;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
@@ -34,45 +40,66 @@ final class ImePanels {
     private ImageView detailBadge;
     private Button detailCommit;
     private String detailTranslation="";
+    private ValueAnimator outgoing;
+    private Bitmap transitionBitmap;
+    private Drawable transitionImage;
     ImePanels(Context context,ImePreferences prefs,View keyboard,Consumer<String> action){
         this.context=context;this.prefs=prefs;this.keyboard=keyboard;this.action=action;
         colors=new Palette(prefs.dark(context));toolbar=new LinearLayout(context);toolbar.setGravity(Gravity.CENTER_VERTICAL);
-        body=new FrameLayout(context);body.setId(R.id.panel_host);body.addView(keyboard,new FrameLayout.LayoutParams(-1,-2));
+        body=new FrameLayout(context){
+            @Override protected void onMeasure(int widthSpec,int heightSpec){
+                keyboard.measure(widthSpec,View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
+                int height=keyboard.getMeasuredHeight();
+                if(height==0){boolean landscape=getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;height=dp((landscape?136:244)*prefs.height()+8);}
+                if(View.MeasureSpec.getMode(heightSpec)!=View.MeasureSpec.UNSPECIFIED)height=Math.min(height,View.MeasureSpec.getSize(heightSpec));
+                super.onMeasure(widthSpec,View.MeasureSpec.makeMeasureSpec(height,View.MeasureSpec.EXACTLY));
+                setMeasuredDimension(View.MeasureSpec.getSize(widthSpec),height);
+            }
+        };body.setId(R.id.panel_host);body.setClipChildren(true);body.setClipToPadding(true);body.addView(keyboard,new FrameLayout.LayoutParams(-1,-1));
         String[] names={"更多","文本编辑","Emoji","键盘模式","收起输入法"};String[] commands={"more","edit","emoji","mode","hide"};
         int[] ids={R.id.toolbar_more,R.id.toolbar_edit,R.id.toolbar_emoji,R.id.toolbar_mode,R.id.toolbar_hide};
         for(int i=0;i<names.length;i++){
-            ImageButton button=new ImageButton(context);button.setId(ids[i]);button.setContentDescription(names[i]);button.setBackgroundColor(android.graphics.Color.TRANSPARENT);button.setImageDrawable(new NavIcon(i,colors.secondary,dp(23)));button.setPadding(dp(10),dp(8),dp(10),dp(8));
-            String command=commands[i];button.setOnClickListener(v->action.accept(command));toolbar.addView(button,new LinearLayout.LayoutParams(0,dp(40),1));
+            ImageButton button=new ImageButton(context);button.setId(ids[i]);button.setContentDescription(names[i]);button.setBackground(new RippleDrawable(ColorStateList.valueOf((colors.accent&0x00ffffff)|0x24000000),null,null));button.setImageDrawable(new NavIcon(i,colors.secondary,dp(23)));button.setPadding(dp(10),dp(8),dp(10),dp(8));
+            String command=commands[i];button.setOnClickListener(v->action.accept(owner().equals(command)?"keyboard":command));toolbar.addView(button,new LinearLayout.LayoutParams(0,dp(40),1));
         }
     }
     private int dp(float n){return (int)(n*context.getResources().getDisplayMetrics().density+0.5f);}
     String active(){return active;}
+    String owner(){if(active.equals("clipboard"))return "edit";if(active.equals("languages")||active.equals("height")||active.equals("style")||active.equals("detail"))return "more";return active;}
     boolean isOpen(){return !active.isEmpty();}
-    void refresh(){colors=new Palette(prefs.dark(context));toolbar.setBackgroundColor(colors.background);for(int i=0;i<toolbar.getChildCount();i++)((ImageButton)toolbar.getChildAt(i)).setImageDrawable(new NavIcon(i,colors.secondary,dp(23)));body.setBackgroundColor(colors.background);}
-    void close(){active="";detailTranslation="";body.animate().cancel();body.setAlpha(1f);body.setTranslationY(0);if(body.getChildCount()>1)body.removeViewAt(1);keyboard.setVisibility(View.VISIBLE);body.getLayoutParams().height=-2;body.requestLayout();}
+    void refresh(){colors=new Palette(prefs.dark(context));toolbar.setBackgroundColor(colors.background);String[] commands={"more","edit","emoji","mode","hide"};for(int i=0;i<toolbar.getChildCount();i++){ImageButton button=(ImageButton)toolbar.getChildAt(i);boolean selected=owner().equals(commands[i]);button.setSelected(selected);button.setImageDrawable(new NavIcon(i,selected?colors.accent:colors.secondary,dp(23)));}body.setBackgroundColor(colors.background);body.requestLayout();}
+    void close(){if(active.isEmpty()){keyboard.setVisibility(View.VISIBLE);return;}snapshot();active="";detailTranslation="";removePanel();keyboard.setVisibility(View.VISIBLE);refresh();animateIncoming(keyboard);}
+    private void removePanel(){if(body.getChildCount()>1)body.removeViewAt(1);}
+    void showCandidates(View grid){snapshot();removePanel();active="candidates";keyboard.setVisibility(View.INVISIBLE);if(grid.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)grid.getParent()).removeView(grid);body.addView(grid,new FrameLayout.LayoutParams(-1,-1));refresh();animateIncoming(grid);}
+    private void snapshot(){
+        if(outgoing!=null)outgoing.cancel();if(transitionImage!=null)body.getOverlay().remove(transitionImage);if(transitionBitmap!=null)transitionBitmap.recycle();transitionImage=null;transitionBitmap=null;
+        if(body.getWidth()==0||body.getHeight()==0||!body.isAttachedToWindow())return;
+        try{transitionBitmap=Bitmap.createBitmap(body.getWidth(),body.getHeight(),Bitmap.Config.ARGB_8888);body.draw(new Canvas(transitionBitmap));transitionImage=new BitmapDrawable(context.getResources(),transitionBitmap);transitionImage.setBounds(0,0,body.getWidth(),body.getHeight());body.getOverlay().add(transitionImage);}catch(OutOfMemoryError ignored){transitionImage=null;if(transitionBitmap!=null)transitionBitmap.recycle();transitionBitmap=null;}
+    }
+    private void animateIncoming(View view){
+        view.animate().cancel();view.setAlpha(.82f);view.setTranslationY(dp(3));view.animate().alpha(1f).translationY(0).setDuration(140).setInterpolator(new DecelerateInterpolator()).start();
+        if(transitionImage==null)return;Drawable image=transitionImage;Bitmap bitmap=transitionBitmap;outgoing=ValueAnimator.ofInt(255,0);outgoing.setDuration(140);outgoing.addUpdateListener(animation->{image.setAlpha((int)animation.getAnimatedValue());if(animation.getAnimatedFraction()==1f){body.getOverlay().remove(image);if(transitionImage==image){transitionImage=null;transitionBitmap=null;}bitmap.recycle();}});outgoing.start();
+    }
     private LinearLayout begin(String name,String title){
-        close();active=name;keyboard.setVisibility(View.GONE);refresh();
-        boolean landscape=context.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;
-        int height=dp((landscape?136:244)*prefs.height()+8);body.getLayoutParams().height=height;
+        snapshot();removePanel();active=name;detailTranslation="";keyboard.setVisibility(View.INVISIBLE);refresh();
         LinearLayout panel=new LinearLayout(context);panel.setOrientation(LinearLayout.VERTICAL);panel.setPadding(dp(10),dp(4),dp(10),dp(6));body.addView(panel,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout header=new LinearLayout(context);header.setGravity(Gravity.CENTER_VERTICAL);TextView heading=text(title,14,colors.text);header.addView(heading,new LinearLayout.LayoutParams(0,dp(30),1));Button back=button("返回键盘",()->action.accept("keyboard"));back.setTextSize(11);header.addView(back,new LinearLayout.LayoutParams(dp(78),dp(30)));panel.addView(header);
-        body.setAlpha(.85f);body.setTranslationY(dp(3));body.animate().alpha(1f).translationY(0).setDuration(110).start();return panel;
+        TextView heading=text(title,14,colors.text);panel.addView(heading,new LinearLayout.LayoutParams(-1,dp(30)));animateIncoming(panel);return panel;
     }
     private TextView text(String value,int size,int color){TextView v=new TextView(context);v.setText(value);v.setTextSize(size);v.setTextColor(color);v.setGravity(Gravity.CENTER_VERTICAL);return v;}
     private Button button(String title,Runnable click){
-        Button b=new Button(context);b.setText(title);b.setTextSize(13);b.setAllCaps(false);b.setTextColor(colors.text);b.setContentDescription(title);GradientDrawable background=new GradientDrawable();background.setColor(colors.key);background.setCornerRadius(dp(10));b.setBackground(background);b.setPadding(dp(5),0,dp(5),0);b.setOnClickListener(v->click.run());return b;
+        Button b=new Button(context);b.setText(title);b.setTextSize(13);b.setAllCaps(false);b.setTextColor(colors.text);b.setContentDescription(title);GradientDrawable background=new GradientDrawable();background.setColor(colors.key);background.setCornerRadius(dp(10));b.setBackground(new RippleDrawable(ColorStateList.valueOf((colors.accent&0x00ffffff)|0x24000000),background,null));b.setPadding(dp(5),0,dp(5),0);b.setOnClickListener(v->click.run());return b;
     }
     private void row(LinearLayout parent,String[] names,String[] commands){
         LinearLayout row=new LinearLayout(context);for(int i=0;i<names.length;i++){String cmd=commands[i];Button b=button(names[i],()->action.accept(cmd));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,0,1);lp.height=-1;lp.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(b,lp);}parent.addView(row,new LinearLayout.LayoutParams(-1,0,1));
     }
     void more(){LinearLayout p=begin("more","更多");row(p,new String[]{"释义显示语言 · "+languageName(),"设置"},new String[]{"languages","settings"});row(p,new String[]{"键盘高度","键盘风格"},new String[]{"height","style"});row(p,new String[]{"打字震动 · "+(prefs.haptic()?"开":"关")},new String[]{"haptic"});}
     String languageName(){String lang=prefs.glossLanguage();return lang.equals("ja")?"日语":lang.equals("fr")?"法语":"英语";}
-    void languages(String status){LinearLayout p=begin("languages","释义显示语言");row(p,new String[]{"英语","日语","法语"},new String[]{"language_en","language_ja","language_fr"});row(p,new String[]{prefs.translation()?"隐藏释义":"显示释义","下载离线翻译模型"},new String[]{"toggle_gloss","download_models"});modelStatus=text(status,11,colors.secondary);modelStatus.setPadding(dp(5),dp(4),0,0);p.addView(modelStatus,new LinearLayout.LayoutParams(-1,dp(48)));}
+    void languages(String status){LinearLayout p=begin("languages","释义显示语言");row(p,new String[]{"英语","日语","法语"},new String[]{"language_en","language_ja","language_fr"});row(p,new String[]{prefs.translation()?"隐藏释义":"显示释义","翻译模型管理"},new String[]{"toggle_gloss","model_manager"});modelStatus=text(status,11,colors.secondary);modelStatus.setPadding(dp(5),dp(4),0,0);p.addView(modelStatus,new LinearLayout.LayoutParams(-1,dp(48)));}
     void modelStatus(String value){if(modelStatus!=null&&active.equals("languages"))modelStatus.setText(value);}
     void height(){
         LinearLayout p=begin("height","键盘高度");TextView value=text("左右滑动调节 · "+Math.round(prefs.height()*100)+"%",13,colors.secondary);p.addView(value,new LinearLayout.LayoutParams(-1,dp(48)));
         SeekBar seek=new SeekBar(context);seek.setId(R.id.height_slider);seek.setContentDescription("键盘高度");seek.setMax(1000);seek.setProgress(Math.round((prefs.height()-.78f)/.46f*1000));p.addView(seek,new LinearLayout.LayoutParams(-1,dp(54)));
-        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar v){}public void onStopTrackingTouch(SeekBar v){action.accept("height_changed");}public void onProgressChanged(SeekBar v,int n,boolean user){if(!user)return;prefs.store.edit().putFloat("height",.78f+.46f*n/1000f).apply();value.setText("左右滑动调节 · "+Math.round(prefs.height()*100)+"%");boolean landscape=context.getResources().getConfiguration().orientation==android.content.res.Configuration.ORIENTATION_LANDSCAPE;body.getLayoutParams().height=dp((landscape?136:244)*prefs.height()+8);body.requestLayout();}});
+        seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onStartTrackingTouch(SeekBar v){}public void onStopTrackingTouch(SeekBar v){action.accept("height_changed");}public void onProgressChanged(SeekBar v,int n,boolean user){if(!user)return;prefs.store.edit().putFloat("height",.78f+.46f*n/1000f).apply();value.setText("左右滑动调节 · "+Math.round(prefs.height()*100)+"%");keyboard.requestLayout();body.requestLayout();}});
         TextView note=text("紧凑 78%                                      宽松 124%",11,colors.secondary);p.addView(note,new LinearLayout.LayoutParams(-1,dp(32)));
     }
     void styles(){LinearLayout p=begin("style","键盘风格");row(p,new String[]{"柔和圆角","清简平面"},new String[]{"style_classic","style_flat"});p.addView(text("保持墨绿色，仅调整键帽与间距",12,colors.secondary),new LinearLayout.LayoutParams(-1,dp(38)));}

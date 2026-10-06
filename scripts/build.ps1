@@ -52,11 +52,11 @@ try {
     [IO.File]::WriteAllText($localProperties, "sdk.dir=$sdkProperty`n", [Text.UTF8Encoding]::new($false))
     $tasks = @(':app:assemble' + $Variant)
     if ($Test) { $tasks = @(':core:checkCore') + $tasks }
-    if ($AndroidTest) { $tasks += @(':app:assembleDebug', ':app:assembleDebugAndroidTest') }
+    if ($AndroidTest) { $tasks += @(':app:assemble' + $Variant + 'AndroidTest') }
     $gradle = Join-Path $buildRoot ".tools\gradle\gradle-$gradleVersion\bin\gradle.bat"
     Push-Location $buildRoot
     try {
-        & $gradle @tasks --no-daemon --console=plain --max-workers=4 '-Pandroid.overridePathCheck=true' '-Duser.language=en' '-Duser.country=US' 2>&1 | Tee-Object -FilePath (Join-Path $projectRoot '.tools\logs\build-latest.log')
+        & $gradle @tasks --no-daemon --console=plain --max-workers=4 '-Pandroid.overridePathCheck=true' "-PimeTestBuildType=$($Variant.ToLowerInvariant())" '-Duser.language=en' '-Duser.country=US' 2>&1 | Tee-Object -FilePath (Join-Path $projectRoot '.tools\logs\build-latest.log')
         if ($LASTEXITCODE -ne 0) { throw "Gradle failed; see .tools/logs/build-latest.log (exit $LASTEXITCODE)." }
     } finally { Pop-Location }
     $variantPath = $Variant.ToLowerInvariant()

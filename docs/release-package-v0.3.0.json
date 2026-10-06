@@ -1,0 +1,285 @@
+{
+  "apk": "releases/Qingyu-0.3.0.apk",
+  "variant": "release",
+  "version_code": 3,
+  "version_name": "0.3.0",
+  "bytes": 59819945,
+  "sha256": "363d182a1b498faea8e1da0f97d77d6fd11cde25a2c020ee27e3cf287eb3f4e0",
+  "min_sdk": 26,
+  "target_sdk": 35,
+  "debuggable": false,
+  "certificate_sha256": "12794d0f0be3a864281e828ad389f8e71bb725e196cb4bf65c4937069452d6d9",
+  "baseline": "releases/Qingyu-0.2.0.apk",
+  "zipalign_16k": true,
+  "baseline_bytes": 61859382,
+  "baseline_sha256": "29b11c99ef6e31a45e2cdfbe650d58161c8060de0d26e66c89188c0e0a919801",
+  "size_reduction_bytes": 2039437,
+  "size_reduction_percent": 3.2968919734762303,
+  "native": {
+    "lib/arm64-v8a/libqingyu_pinyin.so": {
+      "bytes": 311464,
+      "sha256": "613e58a6084dbfb23b14af2da79ffa39cdc2fb740b6ed6b27e698d82bf67ba1d",
+      "zip_data_offset": 540672,
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "relro_ends": [
+        327680
+      ]
+    },
+    "lib/arm64-v8a/libtranslate_jni.so": {
+      "bytes": 16361032,
+      "sha256": "45040ff0cdd194d6e601589d759e6f1ba733de5f95790f76cc3e2046919046be",
+      "zip_data_offset": 868352,
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "relro_ends": [
+        15159296
+      ]
+    },
+    "lib/armeabi-v7a/libqingyu_pinyin.so": {
+      "bytes": 186736,
+      "sha256": "0e9c4f6bf04801699f0eeb8dc3053a2d3a279b904e8227f662ccc05d915726ee",
+      "zip_data_offset": 17235968,
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "relro_ends": [
+        212992
+      ]
+    },
+    "lib/armeabi-v7a/libtranslate_jni.so": {
+      "bytes": 11608796,
+      "sha256": "9a7ebc4b29b51a54cc695ae57c736bc6676c6ddbcd4f75a3aed4547ab1c9e551",
+      "zip_data_offset": 17432576,
+      "load_alignment": [
+        4096,
+        4096,
+        4096
+      ],
+      "relro_ends": [
+        10436608
+      ]
+    },
+    "lib/x86_64/libqingyu_pinyin.so": {
+      "bytes": 312120,
+      "sha256": "889e4fce45438e9b0ee8d1d377de995ae6f88f4b4ce41f986a66bfc7493d12da",
+      "zip_data_offset": 29048832,
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "relro_ends": [
+        327680
+      ]
+    },
+    "lib/x86_64/libtranslate_jni.so": {
+      "bytes": 17371616,
+      "sha256": "a757f9544d2731838e5e775f4fa06782aea7944d9039d24d9f2c57d81efa4265",
+      "zip_data_offset": 29376512,
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "relro_ends": [
+        16171008
+      ]
+    }
+  },
+  "assets": {
+    "assets/input/english-bigrams.tsv": {
+      "bytes": 248893,
+      "sha256": "85bff15f7df75511347d3f9d2a012daeb5599e908e3efb4a13fa8e5fb8f75f15"
+    },
+    "assets/input/english-words.tsv": {
+      "bytes": 1539334,
+      "sha256": "7775da89eb739008ce943b592468248eb25e7faec437ad1c83f990fd68b6a9a1"
+    },
+    "assets/input/input-v3.db": {
+      "bytes": 10874880,
+      "sha256": "c23b15436c6750115e483962797ab8b52ec150fbe21ec843e188215871109554"
+    },
+    "assets/licenses/AOSP-PinyinIME-NOTICE.txt": {
+      "bytes": 10690,
+      "sha256": "b5830d96fb5a7e7e7ebcc295f352846b4b998e78fdc8f9aa68e134d2e4b39986"
+    },
+    "assets/licenses/Apache-2.0.txt": {
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "assets/licenses/CC-CEDICT-source.txt": {
+      "bytes": 807,
+      "sha256": "a88853413f02d2c0cf005678271e04ac1d59e531606fa20bd39f3c614d0be49c"
+    },
+    "assets/licenses/GPL-3.0.txt": {
+      "bytes": 34674,
+      "sha256": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0"
+    },
+    "assets/licenses/input-v3-sources.txt": {
+      "bytes": 1563,
+      "sha256": "91979cc5683c8ba9965718069ce4e5df67b15f443d71974e2e2f114ed038bb0b"
+    },
+    "assets/licenses/jieba-LICENSE.txt": {
+      "bytes": 1094,
+      "sha256": "901d4ea24b62b5d6ab28e0e359ea7d8407a72eb876605ec5f20591267fb0d136"
+    },
+    "assets/licenses/SCOWL-README.txt": {
+      "bytes": 16078,
+      "sha256": "abff200f25e487f61a96fb26ec1a8bb50c4612fe108e0382c389e656af79ba22"
+    },
+    "assets/pinyin/dict_pinyin.dat": {
+      "bytes": 1068442,
+      "sha256": "6bf0bbde4e3134cce38d08524a9f4dc1af40435243c8e36b38eb68d1e14462b2"
+    },
+    "assets/translation/phrase-gloss.tsv": {
+      "bytes": 1069,
+      "sha256": "7ea55fc33a8c7b3d437e4ff35706d0fc37735b8b45814878073bba66c9b05e68"
+    },
+    "assets/translation/zh-en-details.db": {
+      "bytes": 8773632,
+      "sha256": "b8018ec67372cd8c39bb27fecf21761b4c14f5e405af7130ad35353aba736529"
+    },
+    "assets/translation/zh-en.db": {
+      "bytes": 3678208,
+      "sha256": "bda47e361201400d79eb8fb0f26c6c26c4b203c5f387ffc3ef3efa2cbca281ac"
+    },
+    "assets/dexopt/baseline.prof": {
+      "bytes": 764,
+      "sha256": "0c6bb7880ddfc8e23a431b4083ba5fa9e68fd9942f921b4e7021896928c69fd8"
+    },
+    "assets/dexopt/baseline.profm": {
+      "bytes": 138,
+      "sha256": "f52e0bb09247b33d4a6054b3586925ee5ac492b8151a5c94adac382b1e0d6631"
+    }
+  },
+  "badges": {
+    "google_translate_badge.png": {
+      "packed_path": "res/vc.png",
+      "source_sha256": "44aab849963bc32493c1b2ff4ed9d47aea8d16cdfa12d3aaebef22feb2ba2ca9",
+      "packed_sha256": "b2a879e6bdd4337ad9a5755ded9ac57f0bf2749e3edc3ec627154ca6e6decb48",
+      "source_byte_match": false,
+      "rgba_pixel_match": true,
+      "dimensions": [
+        528,
+        48
+      ]
+    },
+    "google_translate_badge_dark.png": {
+      "packed_path": "res/Ow.png",
+      "source_sha256": "f5a888a335c107b6cc106e59804d08b5feb35b3755188b17ffc5e577298e6f1e",
+      "packed_sha256": "56b7838cbf8d222d757f7572d6b151100fc54bb56811b178642c68287022d22e",
+      "source_byte_match": false,
+      "rgba_pixel_match": true,
+      "dimensions": [
+        528,
+        48
+      ]
+    }
+  },
+  "upstream_limitations": [
+    "lib/arm64-v8a/libtranslate_jni.so: RELRO end not 16KiB aligned; ARM64 processes with pages >4KiB disable SDK model path."
+  ],
+  "build_generated_assets": {
+    "assets/dexopt/baseline.prof": "app/build/intermediates/binary_art_profile/release/compileReleaseArtProfile/baseline.prof",
+    "assets/dexopt/baseline.profm": "app/build/intermediates/binary_art_profile_metadata/release/compileReleaseArtProfile/baseline.profm"
+  },
+  "default_language_resources": {
+    "languages": [
+      "zh",
+      "en"
+    ],
+    "chinese_english_phrases": 45,
+    "optional_model_files_bundled": false,
+    "note": "Japanese/French files download on demand; the shared SDK library supports multiple languages."
+  },
+  "input_data": {
+    "schema": 3,
+    "chinese_words": 120355,
+    "chinese_words_with_pos": 87160,
+    "part_of_speech_counts": {
+      "a": 2365,
+      "ad": 76,
+      "ag": 46,
+      "an": 29,
+      "b": 426,
+      "c": 223,
+      "d": 1145,
+      "df": 1,
+      "dg": 2,
+      "e": 28,
+      "f": 181,
+      "g": 961,
+      "h": 1,
+      "i": 5458,
+      "j": 360,
+      "k": 4,
+      "l": 2948,
+      "m": 622,
+      "mg": 2,
+      "mq": 17,
+      "n": 33683,
+      "ng": 279,
+      "nr": 7313,
+      "nrfg": 64,
+      "nrt": 1043,
+      "ns": 6485,
+      "nt": 654,
+      "nz": 2252,
+      "o": 130,
+      "p": 78,
+      "q": 162,
+      "r": 222,
+      "rg": 1,
+      "rz": 1,
+      "s": 187,
+      "t": 770,
+      "tg": 7,
+      "u": 9,
+      "ud": 1,
+      "ug": 1,
+      "uj": 1,
+      "ul": 1,
+      "uv": 1,
+      "uz": 1,
+      "v": 14318,
+      "vd": 3,
+      "vg": 160,
+      "vn": 1077,
+      "x": 364,
+      "y": 23,
+      "z": 626,
+      "zg": 2348
+    }
+  },
+  "r8_jni": {
+    "mapping_sha256": "9c7bef451f6f1a8a78f08c1b809e45088088147064f41c675df61ba15ab6cab6",
+    "class_name": "com.qingyu.core.NativeDecoder",
+    "native_methods": [
+      "cancelLastChoice",
+      "choice",
+      "choose",
+      "close",
+      "delete",
+      "fixedLength",
+      "flush",
+      "open",
+      "pinyin",
+      "predict",
+      "reset",
+      "search",
+      "setLearningEnabled",
+      "syllableStarts"
+    ],
+    "actual_dex_native_flags_verified": true,
+    "three_abi_jni_symbols_verified": true
+  }
+}
