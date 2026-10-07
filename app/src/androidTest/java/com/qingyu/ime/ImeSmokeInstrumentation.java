@@ -40,6 +40,7 @@ public class ImeSmokeInstrumentation extends Instrumentation {
             Intent launch=new Intent(getTargetContext(),SettingsActivity.class);launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             activity=startActivitySync(launch);
             newEditor(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);
+            shell("ime set com.qingyu.ime/.QingyuImeService");
             keyboardReady();
 
             runChecks();
@@ -57,15 +58,15 @@ public class ImeSmokeInstrumentation extends Instrumentation {
             runOnMainSync(()->activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE));SystemClock.sleep(500);keyboardReady();awaitCandidate("开发");clickCandidate("开发");awaitText("开发");
             runOnMainSync(()->activity.setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT));SystemClock.sleep(500);keyboardReady();pass("orientation change preserves composition");
             clear();type("xiangmu");awaitCandidate("项目");awaitGloss("项目","project");
-            Rect original=new Rect();candidate("项目").getBoundsInScreen(original);toggleGloss();SystemClock.sleep(150);
+            Rect original=new Rect();candidate("项目").getBoundsInScreen(original);clear();toggleGloss();type("xiangmu");awaitCandidate("项目");SystemClock.sleep(150);
             AccessibilityNodeInfo unchanged=candidate("项目");Rect withoutGloss=new Rect();unchanged.getBoundsInScreen(withoutGloss);
             check(original.equals(withoutGloss),"gloss toggle moved Chinese candidate");check(!String.valueOf(unchanged.getContentDescription()).contains("project"),"gloss remained after disabling");
             clickCandidate("项目");awaitText("项目");toggleGloss();pass("local gloss toggle preserves candidate layout and Chinese input");
             clear();type("zhongguorenmin");key("SPACE");awaitText("中国人民");pass("sentence composition");
 
             clear();type("shi");awaitCandidate(null);nodeClick("candidate_expand");SystemClock.sleep(160);
-            check(find("candidate_8")!=null,"expanded candidates missing");nodeClick("candidate_next_page");SystemClock.sleep(100);
-            AccessibilityNodeInfo paged=find("candidate_12");check(paged!=null,"next page candidate missing");String chosen=paged.getText().toString();paged.performAction(AccessibilityNodeInfo.ACTION_CLICK);awaitText(chosen);keyboardReady();pass("candidate expand, page and choose");
+            AccessibilityNodeInfo gridCandidate=find("candidate_8");check(gridCandidate!=null,"expanded candidates missing");check(gridCandidate.getParent().performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD),"continuous candidate scroll failed");SystemClock.sleep(250);
+            AccessibilityNodeInfo scrolled=find("candidate_12");check(scrolled!=null,"scrolled candidate missing");String chosen=scrolled.getText().toString();scrolled.performAction(AccessibilityNodeInfo.ACTION_CLICK);awaitText(chosen);keyboardReady();pass("candidate expand, vertical scroll and choose");
 
             clear();type("nihao");key("SPACE");key("LANG");type("abc");key("?123");SystemClock.sleep(100);collectKeys();key("1");key("2");key("ABC");SystemClock.sleep(100);collectKeys();
             awaitText("你好abc12");pass("rapid Chinese/English/number commit order");
@@ -102,7 +103,7 @@ public class ImeSmokeInstrumentation extends Instrumentation {
         });waitForIdleSync();SystemClock.sleep(150);
         runOnMainSync(()->{InputMethodManager imm=(InputMethodManager)activity.getSystemService(Activity.INPUT_METHOD_SERVICE);imm.restartInput(editor);imm.showSoftInput(editor,InputMethodManager.SHOW_IMPLICIT);});SystemClock.sleep(200);
     }
-    protected void keyboardReady(){long until=SystemClock.uptimeMillis()+5000;while(SystemClock.uptimeMillis()<until){if(find("key_SPACE")!=null||find("key_1")!=null){SystemClock.sleep(450);collectKeys();return;}SystemClock.sleep(40);}throw new AssertionError("Keyboard did not become accessible");}
+    protected void keyboardReady(){long until=SystemClock.uptimeMillis()+5000,showAt=0;while(SystemClock.uptimeMillis()<until){if(find("key_SPACE")!=null||find("key_1")!=null){SystemClock.sleep(450);collectKeys();return;}if(SystemClock.uptimeMillis()>=showAt){runOnMainSync(()->((InputMethodManager)activity.getSystemService(Activity.INPUT_METHOD_SERVICE)).showSoftInput(editor,InputMethodManager.SHOW_IMPLICIT));showAt=SystemClock.uptimeMillis()+250;}SystemClock.sleep(40);}throw new AssertionError("Keyboard did not become accessible");}
     protected AccessibilityNodeInfo walk(AccessibilityNodeInfo root,String id){if(root==null)return null;String name=root.getViewIdResourceName();if(("com.qingyu.ime:id/"+id).equals(name))return root;for(int i=0;i<root.getChildCount();i++){AccessibilityNodeInfo child=root.getChild(i);AccessibilityNodeInfo found=walk(child,id);if(found!=null)return found;}return null;}
     protected AccessibilityNodeInfo find(String id){for(AccessibilityWindowInfo w:automation.getWindows()){AccessibilityNodeInfo found=walk(w.getRoot(),id);if(found!=null)return found;}return null;}
     protected void collect(AccessibilityNodeInfo node){if(node==null)return;String id=node.getViewIdResourceName();if(id!=null&&id.startsWith("com.qingyu.ime:id/key_")){Rect rect=new Rect();node.getBoundsInScreen(rect);keys.put(id.substring(id.indexOf("key_")+4),rect);}for(int i=0;i<node.getChildCount();i++)collect(node.getChild(i));}
@@ -121,7 +122,8 @@ public class ImeSmokeInstrumentation extends Instrumentation {
         for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo found=buttonIn(node.getChild(i),title);if(found!=null)return found;}return null;
     }
     protected AccessibilityNodeInfo findButton(String title){for(AccessibilityWindowInfo window:automation.getWindows()){AccessibilityNodeInfo found=buttonIn(window.getRoot(),title);if(found!=null)return found;}return null;}
-    protected void buttonClick(String title){long until=SystemClock.uptimeMillis()+4000;AccessibilityNodeInfo node;while((node=findButton(title))==null&&SystemClock.uptimeMillis()<until)SystemClock.sleep(30);check(node!=null,"Missing button "+title);check(node.performAction(AccessibilityNodeInfo.ACTION_CLICK),"Button failed "+title);waitForIdleSync();SystemClock.sleep(130);}
+    protected AccessibilityNodeInfo anyButton(AccessibilityNodeInfo node,String title){if(node==null)return null;if("android.widget.Button".equals(String.valueOf(node.getClassName()))&&node.isClickable()&&(title.contentEquals(node.getText()==null?"":node.getText())||title.contentEquals(node.getContentDescription()==null?"":node.getContentDescription())))return node;for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo match=anyButton(node.getChild(i),title);if(match!=null)return match;}return null;}
+    protected void buttonClick(String title){long until=SystemClock.uptimeMillis()+4000;boolean clicked=false;while(SystemClock.uptimeMillis()<until){AccessibilityNodeInfo node=findButton(title);if(node!=null&&node.isEnabled()&&node.performAction(AccessibilityNodeInfo.ACTION_CLICK)){clicked=true;break;}if(node==null)for(AccessibilityWindowInfo window:automation.getWindows()){AccessibilityNodeInfo offscreen=anyButton(window.getRoot(),title);if(offscreen!=null)offscreen.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SHOW_ON_SCREEN.getId());}SystemClock.sleep(80);}check(clicked,"Button unavailable or failed "+title);waitForIdleSync();SystemClock.sleep(130);}
     protected AccessibilityNodeInfo awaitNode(String id){long until=SystemClock.uptimeMillis()+4000;AccessibilityNodeInfo node;while((node=find(id))==null&&SystemClock.uptimeMillis()<until)SystemClock.sleep(30);check(node!=null,"Missing node "+id);return node;}
     protected void awaitNodeText(String id,String expected){long until=SystemClock.uptimeMillis()+5000;while(SystemClock.uptimeMillis()<until){AccessibilityNodeInfo node=find(id);if(node!=null&&String.valueOf(node.getText()).contains(expected))return;SystemClock.sleep(30);}throw new AssertionError("Missing text "+expected+" in "+id);}
     protected void nodeClick(String id){AccessibilityNodeInfo node=find(id);check(node!=null,"Missing node "+id);check(node.performAction(AccessibilityNodeInfo.ACTION_CLICK),"Node click failed "+id);}

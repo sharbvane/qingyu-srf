@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sharbvane/qingyu-srf/releases/download/v0.3.0/Qingyu-0.3.0.apk"><img alt="Download APK v0.3.0" src="https://img.shields.io/badge/Android_APK-v0.3.0-476B57"></a>
+  <a href="https://github.com/sharbvane/qingyu-srf/releases/download/v0.4.0/Qingyu-0.4.0.apk"><img alt="Published APK v0.4.0" src="https://img.shields.io/badge/Published_APK-v0.4.0-476B57"></a>
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPL--3.0-blue.svg"></a>
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
 </p>
@@ -21,18 +21,19 @@
 
 | Light theme | Dark theme |
 | --- | --- |
-| ![Qingyu light keyboard with its fixed candidate area and English glosses](docs/images/keyboard-v0.3.0-light.png) | ![Qingyu dark keyboard with its fixed candidate area and English glosses](docs/images/keyboard-v0.3.0-dark.png) |
+| ![Qingyu light keyboard with candidates and attached pinyin](docs/images/keyboard-v0.4.0-light.png) | ![Qingyu dark keyboard with candidates and attached pinyin](docs/images/keyboard-v0.4.0-dark.png) |
 
-See the [v0.3.0 validation record](docs/validation-v0.3.0.md) for screenshots and the actual check scope.
+v0.4.0 is now available on [GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.4.0). See the [validation record](docs/validation-v0.4.0.md) for screenshots and the actual check scope.
 
 ## Features
 
-- **Full pinyin and nine-key:** AOSP native full-pinyin decoder plus a local nine-key reading index with frequency ranking, sentence and segment candidates.
+- **Full pinyin and nine-key:** AOSP native full-pinyin decoder plus a local nine-key reading index with frequency ranking, sentence and segment candidates. Raw pinyin protrudes at the upper left, attached to the keyboard edge, without taking candidate space. Enter commits those original letters without choosing a Chinese candidate.
 - **English candidates:** Over 121,000 word forms, completions, explicit spelling suggestions and contextual next-word prediction, with Chinese glosses.
-- **Fixed candidate area:** Candidates and predictions remain within reserved keyboard space. The expanded grid replaces the keys, and a prediction chain stops after at most three selections. The rightmost X clears current predictions.
-- **Quiet language learning:** Chinese and English dictionaries and local meanings are included. Japanese and French require optional model downloads. Tap enters the original word, hold opens details, swipe up enters its translation.
+- **Compact keyboard top:** Idle shows a short empty candidate strip and icon navigation. While composing, candidates replace the navigation area; navigation returns when composition ends. Fixed overall top space keeps the keys steady. The expanded grid replaces the keys and scrolls continuously up and down. A prediction chain stops after at most three selections; the rightmost X clears current predictions.
+- **Quiet language learning:** Only Chinese and English dictionaries and local meanings are bundled. Choose English, Japanese, French, German, Russian or Spanish annotations; non-English models download on demand. Tap enters the original word and hold opens details. Swipe up in the candidate strip to enter a translation; the expanded grid offers translation entry through its long-press details page.
 - **Phrases and sentences:** Local phrases first; downloaded on-device models translate other sentences asynchronously. Failure preserves normal input.
 - **Icon navigation:** More, text editing, Emoji, keyboard modes and hide. Tap the same icon again to close its panel. Selection, select all, copy, cut, paste and 100 recent clipboard items.
+- **Updates and project links:** More → Check for updates shows the official GitHub release version, notes and APK size inside the app. Downloads undergo package and signing checks before Android handles installation. Project homepage opens the official repository.
 - **Case and letter shortcuts:** Chinese full pinyin starts lowercase. Tap Shift once for one directly committed uppercase English letter; double-tap quickly to lock uppercase. These letters bypass pinyin. Hold a letter and slide left for uppercase or right for lowercase; digit-bearing letters offer uppercase on the left, lowercase in the middle and the digit on the right. Release to enter the highlighted character.
 - **Quiet part-of-speech colors:** Exact jieba Chinese dictionary tags select muted noun, verb, adjective, adverb and function-word tones. Unknown and English words remain neutral. These are lexical defaults, not contextual disambiguation.
 - **Everyday typing:** Chinese punctuation, English, numbers and mixed input; repeat backspace, spacebar cursor gestures and candidate browsing.
@@ -43,13 +44,15 @@ Missing glosses stay blank when no model is ready. Dictionary senses and model t
 
 ## Install and try it
 
-1. Download the APK from [GitHub Release v0.3.0](https://github.com/sharbvane/qingyu-srf/releases/download/v0.3.0/Qingyu-0.3.0.apk). Android 8.0 or newer is required. See [all GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases) for earlier versions.
+1. Download and install the [Qingyu v0.4.0 APK](https://github.com/sharbvane/qingyu-srf/releases/download/v0.4.0/Qingyu-0.4.0.apk), or get the checksum from its [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.4.0). Earlier versions are listed under [all GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases). Android 8.0 or newer is required.
 2. Install and open Qingyu. Use **Enable Qingyu Input Method**, then **Switch to Qingyu**. Android requires these system settings steps.
 3. In any text field, type `kaifa`, `xiangmu` or `sheji`. Tap a Chinese candidate to enter Chinese only.
 
-Version **v0.3.0** uses the same testing signature as the preceding release. See the [current validation record](docs/validation-v0.3.0.md). Long-term physical-device use remains unverified.
+Version **v0.4.0** uses the same signing certificate as v0.3 and can replace it directly. See the [validation record](docs/validation-v0.4.0.md). Long-term physical-device use remains unverified.
 
-Choose English, Japanese or French under More → annotation language, then open Translation model management to download, inspect or delete models. The same management page is available in app settings. Downloads require Wi-Fi and an explicit action; selecting a language or typing does not download a model. Chinese and English keyboards remain available.
+Choose English, Japanese, French, German, Russian or Spanish under More → annotation language. Explicitly selecting a required non-English language for the first time starts its optional model download, with Wi-Fi required. Normal typing never downloads a model. Translation model management, also available in app settings, shows status and actual installed size and supports deletion. Extra languages reserve no model storage before downloading. Chinese and English keyboards remain available.
+
+Check for updates is also available in app settings. Android requires installation-source permission and system confirmation; installation is not silent. See [in-app update behavior](docs/in-app-updates.md) for download restoration, package validation and recovery.
 
 ## Android support
 
@@ -67,15 +70,15 @@ Choose English, Japanese or French under More → annotation language, then open
 - Android-independent interfaces for candidate snapshots, input engines and translation providers live in `core/` to keep future platform work decoupled.
 - A separate low-priority translation worker queries a local SQLite index with an in-memory cache. Lookup failures never block Chinese input.
 - Candidate geometry depends on Chinese text; late English glosses do not change candidate width.
-- The candidate header has a fixed height and the expanded grid fills the existing keyboard body. Lexical tag lookup shares the auxiliary worker; missing tags do not affect input.
+- The overall keyboard top reserves 100 dp in portrait and 92 dp in landscape, shared between idle candidates/navigation and the composing candidate area, including fixed attribution space. Raw pinyin remains attached to its upper edge. The expanded grid scrolls vertically within the existing keyboard body. Lexical tag lookup shares the auxiliary worker; missing tags do not affect input.
 
 See the [upstream and architecture research](docs/research.md).
 
 ## Offline and privacy
 
-Input, candidates, translation inference and clipboard processing run on device. No remote text translation endpoint is called. The APK includes only Chinese and English dictionaries and local meanings. Broader sentence translation and Japanese/French glosses require a user-initiated Wi-Fi download under More → annotation language → Translation model management, or the corresponding app settings page. Typing never initiates a download.
+Input, candidates, translation inference and clipboard processing run on device. No remote text translation endpoint is called. The APK includes only Chinese and English dictionaries and local meanings. Broader sentence translation needs on-device models; Japanese, French, German, Russian and Spanish glosses additionally need their language models. First explicitly selecting a non-English annotation language starts a Wi-Fi model download; models can also be downloaded from Translation model management. Ordinary typing never initiates a model download.
 
-The app has network permission. Google ML Kit can contact Google for models, configuration, compatibility and diagnostics, sending device/installation identifiers, language configuration, input/output size and performance metadata; it does not send input or output text. See [SDK provenance and privacy](third_party/mlkit/SOURCE.md). Clipboard history can be cleared or disabled and is not uploaded. No advertising is integrated.
+The app has network permission. Google ML Kit can contact Google for models, configuration, compatibility and diagnostics, sending device/installation identifiers, language configuration, input/output size and performance metadata; it does not send input or output text. See [SDK provenance and privacy](third_party/mlkit/SOURCE.md). Explicit update checks read GitHub Releases metadata; download requests include no input or clipboard text. Clipboard history can be cleared or disabled and is not uploaded. No advertising is integrated.
 
 On ARM64 devices using 16 KiB memory pages, model translation is currently disabled because of the official SDK binary's RELRO alignment. Normal input, local Chinese/English dictionary definitions and Chinese/English phrases remain available; settings show the limitation.
 
@@ -88,7 +91,7 @@ pwsh -File scripts/setup-toolchain.ps1
 pwsh -File scripts/build.ps1 -Variant Release -Test
 ```
 
-Build output goes to `releases/`. Local tools and signing files are excluded by `.gitignore`. See the [validation log](docs/validation-v0.3.0.md) for test scope and results.
+Build output goes to `releases/`. Local tools and signing files are excluded by `.gitignore`. See the [validation log](docs/validation-v0.4.0.md) for test scope and results.
 
 ## Roadmap
 
@@ -98,9 +101,10 @@ Build output goes to `releases/`. Local tools and signing files are excluded by 
 - [ ] Evaluate a more modern Simplified Chinese lexicon and ranking with clear source licenses
 - [ ] Review gloss quality and expand local dictionary coverage
 - [ ] Design a separate iOS Keyboard Extension
-- [x] English, Japanese and French annotations and on-device sentence translation
+- [x] English, Japanese, French, German, Russian and Spanish annotations and on-device sentence translation
 - [x] English candidates, nine-key, text editing and next-word prediction
-- [ ] Evaluate Korean and Spanish translation providers
+- [x] In-app update checks, downloads and a system installation entry point
+- [ ] Evaluate a Korean translation provider
 
 ## Contributing
 

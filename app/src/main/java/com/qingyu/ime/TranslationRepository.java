@@ -14,7 +14,10 @@ import com.google.mlkit.nl.translate.TranslatorOptions;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -26,6 +29,9 @@ import java.util.function.Function;
 
 /** Local lookups and model work stay off the IME thread. Downloads require an explicit action. */
 final class TranslationRepository implements AutoCloseable {
+    private static final String[] GLOSS_LANGUAGES = {"en", "ja", "fr", "de", "ru", "es"};
+    private static final String[] LANGUAGE_NAMES = {"英语", "日语", "法语", "德语", "俄语", "西班牙语"};
+    private static final String[] NATIVE_NAMES = {"English", "日本語", "Français", "Deutsch", "Русский", "Español"};
     enum State { CHECKING, MISSING, DOWNLOADING, DELETING, READY, FAILED, UNSUPPORTED }
     interface Callback { void onResult(String translation, String note); }
     interface StateCallback { void onState(State state); }
@@ -153,7 +159,7 @@ final class TranslationRepository implements AutoCloseable {
         });
     }
 
-    State status(String language) { return modelPlatformSupported ? states.getOrDefault(modelKey(language), State.CHECKING) : State.UNSUPPORTED; }
+    State status(String language) { return modelPlatformSupported && supported(language) ? states.getOrDefault(modelKey(language), State.CHECKING) : State.UNSUPPORTED; }
     static boolean modelPlatformSupported(boolean process64,String abi,long pageSize) {
         // The current official ML Kit ARM64 binary has a non-16K-aligned RELRO end.
         // Keep dictionary/input paths usable rather than loading that JNI on affected devices.
@@ -164,7 +170,7 @@ final class TranslationRepository implements AutoCloseable {
     void refreshModels(String language, StateCallback callback) {
         worker.post(() -> {
             if (closed) return;
-            if (!modelPlatformSupported) { stateResult(callback, State.UNSUPPORTED); return; }
+            if (!modelPlatformSupported || !supported(language)) { stateResult(callback, State.UNSUPPORTED); return; }
             String key = modelKey(language);
             if (status(key) == State.DOWNLOADING || status(key) == State.DELETING) { stateResult(callback, status(key)); return; }
             long generation=modelGeneration;
@@ -174,7 +180,7 @@ final class TranslationRepository implements AutoCloseable {
                         if(closed||generation!=modelGeneration)return;
                         Set<String> downloaded = new HashSet<>();
                         for (TranslateRemoteModel model : models) downloaded.add(model.getLanguage());
-                        for (String target : new String[]{"en", "ja", "fr"}) {
+                        for (String target : GLOSS_LANGUAGES) {
                             if (status(target) == State.DOWNLOADING || status(target) == State.DELETING) continue;
                             // English is the built-in pivot; other language files translate to/from English.
                             states.put(target, downloaded.contains("zh") && (target.equals("en") || downloaded.contains(target)) ? State.READY : State.MISSING);
@@ -190,7 +196,7 @@ final class TranslationRepository implements AutoCloseable {
     void ensureModels(String language, StateCallback callback) {
         worker.post(() -> {
             if (closed) return;
-            if (!modelPlatformSupported) { stateResult(callback, State.UNSUPPORTED); return; }
+            if (!modelPlatformSupported || !supported(language)) { stateResult(callback, State.UNSUPPORTED); return; }
             String key = modelKey(language);
             if (status(key) == State.DOWNLOADING || status(key) == State.DELETING) { stateResult(callback, status(key)); return; }
             states.put(key, State.DOWNLOADING); stateResult(callback, State.DOWNLOADING);
@@ -206,13 +212,20 @@ final class TranslationRepository implements AutoCloseable {
     /** SDK-managed deletion; removing English's shared Chinese model disables all model pairs. */
     void deleteModels(String language,StateCallback callback){
         worker.post(()->{
-            if(closed)return;if(!modelPlatformSupported){stateResult(callback,State.UNSUPPORTED);return;}
+            if(closed)return;if(!modelPlatformSupported||!supported(language)){stateResult(callback,State.UNSUPPORTED);return;}
             String key=modelKey(language);
             for(State state:states.values())if(state==State.DOWNLOADING||state==State.DELETING){stateResult(callback,status(key));return;}
             modelGeneration++;invalidateModelClients();states.put(key,State.DELETING);stateResult(callback,State.DELETING);
             String fileLanguage=key.equals("en")?"zh":key;
             try{RemoteModelManager.getInstance().deleteDownloadedModel(new TranslateRemoteModel.Builder(fileLanguage).build())
-                .addOnSuccessListener(executor,unused->{if(closed)return;states.put(key,State.MISSING);if(key.equals("en"))for(String target:new String[]{"ja","fr"})states.put(target,State.MISSING);modelsChanged();refreshModels(key,callback);})
+                .addOnSuccessListener(executor,unused->{
+                    if(closed)return;
+                    // ML Kit 17.0.3 deletes its flat dictionaries but leaves the unpacked
+                    // translate_* neural-model directories. Remove only this language pair.
+                    try{deleteModelTree(modelFolder(key,false));deleteModelTree(modelFolder(key,true));}
+                    catch(IOException|RuntimeException failure){states.put(key,State.FAILED);modelsChanged();stateResult(callback,State.FAILED);return;}
+                    states.put(key,State.MISSING);if(key.equals("en"))for(String target:GLOSS_LANGUAGES)states.put(target,State.MISSING);modelsChanged();refreshModels(key,callback);
+                })
                 .addOnFailureListener(executor,failure->{if(closed)return;states.put(key,State.FAILED);stateResult(callback,State.FAILED);});
             }catch(RuntimeException failure){states.put(key,State.FAILED);stateResult(callback,State.FAILED);}
         });
@@ -220,26 +233,45 @@ final class TranslationRepository implements AutoCloseable {
     void refreshAfterModelChange(String language,StateCallback callback){worker.post(()->{if(closed)return;modelGeneration++;invalidateModelClients();states.clear();refreshModels(language,callback);});}
     private void invalidateModelClients(){for(ArrayList<Callback> callbacks:pending.values())for(Callback callback:callbacks)result(callback,"","翻译模型已更改，请重新查看");pending.clear();cache.evictAll();for(Translator translator:clients.values())translator.close();clients.clear();}
     private void modelsChanged(){cache.evictAll();android.content.SharedPreferences prefs=context.getSharedPreferences("qingyu",Context.MODE_PRIVATE);prefs.edit().putLong("models_revision",prefs.getLong("models_revision",0)+1).apply();}
-    /** Installed file bytes, not a download estimate. SDK layout changes produce unknown (-1). */
+    /** Actual installed/staged file bytes, not a download estimate; unreadable SDK paths report -1. */
     void modelSize(String language,SizeCallback callback){
+        if(callback==null)return;
         worker.post(()->{if(closed)return;long bytes=-1;
-            try{String fileLanguage=modelKey(language).equals("en")?"zh":modelKey(language);TranslateRemoteModel model=new TranslateRemoteModel.Builder(fileLanguage).build();
-                File folder=new File(new File(context.getNoBackupFilesDir(),"com.google.mlkit.translate.models"),model.getModelNameForBackend());
-                bytes=folder.isDirectory()?folderBytes(folder):status(language)==State.MISSING?0:-1;
-            }catch(RuntimeException ignored){}
+            try{if(!supported(language)){main.post(()->{if(!closed)callback.onSize(-1);});return;}
+                File folder=modelFolder(language,false),temporary=modelFolder(language,true);
+                long installed=folder.isDirectory()?folderBytes(folder):0,staged=temporary.isDirectory()?folderBytes(temporary):0;
+                bytes=installed<0||staged<0?-1:folder.isDirectory()||temporary.isDirectory()?installed+staged:status(language)==State.MISSING?0:-1;
+            }catch(IOException|RuntimeException ignored){}
             long measured=bytes;main.post(()->{if(!closed)callback.onSize(measured);});
         });
     }
+    private File modelFolder(String language,boolean temporary)throws IOException{
+        String key=modelKey(language),fileLanguage=key.equals("en")?"zh":key;
+        String name=new TranslateRemoteModel.Builder(fileLanguage).build().getModelNameForBackend();
+        if(!name.matches("[a-z]{2}_[a-z]{2}"))throw new IOException("Unknown model directory");
+        File root=new File(context.getNoBackupFilesDir().getCanonicalFile(),"com.google.mlkit.translate.models"),parent=temporary?new File(root,"temp"):root,folder=new File(parent,name);
+        if(!root.getCanonicalFile().equals(root.getAbsoluteFile())||!parent.getCanonicalFile().equals(parent.getAbsoluteFile())||!folder.getCanonicalFile().equals(folder.getAbsoluteFile()))throw new IOException("Model directory escapes app storage");
+        return folder;
+    }
+    private static void deleteModelTree(File file)throws IOException{
+        if(!Files.exists(file.toPath(),LinkOption.NOFOLLOW_LINKS))return;
+        if(file.isDirectory()&&!Files.isSymbolicLink(file.toPath())){File[] children=file.listFiles();if(children==null)throw new IOException("Cannot read model directory");for(File child:children)deleteModelTree(child);}
+        Files.delete(file.toPath());
+    }
     private static long folderBytes(File file){if(file.isFile())return file.length();File[] children=file.listFiles();if(children==null)return -1;long bytes=0;for(File child:children){long size=folderBytes(child);if(size<0)return -1;bytes+=size;}return bytes;}
 
-    static String languageName(String language) { return "ja".equals(language) ? "日语" : "fr".equals(language) ? "法语" : "英语"; }
+    static String[] glossLanguages() { return GLOSS_LANGUAGES.clone(); }
+    static boolean isGlossLanguage(String language) { return languageIndex(language) >= 0; }
+    static String languageName(String language) { int index=languageIndex(language);return "zh".equals(language)?"中文":index<0?"英语":LANGUAGE_NAMES[index]; }
+    static String languageLabel(String language) { int index=languageIndex(language);return index<0?languageName(language):LANGUAGE_NAMES[index]+" · "+NATIVE_NAMES[index]; }
+    private static int languageIndex(String language) { for(int i=0;i<GLOSS_LANGUAGES.length;i++)if(GLOSS_LANGUAGES[i].equals(language))return i;return -1; }
     static String stateText(State state) {
         switch (state) {
             case READY: return "模型已就绪 · 可离线翻译";
             case DOWNLOADING: return "等待 Wi-Fi 或正在下载模型";
             case DELETING: return "正在删除模型";
             case FAILED: return "模型不可用 · 请检查网络后重试下载";
-            case MISSING: return "模型未下载 · 本地词典仍可使用";
+            case MISSING: return "模型未下载 · 中文输入照常可用";
             case UNSUPPORTED: return "此 16KB ARM64 设备暂不支持模型翻译 · 本地释义仍可使用";
             default: return "正在检查本地模型";
         }
@@ -254,8 +286,8 @@ final class TranslationRepository implements AutoCloseable {
         }
         return translator;
     }
-    private static boolean supported(String value) { return value != null && (value.equals("zh") || value.equals("en") || value.equals("ja") || value.equals("fr")); }
-    private static String modelKey(String language) { return "ja".equals(language) || "fr".equals(language) ? language : "en"; }
+    private static boolean supported(String value) { return "zh".equals(value) || isGlossLanguage(value); }
+    private static String modelKey(String language) { return "zh".equals(language) ? "en" : language; }
     private void complete(String key, String value, String note) {
         ArrayList<Callback> callbacks = pending.remove(key);
         if (closed || callbacks == null) return;

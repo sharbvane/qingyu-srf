@@ -9,4 +9,6 @@
     <item name="translation_detail" type="id" />
     <item name="translation_commit" type="id" />
     <item name="translation_attribution" type="id" />
+    <item name="pinyin_preedit" type="id" />
+    <item name="update_status" type="id" />
 </resources>

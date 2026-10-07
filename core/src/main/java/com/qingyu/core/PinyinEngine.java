@@ -134,6 +134,14 @@ public final class PinyinEngine implements ChineseEngine {
         return publish("");
     }
 
+    /** Original letters, including earlier selected but uncommitted segments. */
+    public String rawInput() {
+        checkWorker();
+        StringBuilder raw = new StringBuilder();
+        for (Segment segment : completedSegments) raw.append(segment.pinyin);
+        return raw.append(activeInput).toString();
+    }
+
     /** Flush learning only at a lifecycle boundary, never on every key. */
     public void flush() {
         checkWorker();

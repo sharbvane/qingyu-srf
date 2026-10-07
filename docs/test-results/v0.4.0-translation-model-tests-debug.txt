@@ -1,0 +1,51 @@
+UTC: 2026-10-07T00:23:58.3400241Z
+Version: 0.4.0
+Variant: Debug
+Runner: TranslationModelInstrumentation
+Models available branch: False
+Models only branch: False
+V4 only branch: False
+Serial: emulator-5554
+APK SHA256: 78365E8B7B984264B3F87BD00DB8C11FC7529FDA10CE152362CECD345AC5B650
+
+MODEL en DOWNLOADING
+MODEL en READY
+MODEL en READY
+MODEL ja DOWNLOADING
+MODEL ja READY
+MODEL ja READY
+MODEL fr DOWNLOADING
+MODEL fr READY
+MODEL fr READY
+MODEL de DOWNLOADING
+MODEL de READY
+MODEL de READY
+MODEL ru DOWNLOADING
+MODEL ru READY
+MODEL ru READY
+MODEL es DOWNLOADING
+MODEL es READY
+MODEL es READY
+PASS six-language catalog, preferences and invalid download guard
+PASS model ABI/page-size guard
+MODEL en READY
+BYTES en 45148182 | en_zh
+TRANSLATED en I would like to drink coffee with my friends this afternoon. | Google Translate · 端侧翻译
+MODEL ja READY
+BYTES ja 63391979 | en_ja
+TRANSLATED ja 今日の友達とコーヒーを飲みたいのですが。 | Google Translate · 端侧翻译
+MODEL fr READY
+BYTES fr 45219923 | en_fr
+TRANSLATED fr J'aimerais boire du café avec mes amis cet après-midi. | Google Translate · 端侧翻译
+MODEL de READY
+BYTES de 46564403 | de_en
+TRANSLATED de Ich würde gerne heute Nachmittag mit meinen Freunden Kaffee trinken. | Google Translate · 端侧翻译
+MODEL ru READY
+BYTES ru 42194902 | en_ru
+TRANSLATED ru Я хотел бы выпить кофе с моими друзьями сегодня днем. | Google Translate · 端侧翻译
+MODEL es READY
+BYTES es 45311611 | en_es
+TRANSLATED es Me gustaría tomar un café con mis amigos esta tarde. | Google Translate · 端侧翻译
+TRANSLATED en-zh 绿色键盘每天都会打字舒适。
+ALL_MODEL_CHECKS_PASS
+

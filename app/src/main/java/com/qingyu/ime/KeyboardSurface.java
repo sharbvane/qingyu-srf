@@ -105,6 +105,7 @@ final class KeyboardSurface extends View {
     }
     void consumedLetter() { if (shifted && !capsLock) { shifted=false; invalidate(); accessibilityChanged(); } }
     boolean uppercase() { return shifted; }
+    void enterLabel(String value) { if(!enterLabel.equals(value)){enterLabel=value;invalidate();accessibilityChanged();} }
     boolean isSymbols() { return symbols || numeric; }
     void resetModes() { symbols=false; shifted=false; capsLock=false; secondSymbols=false; cancelTouch(); }
     private float dp(float n) { return n*density; }
@@ -281,7 +282,7 @@ final class KeyboardSurface extends View {
             case "SHIFT":return symbols?(secondSymbols?"数字符号页":"更多符号"):(capsLock?"大写已锁定":"切换大小写");
             case "SPACE":return "空格";
             case "LANG":return secure?"安全输入，英文键盘":(english?"切换中文":"切换英文");
-            case "ENTER":return enterLabel.equals("↵")?"换行":enterLabel;
+            case "ENTER":return enterLabel.equals("拼音")?"提交原始拼音":enterLabel.equals("↵")?"换行":enterLabel;
             case "⌫":return "删除";
             case "?123":return "数字和符号";
             case "ABC":return "字母键盘";

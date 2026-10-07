@@ -27,7 +27,13 @@ final class CandidateLayoutCheck {
         CandidateSurface header=new CandidateSurface(context,prefs,listener);
         header.update("",Collections.emptyList(),true,"");layout(header,1080,0);
         int fixedHeight=header.getHeight();
+        int defaultHeight=context.getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE?44:52;
+        check(fixedHeight==Math.round(defaultHeight*context.getResources().getDisplayMetrics().density),"Wrong compact idle candidate height");
         header.update("kaifa",Arrays.asList("开发","项目","非常长的候选词用于边界检查"),true,"");layout(header,1080,0);
+        Bitmap headerBitmap=Bitmap.createBitmap(1080,fixedHeight,Bitmap.Config.ARGB_8888);
+        header.draw(new Canvas(headerBitmap){@Override public void drawText(String value,float x,float baseline,Paint paint){check(!value.contains("kaifa"),"Raw pinyin is still drawn inside candidates");Paint.FontMetrics metrics=paint.getFontMetrics();check(baseline+metrics.ascent>=-1&&baseline+metrics.descent<=fixedHeight+1,"Header text escaped reserved space");super.drawText(value,x,baseline,paint);}});headerBitmap.recycle();
+        int activeHeight=Math.round((defaultHeight+48)*context.getResources().getDisplayMetrics().density);layout(header,1080,activeHeight);
+        Bitmap activeBitmap=Bitmap.createBitmap(1080,activeHeight,Bitmap.Config.ARGB_8888);header.draw(new Canvas(activeBitmap){@Override public void drawRoundRect(float left,float top,float right,float bottom,float rx,float ry,Paint paint){check(bottom-top<=52*context.getResources().getDisplayMetrics().density+.5f,"Active header highlight became a tall color block");super.drawRoundRect(left,top,right,bottom,rx,ry,paint);}});activeBitmap.recycle();layout(header,1080,0);
         Rect first=bounds(header,100);header.setExpandIndicator(true);layout(header,1080,0);
         check(header.getHeight()==fixedHeight&&bounds(header,100).equals(first),"Expand arrow changed header geometry");
         header.update("",Arrays.asList("人民","文化","语言","后续候选词"),true,"");header.setInteractiveComposition(false);header.setPredicting(true);layout(header,1080,0);
@@ -50,20 +56,25 @@ final class CandidateLayoutCheck {
             java.util.Map<String,String> glosses=new java.util.HashMap<>();for(String word:grid.words())glosses.put(word,"annotation");grid.glosses(glosses);
             int exactHeight=Math.round((landscape?140:198)*oriented.getResources().getDisplayMetrics().density);
             layout(grid,1080,exactHeight);check(grid.getHeight()==exactHeight,"Grid ignored exact body height");
-            check(grid.visibleWords().size()==(landscape?6:12)&&bounds(grid,100).top==0,"Wrong grid slots or extra composition row");
+            check(grid.visibleWords().size()>0&&grid.visibleWords().size()<=12&&bounds(grid,100).top==0,"Wrong grid slots or extra composition row");
             for(int i=0;i<grid.visibleWords().size();i++){Rect box=bounds(grid,100+i);check(box.left>=0&&box.right<=1080&&box.bottom<grid.getHeight(),"Grid candidate outside body");}
+            check(grid.getAccessibilityNodeProvider().createAccessibilityNodeInfo(1000)==null&&grid.getAccessibilityNodeProvider().createAccessibilityNodeInfo(1001)==null,"Legacy paging controls remain");
             Bitmap bitmap=Bitmap.createBitmap(1080,exactHeight,Bitmap.Config.ARGB_8888);
             grid.draw(new Canvas(bitmap){
                 @Override public void drawText(String value,float x,float baseline,Paint paint){
                     int index=grid.words().indexOf(value);
                     if(index>=0||value.equals("annotation")){
-                        int row=index>=0?index/3:Math.min((landscape?2:4)-1,(int)(baseline/(bounds(grid,100).height())));
+                        int row=index>=0?index/3:Math.max(0,(int)(baseline/(bounds(grid,100).height())));
                         Rect cell=bounds(grid,100+row*3);Paint.FontMetrics metrics=paint.getFontMetrics();
-                        check(baseline+metrics.ascent>=cell.top-1&&baseline+metrics.descent<=cell.bottom+1,"Minimum-height grid text crossed a row/footer");
+                        if(cell.height()==bounds(grid,100).height())check(baseline+metrics.ascent>=cell.top-1&&baseline+metrics.descent<=cell.bottom+1,"Minimum-height grid text crossed a full row");
                     }
                     super.drawText(value,x,baseline,paint);
                 }
             });bitmap.recycle();
+            Configuration large=new Configuration(config);large.fontScale=1.3f;Context enlarged=context.createConfigurationContext(large);
+            CandidateSurface scaled=new CandidateSurface(enlarged,new ImePreferences(enlarged),listener);scaled.update("kaifa",Arrays.asList("开发","很长的中文候选用于截断"),true,"");scaled.glosses(Collections.singletonMap("开发","develop"));layout(scaled,1080,0);
+            int scaledHeight=scaled.getHeight();Bitmap scaledBitmap=Bitmap.createBitmap(1080,scaledHeight,Bitmap.Config.ARGB_8888);
+            scaled.draw(new Canvas(scaledBitmap){@Override public void drawText(String value,float x,float baseline,Paint paint){Paint.FontMetrics metrics=paint.getFontMetrics();check(baseline+metrics.ascent>=-1&&baseline+metrics.descent<=scaledHeight+1,"1.3 font scale escaped header");super.drawText(value,x,baseline,paint);}});scaledBitmap.recycle();
         }
         for(boolean dark:new boolean[]{false,true}){
             Palette palette=new Palette(dark);java.util.Set<Integer> tones=new java.util.HashSet<>();

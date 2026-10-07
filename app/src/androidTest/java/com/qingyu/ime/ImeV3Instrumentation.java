@@ -9,7 +9,7 @@ import android.view.WindowInsets;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 /** v0.3 regressions use the actual IME window and editor; helpers exercise native touch paths. */
-public final class ImeV3Instrumentation extends ImeV2Instrumentation {
+public class ImeV3Instrumentation extends ImeV2Instrumentation {
     private boolean modelsOnly;
     @Override public void onCreate(android.os.Bundle arguments){modelsOnly=arguments!=null&&"true".equals(arguments.getString("models_only"));super.onCreate(arguments);}
     @Override protected String successMarker(){return modelsOnly?"ALL_MODEL_MANAGEMENT_CHECKS_PASS":"ALL_V3_IME_CHECKS_PASS";}
@@ -23,9 +23,9 @@ public final class ImeV3Instrumentation extends ImeV2Instrumentation {
         type("kaifa");awaitCandidate("开发");
         Rect idleBody=bounds("panel_host"),candidateBounds=new Rect();candidate("开发").getBoundsInScreen(candidateBounds);
         assertReservedArea(candidateBounds);
-        Rect toolbar=bounds("toolbar_more");nodeClick("candidate_expand");SystemClock.sleep(200);
+        Rect header=new Rect();candidate("开发").getParent().getBoundsInScreen(header);nodeClick("candidate_expand");SystemClock.sleep(200);
         check(find("key_SPACE")==null&&find("candidate_8")!=null,"Expanded grid missing or keyboard touch nodes still exposed");
-        check(idleBody.equals(bounds("panel_host"))&&toolbar.equals(bounds("toolbar_more")),"Expansion changed reserved keyboard geometry");
+        Rect expandedHeader=new Rect();candidate("开发").getParent().getBoundsInScreen(expandedHeader);check(idleBody.equals(bounds("panel_host"))&&header.equals(expandedHeader),"Expansion changed reserved keyboard geometry");
         Rect grid=new Rect();awaitNode("candidate_8").getBoundsInScreen(grid);check(idleBody.contains(grid),"Expanded candidate escapes keyboard body");
         screenshot("v3-expanded.png");nodeClick("candidate_expand");keyboardReady();check(idleBody.equals(bounds("panel_host")),"Collapse changed keyboard height");
         pass("candidate expansion fills fixed keyboard body, reserves app space and collapses safely");
@@ -81,7 +81,7 @@ public final class ImeV3Instrumentation extends ImeV2Instrumentation {
         setLanguage("法语");type("womenmingtianqubeijing");awaitCandidate("我们明天去北京");holdCandidate("我们明天去北京");awaitNodeText("translation_detail","Google Translate · 端侧翻译");String sentence=awaitNode("translation_detail").getText().toString().split("\n",2)[0];check(!sentence.isEmpty()&&!sentence.equals("我们明天去北京"),"French sentence translation missing");closePanel();keyboardReady();upCandidate("我们明天去北京");awaitText(sentence);clear();setLanguage("英语");pass("complete seven-syllable French model translation survives detail and upward sentence commit");
     }
     private void openManager(){nodeClick("toolbar_more");buttonClick("释义显示语言 · 日语");buttonClick("翻译模型管理");long until=SystemClock.uptimeMillis()+5000;while(description("日语模型状态")==null&&SystemClock.uptimeMillis()<until)SystemClock.sleep(30);check(description("日语模型状态")!=null,"Model manager intent did not open settings page");}
-    private void leaveManager()throws Exception{shell("input keyevent 4");SystemClock.sleep(180);shell("input keyevent 4");SystemClock.sleep(250);android.content.Intent intent=new android.content.Intent(getTargetContext(),SettingsActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK);activity=startActivitySync(intent);newEditor(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);keyboardReady();}
+    private void leaveManager()throws Exception{shell("input keyevent 4");SystemClock.sleep(180);newEditor(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);keyboardReady();}
     private AccessibilityNodeInfo descriptionIn(AccessibilityNodeInfo node,String value){if(node==null)return null;if(value.contentEquals(node.getContentDescription()==null?"":node.getContentDescription()))return node;for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo match=descriptionIn(node.getChild(i),value);if(match!=null)return match;}return null;}
     private AccessibilityNodeInfo description(String value){for(android.view.accessibility.AccessibilityWindowInfo window:automation.getWindows()){AccessibilityNodeInfo match=descriptionIn(window.getRoot(),value);if(match!=null)return match;}return null;}
     private void awaitModelState(String language,String expected){long until=SystemClock.uptimeMillis()+90000;String actual="";while(SystemClock.uptimeMillis()<until){AccessibilityNodeInfo node=description(language+"模型状态");if(node!=null){actual=String.valueOf(node.getText());if(actual.contains(expected))return;if(actual.contains("模型不可用"))throw new AssertionError("Model operation failed "+language+": "+actual);}SystemClock.sleep(60);}throw new AssertionError("Model state timeout "+language+" expected "+expected+", actual "+actual);}

@@ -1,0 +1,21 @@
+UTC: 2026-10-07T00:19:02.3642633Z
+Version: 0.4.0
+Variant: Debug
+Runner: AppUpdateInstrumentation
+Models available branch: False
+Models only branch: False
+V4 only branch: False
+Serial: emulator-5554
+APK SHA256: 78365E8B7B984264B3F87BD00DB8C11FC7529FDA10CE152362CECD345AC5B650
+
+PASS update numeric versions and invalid tags
+PASS update stable release, notes, asset name and size
+PASS update HTTPS repository and URL boundary
+PASS update archive version, downgrade and signature/digest checks
+PASS update installer MIME, temporary read grant and provider path guard
+INSTALLER priority=0 preferredOrder=0 match=0x608000 specificIndex=-1 isDefault=true
+com.google.android.packageinstaller/com.android.packageinstaller.InstallStart
+PASS update private APK provider rejects raw tampering, same signing identity and system installer resolution
+PASS update persisted download restoration and cancellation
+ALL_APP_UPDATE_CHECKS_PASS
+

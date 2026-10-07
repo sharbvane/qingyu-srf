@@ -5,15 +5,20 @@ Android guide on 2026-10-05:
 https://developers.google.com/ml-kit/language/translation/android
 
 The model translates complete input on-device. Qingyu never calls a remote
-text translation endpoint. Only an explicit model-download action calls
+text translation endpoint. An explicit model-download action or the user's
+first explicit selection of a required non-English annotation language calls
 `downloadModelIfNeeded`, with Wi-Fi required. Model existence checks do not
 download files. Candidate generation and editor operations do not wait for
 dictionary lookup, model checks, downloads or inference.
 
 Supported input sources are Chinese and English. Chinese annotations select
-English, Japanese or French; English annotations select Chinese. English is
-the built-in pivot. Japanese/French translation additionally requires that
-language's model and may lose nuance because it routes through English.
+English, Japanese, French, German, Russian or Spanish; English annotations
+select Chinese. The APK bundles only Chinese/English dictionaries and local
+phrase meanings, not these optional model weights. Extra languages occupy no
+model storage before downloading. The model-management page reports download
+state and actual installed file size and supports deletion. English is the
+built-in pivot. Non-English translation additionally requires that language's
+model and may lose nuance because it routes through English.
 Model output is intended for casual translation, not guaranteed accuracy.
 https://developers.google.com/ml-kit/language/translation
 
@@ -24,7 +29,8 @@ Google. The SDK can contact Google for models, updates, accelerator
 compatibility, remote configuration and diagnostics. It sends metadata such
 as device/app information, installation identifiers, language configuration,
 input/output size, latency and events/error codes. These SDK requests are
-independent of Qingyu's explicit model-download action. Qingyu does not log
+independent of Qingyu's explicit model-download or language-selection action.
+Qingyu does not log
 typed text or attach input/clipboard text to download requests.
 
 https://developers.google.com/ml-kit/terms
@@ -57,6 +63,11 @@ Two unmodified original source PNGs are retained in `res/drawable-nodpi`:
 Display at the official regular badge ratio, typically 176×16 dp, without
 tint, cropping, brand redraw or distortion. These are Google brand assets
 used for required attribution, not Qingyu original or GPL licensed imagery.
+The v0.4 keyboard top reserves 100 dp in portrait and 92 dp in landscape,
+shared between idle candidates/navigation and composing candidates, including
+fixed model-attribution space. Raw pinyin stays attached to its upper edge;
+the expanded candidate grid scrolls vertically within the keyboard body and
+retains its attribution.
 
 The source PNG files retain the exact official bytes and SHA-256 values
 above. Release packaging applies AAPT lossless PNG encoding optimization,
@@ -64,7 +75,7 @@ so the packaged file names and encoded-byte hashes can differ. The final
 package audit compares decoded RGBA pixels and the original 528×48
 dimensions; both remain identical to the official source graphics. It
 records source and packaged hashes separately in the version's
-`releases/qa/v0.2.0/release-package.json`.
+`releases/qa/<version>/release-package.json`.
 
 ## 16 KiB ARM64 device limitation
 
@@ -78,6 +89,6 @@ https://developer.android.com/guide/practices/page-sizes#relro
 Qingyu does not modify the proprietary binary. On a 64-bit ARM process
 using pages larger than 4 KiB, it reports the model as unsupported and
 does not instantiate a Translator or download its models. Chinese/English
-input, local dictionary glosses, original three-language phrases and
+input, local Chinese/English dictionary glosses, Chinese/English phrases and
 complete dictionary definitions remain available. Revisit this guard when
 an official fixed SDK is available; no affected physical device was tested.

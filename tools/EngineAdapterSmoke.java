@@ -44,6 +44,7 @@ public final class EngineAdapterSmoke {
         state = engine.select(id(state, "中国"));
         check(state.composing.equals("中国renmin"), "partial selection composing");
         check(state.committedText.isEmpty(), "partial selection stays in preedit");
+        check(engine.rawInput().equals("zhongguorenmin"), "raw Enter retains letters behind a selected Chinese prefix");
         state = engine.backspace();
         check(state.composing.equals("中国renmi"), "partial composing backspace");
         state = engine.search("zhongguorenmin");
@@ -64,6 +65,7 @@ public final class EngineAdapterSmoke {
         state = engine.search(longInput);
         state = engine.select(0);
         int tailLength = state.rawPinyin.length();
+        check(engine.rawInput().equals(longInput), "raw Enter retains completed native segments and pending letters");
         check(tailLength > 0, "long composition keeps suffix");
         for (int i = 0; i < tailLength; i++) state = engine.backspace();
         check(!state.rawPinyin.isEmpty() && !state.composing.isEmpty(), "deleting tail restores preceding selected segment");

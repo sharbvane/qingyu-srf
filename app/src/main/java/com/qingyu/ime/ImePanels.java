@@ -43,6 +43,7 @@ final class ImePanels {
     private ValueAnimator outgoing;
     private Bitmap transitionBitmap;
     private Drawable transitionImage;
+    private Runnable panelChanged=()->{};
     ImePanels(Context context,ImePreferences prefs,View keyboard,Consumer<String> action){
         this.context=context;this.prefs=prefs;this.keyboard=keyboard;this.action=action;
         colors=new Palette(prefs.dark(context));toolbar=new LinearLayout(context);toolbar.setGravity(Gravity.CENTER_VERTICAL);
@@ -60,30 +61,32 @@ final class ImePanels {
         int[] ids={R.id.toolbar_more,R.id.toolbar_edit,R.id.toolbar_emoji,R.id.toolbar_mode,R.id.toolbar_hide};
         for(int i=0;i<names.length;i++){
             ImageButton button=new ImageButton(context);button.setId(ids[i]);button.setContentDescription(names[i]);button.setBackground(new RippleDrawable(ColorStateList.valueOf((colors.accent&0x00ffffff)|0x24000000),null,null));button.setImageDrawable(new NavIcon(i,colors.secondary,dp(23)));button.setPadding(dp(10),dp(8),dp(10),dp(8));
-            String command=commands[i];button.setOnClickListener(v->action.accept(owner().equals(command)?"keyboard":command));toolbar.addView(button,new LinearLayout.LayoutParams(0,dp(40),1));
+            String command=commands[i];button.setOnClickListener(v->action.accept(owner().equals(command)?"keyboard":command));toolbar.addView(button,new LinearLayout.LayoutParams(0,dp(48),1));
         }
     }
     private int dp(float n){return (int)(n*context.getResources().getDisplayMetrics().density+0.5f);}
     String active(){return active;}
     String owner(){if(active.equals("clipboard"))return "edit";if(active.equals("languages")||active.equals("height")||active.equals("style")||active.equals("detail"))return "more";return active;}
     boolean isOpen(){return !active.isEmpty();}
-    void refresh(){colors=new Palette(prefs.dark(context));toolbar.setBackgroundColor(colors.background);String[] commands={"more","edit","emoji","mode","hide"};for(int i=0;i<toolbar.getChildCount();i++){ImageButton button=(ImageButton)toolbar.getChildAt(i);boolean selected=owner().equals(commands[i]);button.setSelected(selected);button.setImageDrawable(new NavIcon(i,selected?colors.accent:colors.secondary,dp(23)));}body.setBackgroundColor(colors.background);body.requestLayout();}
+    void onPanelChanged(Runnable callback){panelChanged=callback;}
+    void refresh(){colors=new Palette(prefs.dark(context));toolbar.setBackgroundColor(colors.background);String[] commands={"more","edit","emoji","mode","hide"};for(int i=0;i<toolbar.getChildCount();i++){ImageButton button=(ImageButton)toolbar.getChildAt(i);boolean selected=owner().equals(commands[i]);button.setSelected(selected);button.setImageDrawable(new NavIcon(i,selected?colors.accent:colors.secondary,dp(23)));}body.setBackgroundColor(colors.background);body.requestLayout();panelChanged.run();}
     void close(){if(active.isEmpty()){keyboard.setVisibility(View.VISIBLE);return;}snapshot();active="";detailTranslation="";removePanel();keyboard.setVisibility(View.VISIBLE);refresh();animateIncoming(keyboard);}
     private void removePanel(){if(body.getChildCount()>1)body.removeViewAt(1);}
     void showCandidates(View grid){snapshot();removePanel();active="candidates";keyboard.setVisibility(View.INVISIBLE);if(grid.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)grid.getParent()).removeView(grid);body.addView(grid,new FrameLayout.LayoutParams(-1,-1));refresh();animateIncoming(grid);}
     private void snapshot(){
         if(outgoing!=null)outgoing.cancel();if(transitionImage!=null)body.getOverlay().remove(transitionImage);if(transitionBitmap!=null)transitionBitmap.recycle();transitionImage=null;transitionBitmap=null;
-        if(body.getWidth()==0||body.getHeight()==0||!body.isAttachedToWindow())return;
+        if(body.getWidth()==0||body.getHeight()==0||!body.isAttachedToWindow()||!ValueAnimator.areAnimatorsEnabled())return;
         try{transitionBitmap=Bitmap.createBitmap(body.getWidth(),body.getHeight(),Bitmap.Config.ARGB_8888);body.draw(new Canvas(transitionBitmap));transitionImage=new BitmapDrawable(context.getResources(),transitionBitmap);transitionImage.setBounds(0,0,body.getWidth(),body.getHeight());body.getOverlay().add(transitionImage);}catch(OutOfMemoryError ignored){transitionImage=null;if(transitionBitmap!=null)transitionBitmap.recycle();transitionBitmap=null;}
     }
     private void animateIncoming(View view){
+        if(!ValueAnimator.areAnimatorsEnabled()){view.animate().cancel();view.setAlpha(1f);view.setTranslationY(0);return;}
         view.animate().cancel();view.setAlpha(.82f);view.setTranslationY(dp(3));view.animate().alpha(1f).translationY(0).setDuration(140).setInterpolator(new DecelerateInterpolator()).start();
         if(transitionImage==null)return;Drawable image=transitionImage;Bitmap bitmap=transitionBitmap;outgoing=ValueAnimator.ofInt(255,0);outgoing.setDuration(140);outgoing.addUpdateListener(animation->{image.setAlpha((int)animation.getAnimatedValue());if(animation.getAnimatedFraction()==1f){body.getOverlay().remove(image);if(transitionImage==image){transitionImage=null;transitionBitmap=null;}bitmap.recycle();}});outgoing.start();
     }
     private LinearLayout begin(String name,String title){
         snapshot();removePanel();active=name;detailTranslation="";keyboard.setVisibility(View.INVISIBLE);refresh();
         LinearLayout panel=new LinearLayout(context);panel.setOrientation(LinearLayout.VERTICAL);panel.setPadding(dp(10),dp(4),dp(10),dp(6));body.addView(panel,new FrameLayout.LayoutParams(-1,-1));
-        TextView heading=text(title,14,colors.text);panel.addView(heading,new LinearLayout.LayoutParams(-1,dp(30)));animateIncoming(panel);return panel;
+        TextView heading=text(title,16,colors.text);heading.setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);heading.setPadding(dp(10),0,0,0);panel.addView(heading,new LinearLayout.LayoutParams(-1,dp(32)));animateIncoming(panel);return panel;
     }
     private TextView text(String value,int size,int color){TextView v=new TextView(context);v.setText(value);v.setTextSize(size);v.setTextColor(color);v.setGravity(Gravity.CENTER_VERTICAL);return v;}
     private Button button(String title,Runnable click){
@@ -92,9 +95,20 @@ final class ImePanels {
     private void row(LinearLayout parent,String[] names,String[] commands){
         LinearLayout row=new LinearLayout(context);for(int i=0;i<names.length;i++){String cmd=commands[i];Button b=button(names[i],()->action.accept(cmd));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,0,1);lp.height=-1;lp.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(b,lp);}parent.addView(row,new LinearLayout.LayoutParams(-1,0,1));
     }
-    void more(){LinearLayout p=begin("more","更多");row(p,new String[]{"释义显示语言 · "+languageName(),"设置"},new String[]{"languages","settings"});row(p,new String[]{"键盘高度","键盘风格"},new String[]{"height","style"});row(p,new String[]{"打字震动 · "+(prefs.haptic()?"开":"关")},new String[]{"haptic"});}
-    String languageName(){String lang=prefs.glossLanguage();return lang.equals("ja")?"日语":lang.equals("fr")?"法语":"英语";}
-    void languages(String status){LinearLayout p=begin("languages","释义显示语言");row(p,new String[]{"英语","日语","法语"},new String[]{"language_en","language_ja","language_fr"});row(p,new String[]{prefs.translation()?"隐藏释义":"显示释义","翻译模型管理"},new String[]{"toggle_gloss","model_manager"});modelStatus=text(status,11,colors.secondary);modelStatus.setPadding(dp(5),dp(4),0,0);p.addView(modelStatus,new LinearLayout.LayoutParams(-1,dp(48)));}
+    private LinearLayout scrolling(LinearLayout panel){ScrollView scroll=new ScrollView(context);scroll.setFillViewport(false);LinearLayout list=new LinearLayout(context);list.setOrientation(LinearLayout.VERTICAL);scroll.addView(list);panel.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));return list;}
+    private void listAction(LinearLayout list,String title,String command){
+        Button b=button(title,()->action.accept(command));b.setTextSize(14);b.setGravity(Gravity.START|Gravity.CENTER_VERTICAL);b.setPadding(dp(12),0,dp(10),0);b.setBackground(new RippleDrawable(ColorStateList.valueOf((colors.accent&0x00ffffff)|0x18000000),null,null));b.setCompoundDrawablesWithIntrinsicBounds(null,null,new NavIcon(5,colors.secondary,dp(18)),null);list.addView(b,new LinearLayout.LayoutParams(-1,dp(48)));
+    }
+    void more(){
+        LinearLayout list=scrolling(begin("more","更多"));listAction(list,"释义显示语言 · "+languageName(),"languages");listAction(list,"键盘高度","height");listAction(list,"键盘风格","style");listAction(list,"打字震动 · "+(prefs.haptic()?"开":"关"),"haptic");
+        View separation=new View(context);list.addView(separation,new LinearLayout.LayoutParams(-1,dp(8)));listAction(list,"设置","settings");listAction(list,"检查更新","check_updates");listAction(list,"项目主页","project_home");
+    }
+    String languageName(){return TranslationRepository.languageName(prefs.glossLanguage());}
+    void languages(String status){
+        LinearLayout list=scrolling(begin("languages","释义显示语言"));String[] languages=TranslationRepository.glossLanguages();
+        for(int i=0;i<languages.length;i+=2){LinearLayout row=new LinearLayout(context);for(int j=i;j<Math.min(i+2,languages.length);j++){String code=languages[j];Button b=button(TranslationRepository.languageName(code),()->action.accept("language_"+code));boolean selected=code.equals(prefs.glossLanguage());b.setSelected(selected);b.setTextColor(selected?colors.accent:colors.text);GradientDrawable fill=new GradientDrawable();fill.setColor(selected?colors.function:colors.key);fill.setCornerRadius(dp(10));b.setBackground(new RippleDrawable(ColorStateList.valueOf((colors.accent&0x00ffffff)|0x24000000),fill,null));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(48),1);lp.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(b,lp);}list.addView(row);}
+        listAction(list,prefs.translation()?"隐藏释义":"显示释义","toggle_gloss");listAction(list,"翻译模型管理","model_manager");modelStatus=text(status,12,colors.secondary);modelStatus.setPadding(dp(12),dp(8),dp(12),dp(8));list.addView(modelStatus,new LinearLayout.LayoutParams(-1,-2));
+    }
     void modelStatus(String value){if(modelStatus!=null&&active.equals("languages"))modelStatus.setText(value);}
     void height(){
         LinearLayout p=begin("height","键盘高度");TextView value=text("左右滑动调节 · "+Math.round(prefs.height()*100)+"%",13,colors.secondary);p.addView(value,new LinearLayout.LayoutParams(-1,dp(48)));
@@ -140,6 +154,7 @@ final class ImePanels {
             if(kind==2){canvas.drawCircle(12,12,9,paint);paint.setStyle(Paint.Style.FILL);canvas.drawCircle(9,9,1,paint);canvas.drawCircle(15,9,1,paint);paint.setStyle(Paint.Style.STROKE);canvas.drawArc(7,9,17,17,25,130,false,paint);}
             if(kind==3){canvas.drawRoundRect(2,5,22,19,3,3,paint);for(int y=9;y<=12;y+=3)for(int x=6;x<=18;x+=4)canvas.drawPoint(x,y,paint);canvas.drawLine(7,16,17,16,paint);}
             if(kind==4){canvas.drawLine(5,9,12,16,paint);canvas.drawLine(12,16,19,9,paint);}
+            if(kind==5){canvas.drawLine(9,6,15,12,paint);canvas.drawLine(15,12,9,18,paint);}
             canvas.restore();}
         @Override public void setAlpha(int alpha){paint.setAlpha(alpha);}@Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}@Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}@Override public int getIntrinsicWidth(){return size;}@Override public int getIntrinsicHeight(){return size;}
     }

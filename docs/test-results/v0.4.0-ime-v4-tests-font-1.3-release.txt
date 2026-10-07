@@ -1,0 +1,26 @@
+UTC: 2026-10-07T00:31:25.8176218Z
+Version: 0.4.0
+Variant: Release
+Runner: ImeV4Instrumentation
+System font scale: 1.3
+Models available branch: False
+Models only branch: False
+V4 only branch: True
+Serial: emulator-5554
+APK SHA256: 24634AA1D406AF73D1FF23DCFB42947473DDA6FB0BBD791751112233F18B9BDC
+
+PASS compact idle candidates/navigation, attached pinyin and active candidates replace navigation without moving keys; Enter commits raw letters only
+PASS raw Enter preserves selected-prefix letters, explicit apostrophe and fast queued input
+PASS raw Enter suppresses send while composing and keeps normal newline/editor actions when empty
+PASS expanded candidates drag vertically with momentum and select a later visible word without paging or translation conflict
+PASS pinyin bubble clears on candidate commit and stays absent in password input
+PASS More check-update entry opens the in-app update surface and returns to a working IME
+
+ALL_V4_IME_CHECKS_PASS
+PASS compact idle candidates/navigation, attached pinyin and active candidates replace navigation without moving keys; Enter commits raw letters only
+PASS raw Enter preserves selected-prefix letters, explicit apostrophe and fast queued input
+PASS raw Enter suppresses send while composing and keeps normal newline/editor actions when empty
+PASS expanded candidates drag vertically with momentum and select a later visible word without paging or translation conflict
+PASS pinyin bubble clears on candidate commit and stays absent in password input
+PASS More check-update entry opens the in-app update surface and returns to a working IME
+

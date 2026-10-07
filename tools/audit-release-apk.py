@@ -69,7 +69,7 @@ assert f"versionCode='{version_code}'" in badging and f"versionName='{version}'"
 assert re.search(r"(?m)^(?:minSdkVersion|sdkVersion):'26'", badging) and "targetSdkVersion:'35'" in badging
 assert "application-debuggable" not in badging
 manifest = run([str(sdk / "aapt2.exe"), "dump", "xmltree", str(apk), "--file", "AndroidManifest.xml"])
-for marker in ["BIND_INPUT_METHOD", "QingyuImeService", "android.view.InputMethod", "android.view.im"]:
+for marker in ["BIND_INPUT_METHOD", "QingyuImeService", "android.view.InputMethod", "android.view.im", "REQUEST_INSTALL_PACKAGES", "com.qingyu.ime.updates", "grantUriPermissions"]:
     assert marker in manifest, marker
 
 metadata = {"apk": apk.relative_to(ROOT).as_posix(), "variant": "release", "version_code": version_code, "version_name": version, "bytes": len(raw), "sha256": sha,
@@ -138,9 +138,9 @@ with zipfile.ZipFile(apk) as archive:
     assert phrase_rows and all(len(row) == 2 and all(row) for row in phrase_rows), "Only Chinese/English phrase columns belong in default resources."
     assert dict(phrase_rows)["开发"] == "develop"
     assert "assets/input/input-v2.db" not in names and "assets/input/input-v3.db" in names
-    assert not any(re.search(r"(?:^|/)(?:ja|fr|japanese|french)(?:[./_-]|$)", name, re.I) for name in source_assets)
+    assert not any(re.search(r"(?:^|/)(?:ja|fr|de|ru|es|japanese|french|german|russian|spanish)(?:[./_-]|$)", name, re.I) for name in source_assets)
     metadata["default_language_resources"] = {"languages": ["zh", "en"], "chinese_english_phrases": len(phrase_rows),
-        "optional_model_files_bundled": False, "note": "Japanese/French files download on demand; the shared SDK library supports multiple languages."}
+        "optional_model_files_bundled": False, "note": "Japanese/French/German/Russian/Spanish files download on demand; the shared SDK library supports multiple languages."}
     assert archive.read("assets/licenses/GPL-3.0.txt") == (ROOT / "LICENSE").read_bytes()
     resource_dump = subprocess.check_output([str(sdk / "aapt2.exe"), "dump", "resources", str(apk)], text=True, encoding="utf-8", errors="replace")
     for name in ["google_translate_badge.png", "google_translate_badge_dark.png"]:

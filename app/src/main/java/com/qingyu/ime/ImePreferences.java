@@ -19,7 +19,7 @@ final class ImePreferences {
     }
     String glossLanguage() {
         String language = store.getString("gloss_language", "en");
-        return language.equals("ja") || language.equals("fr") ? language : "en";
+        return TranslationRepository.isGlossLanguage(language) ? language : "en";
     }
     String keyboardMode() { return "t9".equals(store.getString("keyboard_mode", "full")) ? "t9" : "full"; }
     boolean nineKey() { return keyboardMode().equals("t9"); }
