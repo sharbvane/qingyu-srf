@@ -1,3 +1,6 @@
-ALL_ENGLISH_ENGINE_CHECKS_PASS: 121167 words, 1000 completion/correction/prediction calls 1274.74 ms
+ALL_ENGLISH_ENGINE_CHECKS_PASS: 121167 words, 1000 completion/correction/prediction calls 1011.33 ms
 Nine-key sentence first=开发项目 pinyin=kai'fa'xiang'mu digits=12
-ALL_INPUT_DICTIONARY_CHECKS_PASS: actual Android SQLite, 200 nine-key calls 68.34 ms
+PERSONALIZATION kd 快点 initial=15 one-choice=15 after-12=1
+PERSONALIZATION kd reopened=1; new phrase=你好轻语 / nihaoqingyu / nhqy; private learning unchanged
+PERSONALIZATION segmented 我要看 + 短视频: suffix/whole exactly 3; full/wykdsp persisted; preview/private unchanged
+ALL_INPUT_DICTIONARY_CHECKS_PASS: actual Android SQLite, 200 nine-key calls 60.91 ms

@@ -1,0 +1,11 @@
+RELEASE_SIGNING_CHECKS_PASS (identity, lineage, private ACL; no credentials printed).
+Release certificate SHA-256: 1d6872a840fe42468cdc5af2d11eeee87455c4b635e2fd2b60168b082c4e0cf5
+RELEASE_SIGNING_CHECKS_PASS (identity, lineage, private ACL; no credentials printed).
+Release certificate SHA-256: 1d6872a840fe42468cdc5af2d11eeee87455c4b635e2fd2b60168b082c4e0cf5
+RELEASE_SIGNING_CHECKS_PASS (identity, lineage, private ACL; no credentials printed).
+Release certificate SHA-256: 1d6872a840fe42468cdc5af2d11eeee87455c4b635e2fd2b60168b082c4e0cf5
+PASS: portable backup restores both keys, credentials and authenticated lineage under private ACL.
+PASS: initialization refuses to regenerate an existing signing identity.
+PASS: published APKs and the original debug keystore are preserved.
+PASS: missing Release key fails closed and is not recreated.
+RELEASE_SIGNING_RECOVERY_CHECKS_PASS

@@ -1,0 +1,8 @@
+UTC: 2026-10-07T14:19:09.8571013Z
+Android: API 35 x86_64 emulator-5554
+APK SHA256: 76D70841DA75BF54FF4C65865B1F415F53E2D843E162E978EEDA40453882102B
+
+PASS independent Release current signer and authenticated v0.4 history
+PASS preserved app-private preferences, file sentinel and application UID
+PASS existing user dictionary bytes preserved (content and digest not logged)
+RELEASE_MIGRATION_VERIFY_PASS

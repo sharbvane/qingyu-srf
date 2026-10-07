@@ -5,6 +5,6 @@ PASS long composition segmentation without keystroke loss
 PASS invalid-pinyin tail preservation and deletion
 PASS bounded 64-character composition
 PASS non-destructive complete candidate preview: nine-syllable tail, chosen prefix, completed segments, invalid letters, candidate ids, grouped undo and no learning
-PASS 1000 Java/JNI type/delete cycles; 6285 searches with up to 128 candidates; total 999.41 ms; p50 0.041 ms; p95 0.245 ms; max 4.641 ms
+PASS 1000 Java/JNI type/delete cycles; 6285 searches with up to 128 candidates; total 691.89 ms; p50 0.028 ms; p95 0.153 ms; max 1.807 ms
 PASS 100 deterministic random 64-character type/delete sequences
 ALL_ADAPTER_CHECKS_PASS

@@ -25,15 +25,10 @@ final class AttributionCheck {
         int height = surface.getMeasuredHeight();
         Rect before = bounds(surface, 100);
         surface.glosses(Collections.singletonMap("开发", "a deliberately long sentence supplied by the model"));
-        surface.setGoogleTranslation(true);
         layout(surface);
-        check(height == surface.getMeasuredHeight() && before.equals(bounds(surface, 100)), "Model attribution moved a candidate");
+        check(height == surface.getMeasuredHeight() && before.equals(bounds(surface, 100)), "Local annotation moved a candidate");
         AccessibilityNodeInfo attribution = surface.getAccessibilityNodeProvider().createAccessibilityNodeInfo(4);
-        check(attribution != null && !attribution.isClickable(), "Missing readable, noninteractive attribution");
-        Rect badge = new Rect(); attribution.getBoundsInParent(badge);
-        check(badge.top >= before.bottom && badge.bottom <= height, "Badge overlaps candidates or is clipped");
-        surface.setGoogleTranslation(false);
-        check(surface.getAccessibilityNodeProvider().createAccessibilityNodeInfo(4) == null, "Local gloss still attributed to Google");
+        check(attribution == null && before.bottom == height, "Keyboard still reserves a model branding strip");
 
         ImePanels panels = new ImePanels(context, prefs, new View(context), action -> {});
         panels.body.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
@@ -41,11 +36,11 @@ final class AttributionCheck {
         View image = panels.body.findViewById(R.id.translation_attribution);
         Button commit = panels.body.findViewById(R.id.translation_commit);
         panels.detailResult("开发", "develop", "本地短语");
-        check(image.getVisibility() == View.INVISIBLE && commit.getText().toString().equals("输入译文"), "Local details have Google branding");
+        check(image.getVisibility() == View.GONE && commit.getText().toString().equals("输入译文"), "Local details have Google branding");
         panels.detailResult("开发", "development", "Google Translate · 端侧翻译");
         check(image.getVisibility() == View.VISIBLE && commit.getText().toString().equals("Translate with Google"), "Model details missing badge/action attribution");
         panels.detailResult("谷歌翻译", "Google Translate", "CC-CEDICT · 英文词典释义\nGoogle Translate is a proper name");
-        check(image.getVisibility() == View.INVISIBLE, "A dictionary mention falsely marked as a model result");
+        check(image.getVisibility() == View.GONE, "A dictionary mention falsely marked as a model result");
         panels.close();
     }
     private static void layout(View view) {

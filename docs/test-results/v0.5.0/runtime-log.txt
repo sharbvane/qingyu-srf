@@ -1,0 +1,8 @@
+Final APK SHA256: 76D70841DA75BF54FF4C65865B1F415F53E2D843E162E978EEDA40453882102B
+Since final Release IME checks: 2026-10-07 14:19 UTC
+Selected log tags only; not a long-duration memory or latency benchmark.
+--------- beginning of main
+10-07 14:19:25.045  6019  6074 I QingyuInput: Auxiliary dictionaries ready in 1566 ms
+10-07 14:23:46.752  6019  7441 I QingyuInput: Auxiliary dictionaries ready in 2087 ms
+10-07 14:25:03.981  7658  7707 I QingyuInput: Auxiliary dictionaries ready in 1714 ms
+10-07 14:26:23.091  8071  8118 I QingyuInput: Auxiliary dictionaries ready in 1868 ms

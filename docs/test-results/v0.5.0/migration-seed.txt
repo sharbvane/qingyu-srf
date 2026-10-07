@@ -1,0 +1,8 @@
+UTC: 2026-10-07T14:07:49.5924029Z
+Serial: emulator-5554
+Original Release: Qingyu-0.4.0.apk
+SHA256: 24634AA1D406AF73D1FF23DCFB42947473DDA6FB0BBD791751112233F18B9BDC
+Observed adb install -r -d: Success (restored v0.4 after Debug testing)
+PASS original v0.4 signing identity and version
+PASS app-private preference/file sentinel seeded; existing user dictionary only read
+RELEASE_MIGRATION_SEED_PASS

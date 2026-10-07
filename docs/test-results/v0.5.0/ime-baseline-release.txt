@@ -1,0 +1,47 @@
+UTC: 2026-10-07T14:25:42.9681363Z
+Version: 0.5.0
+Variant: Release
+Runner: ImeSmokeInstrumentation
+System font scale: 1.0
+Models available branch: False
+Models only branch: False
+V4 only branch: False
+Serial: emulator-5554
+APK SHA256: 76D70841DA75BF54FF4C65865B1F415F53E2D843E162E978EEDA40453882102B
+
+PASS candidate click commits Chinese only and first candidate preserves key geometry
+PASS orientation change preserves composition
+PASS local gloss toggle preserves candidate layout and Chinese input
+PASS sentence composition
+PASS candidate expand, vertical scroll and choose
+PASS rapid Chinese/English/number commit order
+PASS composition delete and resume
+PASS Unicode code point backspace
+PASS held backspace repeats
+PASS long press number
+PASS explicit pinyin syllable separator
+PASS 70 character continuous input segments without loss
+PASS space swipe cursor
+PASS password direct input, language locked
+PASS password ASCII punctuation accessible
+PASS numeric field keypad
+PASS dark theme restart and input
+
+ALL_IME_CHECKS_PASS
+PASS candidate click commits Chinese only and first candidate preserves key geometry
+PASS orientation change preserves composition
+PASS local gloss toggle preserves candidate layout and Chinese input
+PASS sentence composition
+PASS candidate expand, vertical scroll and choose
+PASS rapid Chinese/English/number commit order
+PASS composition delete and resume
+PASS Unicode code point backspace
+PASS held backspace repeats
+PASS long press number
+PASS explicit pinyin syllable separator
+PASS 70 character continuous input segments without loss
+PASS space swipe cursor
+PASS password direct input, language locked
+PASS password ASCII punctuation accessible
+PASS numeric field keypad
+PASS dark theme restart and input

@@ -62,7 +62,19 @@ lines += ["Bytes: " + str(len(raw)), "SHA-256: " + sha,
 signer = ["cmd", "/d", "/c", str(sdk / "apksigner.bat"), "verify", "--verbose", "--print-certs"]
 new_cert = re.search(r"certificate SHA-256 digest: (\w+)", run(signer + [str(apk)])).group(1)
 old_cert = re.search(r"certificate SHA-256 digest: (\w+)", run(signer + [str(baseline)])).group(1)
-assert new_cert == old_cert
+signing_policy = json.loads((ROOT / "docs/release-signing-policy.json").read_text(encoding="utf-8-sig"))
+assert new_cert == signing_policy["release_certificate_sha256"] != signing_policy["legacy_certificate_sha256"], "Release must use the independent production key."
+assert old_cert in {new_cert, signing_policy["legacy_certificate_sha256"]}, "Unrecognized previous release signer."
+assert signing_policy["rotation_min_sdk"] == 28 and signing_policy["legacy_max_sdk"] == 27
+platform_signers = {}
+for low, high, expected in [(26, 27, signing_policy["legacy_certificate_sha256"]), (28, 35, new_cert)]:
+    cert = re.search(r"certificate SHA-256 digest: (\w+)", run(signer + ["--min-sdk-version", str(low), "--max-sdk-version", str(high), str(apk)])).group(1)
+    assert cert == expected, "Wrong platform-specific APK signer."
+    platform_signers[f"{low}-{high}"] = cert
+lineage_text = run(["cmd", "/d", "/c", str(sdk / "apksigner.bat"), "lineage", "--in", str(apk), "--print-certs", "-v"])
+assert new_cert in lineage_text and signing_policy["legacy_certificate_sha256"] in lineage_text, "Missing proof-of-rotation."
+assert len(re.findall(r"Has installed data capability:\s*true", lineage_text)) == 2
+assert len(re.findall(r"Has rollback capability\s*:\s*false", lineage_text)) == 2
 run([str(sdk / "zipalign.exe"), "-c", "-P", "16", "4", str(apk)])
 badging = run([str(sdk / "aapt2.exe"), "dump", "badging", str(apk)])
 assert f"versionCode='{version_code}'" in badging and f"versionName='{version}'" in badging
@@ -74,7 +86,8 @@ for marker in ["BIND_INPUT_METHOD", "QingyuImeService", "android.view.InputMetho
 
 metadata = {"apk": apk.relative_to(ROOT).as_posix(), "variant": "release", "version_code": version_code, "version_name": version, "bytes": len(raw), "sha256": sha,
             "min_sdk": 26, "target_sdk": 35, "debuggable": False,
-            "certificate_sha256": new_cert, "baseline": str(baseline), "zipalign_16k": True,
+            "certificate_sha256": new_cert, "platform_signers": platform_signers, "signing_rotation": signing_policy,
+            "baseline": baseline.relative_to(ROOT).as_posix(), "zipalign_16k": True,
             "baseline_bytes": len(baseline_raw), "baseline_sha256": baseline_sha,
             "size_reduction_bytes": saved_bytes, "size_reduction_percent": saved_percent,
             "native": {}, "assets": {}, "badges": {}, "upstream_limitations": []}
@@ -166,6 +179,20 @@ with zipfile.ZipFile(apk) as archive:
         assert tag_counts == input_manifest["pos_tags"]
         assert {word: tag for word, tag in database.execute("SELECT text,pos FROM chinese WHERE text IN ('项目','开发','美丽','非常','的')")} == {"项目":"n","开发":"v","美丽":"ns","非常":"d","的":"uj"}
     metadata["input_data"] = {"schema": 3, "chinese_words": chinese_count, "chinese_words_with_pos": tagged_count, "part_of_speech_counts": tag_counts}
+    pinyin_manifest = json.loads((ROOT / "third_party/pinyinime/model-v2-manifest.json").read_text(encoding="utf-8-sig"))
+    for item in [pinyin_manifest["output"], pinyin_manifest["lexicon"]]:
+        packed_name = "assets/" + item["path"].removeprefix("app/src/main/assets/")
+        assert metadata["assets"][packed_name] == {"bytes": item["bytes"], "sha256": item["sha256"]}, packed_name
+    assert archive.read("assets/licenses/Rime-ice-LICENSE") == (ROOT / "third_party/pinyinime/Rime-ice-LICENSE").read_bytes()
+    with sqlite3.connect((ROOT / "app/src/main/assets/pinyin/lexicon-v2.db").as_uri() + "?mode=ro", uri=True) as lexicon:
+        assert lexicon.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert lexicon.execute("SELECT count(*) FROM words").fetchone()[0] == pinyin_manifest["lexicon"]["readings"]
+        for code, word in [("anzhuo", "安卓"), ("dangang", "单杠")]:
+            assert lexicon.execute("SELECT 1 FROM words WHERE raw=? AND text=?", (code, word)).fetchone(), (code, word)
+        for field, code in [("raw", "dangang"), ("initials", "kd")]:
+            plan = " ".join(str(row[-1]) for row in lexicon.execute(f"EXPLAIN QUERY PLAN SELECT text,pinyin,weight FROM words WHERE {field}=? ORDER BY weight DESC LIMIT 64", (code,)))
+            assert "USING INDEX" in plan and "TEMP B-TREE" not in plan, plan
+    metadata["chinese_pinyin"] = pinyin_manifest
     for manifest_name, asset in [("manifest.json", "zh-en.db"), ("details-manifest.json", "zh-en-details.db")]:
         provenance = json.loads((ROOT / "third_party/cedict" / manifest_name).read_text(encoding="utf-8-sig"))
         assert metadata["assets"]["assets/translation/" + asset]["sha256"] == provenance["database_sha256"], asset
@@ -236,7 +263,7 @@ with zipfile.ZipFile(apk) as archive:
     lines.append("R8 mapping, actual DEX native flags/names, and all three native symbol tables preserve " + str(len(native_methods)) + " JNI methods.")
 
 assert digest(baseline.read_bytes()) == baseline_sha, "Previous release changed during audit."
-lines += ["STATIC_PACKAGE_CHECKS_PASS", f"Signature equals v{baseline_version} signer; previous release preserved; all self-built native libraries align LOAD and RELRO to 16KiB.",
+lines += ["STATIC_PACKAGE_CHECKS_PASS", f"Independent Release signer with authenticated rotation from the v0.4 signer on API 28+; API 26-27 retain the compatibility signer; previous release preserved; all self-built native libraries align LOAD and RELRO to 16KiB.",
           "The proprietary ARM64 SDK RELRO limitation remains; no 16KiB physical-device runtime is claimed.",
           "This report does not assert UI/model/real-device test success."]
 (out / "final-package-audit.txt").write_text("\n".join(lines), encoding="utf-8")

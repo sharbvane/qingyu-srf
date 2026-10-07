@@ -1,0 +1,2 @@
+PASS native old learned phrase, new-model reopen, spelling/commit, privacy and fixed-prefix context
+ALL_CHINESE_UPGRADE_CHECKS_PASS

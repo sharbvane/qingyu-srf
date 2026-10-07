@@ -12,7 +12,7 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 
 /** New behavior plus the existing actual-IME regression path. */
-public final class ImeV4Instrumentation extends ImeV3Instrumentation {
+public class ImeV4Instrumentation extends ImeV3Instrumentation {
     private boolean v4Only,modelsAvailable;
     @Override public void onCreate(android.os.Bundle args){v4Only=args!=null&&"true".equals(args.getString("v4_only"));modelsAvailable=args!=null&&"true".equals(args.getString("models_available"));super.onCreate(args);}
     @Override protected String successMarker(){return "ALL_V4_IME_CHECKS_PASS";}

@@ -1,5 +1,18 @@
 plugins { id 'com.android.application' }
 
+def releaseSigningFile = rootProject.file('release-signing/signing.properties')
+def releaseSigning = new Properties()
+if (releaseSigningFile.isFile()) {
+    releaseSigningFile.withInputStream { releaseSigning.load(it) }
+}
+def hasReleaseSigning = rootProject.file('release-signing/qingyu-release.p12').isFile() &&
+        ['storePassword', 'keyPassword', 'keyAlias'].every { releaseSigning.getProperty(it) }
+gradle.taskGraph.whenReady { graph ->
+    if (!hasReleaseSigning && graph.allTasks.any { it.name.toLowerCase().contains('release') }) {
+        throw new GradleException('Release signing is missing. Restore release-signing/ or run scripts/release-signing.ps1 -Action Initialize once.')
+    }
+}
+
 android {
     namespace 'com.qingyu.ime'
     compileSdk 35
@@ -10,12 +23,23 @@ android {
         applicationId 'com.qingyu.ime'
         minSdk 26
         targetSdk 35
-        versionCode 4
-        versionName '0.4.0'
+        versionCode 5
+        versionName '0.5.0'
         ndk { abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64' }
         testInstrumentationRunner 'com.qingyu.ime.ImeSmokeInstrumentation'
         externalNativeBuild {
             cmake { arguments '-DANDROID_SUPPORT_FLEXIBLE_PAGE_SIZES=ON' }
+        }
+    }
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile rootProject.file('release-signing/qingyu-release.p12')
+                storeType 'PKCS12'
+                storePassword releaseSigning.getProperty('storePassword')
+                keyAlias releaseSigning.getProperty('keyAlias')
+                keyPassword releaseSigning.getProperty('keyPassword')
+            }
         }
     }
     buildTypes {
@@ -23,7 +47,7 @@ android {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
         }
     }
     externalNativeBuild {

@@ -1,0 +1,13 @@
+Installed debug APK assets; actual LocalInputDictionary.open on app_process with
+THREAD_PRIORITY_BACKGROUND and a fresh isolated filesDir, production files unchanged.
+This measures first-install asset extraction plus loading; OS disk-cache state was
+not reset and one emulator sample is not a real-device performance guarantee.
+
+Cold filesDir: input-v3.db copy + SQLite open 108 ms;
+EnglishEngine parse 513 ms; lexicon-v2.db copy + SQLite open 464 ms.
+Complete open: 1087.00 ms; dangang first candidate: 单杠; English loaded: true.
+Warm filesDir: complete open 503.96 ms; dangang first: 单杠; English loaded: true.
+
+Both checks use AssetManager loaded from the actual installed APK, not external
+raw word tables. No application install/stop, IME interaction, or production
+learning-file mutation occurred. Probe source: .tools/InputColdProbe.java.

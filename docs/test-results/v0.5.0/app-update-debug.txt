@@ -1,0 +1,26 @@
+UTC: 2026-10-07T13:59:29.9634935Z
+Version: 0.5.0
+Variant: Debug
+Runner: AppUpdateInstrumentation
+System font scale: 1.0
+Models available branch: False
+Models only branch: False
+V4 only branch: False
+Serial: emulator-5554
+APK SHA256: D3E1E6C9140030972AEF9CD7B068BF5B3E3CA7EF2F51B9CE4A49CE651DBD0824
+
+PASS update numeric versions and invalid tags
+PASS update stable release, notes, asset name and size
+PASS update HTTPS repository and URL boundary
+PASS update official web fallback notes, exact size, digest row and redirect/header boundaries
+PASS update rate-limit seconds, date, reset, bounded exponential cooldown
+PASS update one-way signer rotation rejects shared root, reversed/malformed histories and multiple signers
+PASS update archive version, downgrade and signature/digest checks
+PASS update installer MIME, temporary read grant and provider path guard
+INSTALLER priority=0 preferredOrder=0 match=0x608000 specificIndex=-1 isDefault=true
+com.google.android.packageinstaller/com.android.packageinstaller.InstallStart
+PASS update private APK provider rejects raw tampering, same signing identity and system installer resolution
+PASS update persisted download restoration and cancellation
+PASS update persisted rapid-check cache and limited retry avoid network
+PASS update live official web fallback: 0.4.0 bytes=59836541 digest=sha256:24634aa1d406af73d1ff23dcfb42947473dda6fb0bbd791751112233f18b9bdc
+ALL_APP_UPDATE_CHECKS_PASS

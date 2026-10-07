@@ -192,9 +192,10 @@ bool DictBuilder::alloc_resource(size_t lma_num) {
   lma_nds_used_num_le0_ = 0;
   lma_nodes_le0_ = new LmaNodeLE0[kMaxSpellingNum + 1];
 
-  // Other nodes is less than lemma_num
+  // An eight-character dictionary can have several unique prefix nodes per
+  // lemma. The old four-character lexicon happened to fit one node per lemma.
   lma_nds_used_num_ge1_ = 0;
-  lma_nodes_ge1_ = new LmaNodeGE1[lemma_num_];
+  lma_nodes_ge1_ = new LmaNodeGE1[lemma_num_ * kMaxLemmaSize];
 
   homo_idx_buf_ = new LemmaIdType[lemma_num_];
   spl_table_ = new SpellingTable();
@@ -211,7 +212,7 @@ bool DictBuilder::alloc_resource(size_t lma_num) {
   memset(lemma_arr_, 0, sizeof(LemmaEntry) * lemma_num_);
   memset(scis_, 0, sizeof(SingleCharItem) * scis_num_);
   memset(lma_nodes_le0_, 0, sizeof(LmaNodeLE0) * (kMaxSpellingNum + 1));
-  memset(lma_nodes_ge1_, 0, sizeof(LmaNodeGE1) * lemma_num_);
+  memset(lma_nodes_ge1_, 0, sizeof(LmaNodeGE1) * lemma_num_ * kMaxLemmaSize);
   memset(homo_idx_buf_, 0, sizeof(LemmaIdType) * lemma_num_);
   spl_table_->init_table(kMaxPinyinSize, kSplTableHashLen, true);
 
@@ -416,11 +417,6 @@ size_t DictBuilder::read_raw_dict(const char* fn_raw,
       continue;
     }
 
-    if (lemma_size > 4) {
-      i--;
-      continue;
-    }
-
     // Copy to the lemma entry
     utf16_strcpy(lemma_arr_[i].hanzi_str, token);
 
@@ -434,11 +430,6 @@ size_t DictBuilder::read_raw_dict(const char* fn_raw,
       return false;
     }
     lemma_arr_[i].freq = utf16_atof(token);
-
-    if (lemma_size > 1 && lemma_arr_[i].freq < 60) {
-      i--;
-      continue;
-    }
 
     // Get GBK mark, if no valid Hanzi list available, all items which contains
     // GBK characters will be discarded. Otherwise, all items which contains
@@ -740,6 +731,8 @@ size_t DictBuilder::build_scis() {
   }
 
   scis_num_ = unique_scis_num;
+  // The serialized Hanzi/reading index and LemmaEntry indices are uint16.
+  if (scis_num_ > 65535) return 0;
 
   // Update the lemma list.
   for (size_t pos = 0; pos < lemma_num_; pos++) {

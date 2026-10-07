@@ -1,0 +1,8 @@
+{
+  "application_id": "com.qingyu.ime",
+  "release_certificate_sha256": "1d6872a840fe42468cdc5af2d11eeee87455c4b635e2fd2b60168b082c4e0cf5",
+  "legacy_certificate_sha256": "12794d0f0be3a864281e828ad389f8e71bb725e196cb4bf65c4937069452d6d9",
+  "rotation_min_sdk": 28,
+  "legacy_max_sdk": 27,
+  "lineage_sha256": "97d0b304ea0a1f4c3b3ddabc6c68936a56fa71cc00a9bc1a27c731ca249d5589"
+}

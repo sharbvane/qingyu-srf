@@ -19,7 +19,7 @@ public class ImeV2Instrumentation extends ImeSmokeInstrumentation {
     @Override public void onCreate(android.os.Bundle arguments){modelsAvailable=arguments!=null&&"true".equals(arguments.getString("models_available"));super.onCreate(arguments);}
     @Override protected String successMarker(){return "ALL_V2_IME_CHECKS_PASS";}
     @Override protected void runChecks() throws Exception{
-        if(debugTarget()){mainCheck(()->AttributionCheck.run(getTargetContext()));pass("model attribution reserves stable geometry and preserves local source");}
+        if(debugTarget()){mainCheck(()->AttributionCheck.run(getTargetContext()));pass("keyboard has no model branding strip; model details retain source attribution");}
         for(String id:new String[]{"toolbar_more","toolbar_edit","toolbar_emoji","toolbar_mode","toolbar_hide"})check(find(id)!=null,"Missing navigation "+id);
         check(find("punctuation_0")==null&&find("annotation_toggle")==null,"Legacy punctuation/control row is still visible");
         check(find("candidate_expand")==null,"Expand visible without composing candidates");
@@ -70,8 +70,8 @@ public class ImeV2Instrumentation extends ImeSmokeInstrumentation {
         check(awaitNode("translation_attribution").isVisibleToUser(),"Downloaded model detail attribution is not visible");
         check(findButton("Translate with Google")!=null,"Downloaded model detail is missing the attributed commit action");
         check(text().equals("wenhua"),"Viewing downloaded model translation changed composing text");
-        closePanel();keyboardReady();upCandidate("文化");awaitText("文化");
-        pass("downloaded Japanese model definition shows attribution and upward gesture commits its translation");
+        closePanel();keyboardReady();upCandidate("文化");awaitNodeText("translation_detail","Google Translate · 端侧翻译");check(text().equals("wenhua"),"Model swipe committed without opening details");buttonClick("Translate with Google");awaitText("文化");
+        pass("downloaded Japanese translation remains in attributed details; upward gesture opens details before commit");
         }
 
         clear();setLanguage("英语");nodeClick("toolbar_more");buttonClick("键盘高度");

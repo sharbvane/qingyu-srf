@@ -5,6 +5,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import com.qingyu.core.EnglishEngine;
 import com.qingyu.core.NineKeyCandidate;
+import com.qingyu.core.PinyinEngine;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -19,15 +20,24 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashSet;
+import java.util.Locale;
 
 /** Own serial worker: asset installation, queries and learning never run on UI thread. */
-final class LocalInputDictionary implements AutoCloseable {
+final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon {
     private SQLiteDatabase database;
+    private SQLiteDatabase pinyinDatabase;
     private EnglishEngine english;
     private File learningFile;
     private File chineseLearningFile;
+    private File pinyinLearningFile;
     private boolean learningEnabled=true;
     private final LinkedHashMap<String,Integer> chineseLearning=new LinkedHashMap<>();
+    private final LinkedHashMap<String,Integer> pinyinLearning=new LinkedHashMap<>();
+    private final Map<String,Integer> pinyinReferences=new HashMap<>();
+    private final Map<String,LinkedHashMap<String,String>> learnedPinyin=new HashMap<>();
+    private final Map<String,List<PinyinRow>> pinyinCache=new LinkedHashMap<>(64,.75f,true);
+    private boolean pinyinDirty;
     private final Map<String,List<Row>> nineCache=new LinkedHashMap<>();
     private final Map<String,String> glossCache=new LinkedHashMap<>();
     private final Map<String,String> posCache=new LinkedHashMap<>();
@@ -36,16 +46,7 @@ final class LocalInputDictionary implements AutoCloseable {
         LocalInputDictionary dictionary=new LocalInputDictionary();
         // The filename is the asset schema version; v0.2's installed database
         // cannot be reused because it does not contain lexical tags.
-        File target=new File(context.getFilesDir(),"input-v3.db");
-        if(!target.exists()) {
-            File temp=new File(context.getFilesDir(),"input-v3.tmp");
-            try(InputStream in=context.getAssets().open("input/input-v3.db");FileOutputStream out=new FileOutputStream(temp)) {
-                byte[] buffer=new byte[32768];int count;
-                while((count=in.read(buffer))!=-1) out.write(buffer,0,count);
-                out.getFD().sync();
-            }
-            if(!temp.renameTo(target)) throw new java.io.IOException("Input dictionary installation failed");
-        }
+        File target=installAsset(context,"input/input-v3.db","input-v3.db");
         try {
             dictionary.database=SQLiteDatabase.openDatabase(target.getPath(),null,SQLiteDatabase.OPEN_READONLY);
             dictionary.english=new EnglishEngine(context.getAssets().open("input/english-words.tsv"),context.getAssets().open("input/english-bigrams.tsv"));
@@ -65,12 +66,83 @@ final class LocalInputDictionary implements AutoCloseable {
                     catch(NumberFormatException ignored) { }
                 }
             }
+            // Optional modern data must never take English/T9 or native pinyin down.
+            try{File modern=installAsset(context,"pinyin/lexicon-v2.db","lexicon-v2.db");dictionary.pinyinDatabase=SQLiteDatabase.openDatabase(modern.getPath(),null,SQLiteDatabase.OPEN_READONLY);}catch(Exception ignored){}
+            dictionary.pinyinLearningFile=new File(context.getFilesDir(),"pinyin-learning-v1.tsv");
+            try{dictionary.loadPinyinLearning();}catch(Exception ignored){} // Malformed personal data is not an input failure.
             return dictionary;
         } catch(Exception failure) { dictionary.close();throw failure; }
+    }
+    private static File installAsset(Context context,String asset,String name)throws Exception{
+        File target=new File(context.getFilesDir(),name);if(target.exists())return target;
+        File temp=new File(context.getFilesDir(),name+".tmp");
+        try{try(InputStream in=context.getAssets().open(asset);FileOutputStream out=new FileOutputStream(temp)){byte[] buffer=new byte[32768];int count;while((count=in.read(buffer))!=-1)out.write(buffer,0,count);out.getFD().sync();}if(!temp.renameTo(target))throw new java.io.IOException("Input dictionary installation failed");}finally{if(temp.exists())temp.delete();}return target;
     }
     EnglishEngine english() { return english; }
     void setLearningEnabled(boolean enabled) {
         learningEnabled=enabled;if(english!=null) english.setLearningEnabled(enabled);
+    }
+
+    /** Indexed exact full-pinyin/initials; spelling boundaries remain the engine's choice. */
+    @Override public synchronized List<PinyinEngine.Word> lookup(String code,String context){return pinyinSuggestions(code,context,false);}
+    synchronized List<PinyinEngine.Word> completePinyin(String code,String context){return pinyinSuggestions(code,context,true);}
+    private List<PinyinEngine.Word> pinyinSuggestions(String code,String context,boolean prefix){
+        String raw=pinyinCode(code);if(raw.isEmpty())return Collections.emptyList();
+        String key=(prefix?"p:":"e:")+code.toLowerCase(Locale.ROOT);List<PinyinRow> rows=pinyinCache.get(key);
+        if(rows==null){
+            LinkedHashMap<String,PinyinRow> found=new LinkedHashMap<>();
+            if(pinyinDatabase!=null)try{
+                String predicate=prefix?"raw>=? AND raw<?":"raw=?";String[] args=prefix?new String[]{raw,raw+"{"}:new String[]{raw};
+                try(Cursor c=pinyinDatabase.rawQuery("SELECT text,pinyin,weight FROM words WHERE "+predicate+" ORDER BY weight DESC LIMIT 64",args)){while(c.moveToNext()){PinyinRow row=new PinyinRow(c.getString(0),c.getString(1),c.getInt(2));if(matchesBoundaries(code,row.pinyin,false))found.put(row.text+"\t"+row.pinyin,row);}}
+                if(!prefix)try(Cursor c=pinyinDatabase.rawQuery("SELECT text,pinyin,weight FROM words WHERE initials=? ORDER BY weight DESC LIMIT 64",new String[]{raw})){while(c.moveToNext()){PinyinRow row=new PinyinRow(c.getString(0),c.getString(1),c.getInt(2));if(matchesBoundaries(code,row.pinyin,true))found.putIfAbsent(row.text+"\t"+row.pinyin,row);}}
+            }catch(android.database.SQLException ignored){} // Base native input remains available.
+            if(!prefix){LinkedHashMap<String,String> learned=learnedPinyin.get(raw);if(learned!=null)for(Map.Entry<String,String> entry:learned.entrySet()){
+                String reading=entry.getValue();if(reading.isEmpty()||!matchesBoundaries(code,reading,pinyinInitials(reading).equals(raw)))continue;
+                if(!raw.equals(pinyinCode(reading))&&!raw.equals(pinyinInitials(reading))&&pinyinLearning.getOrDefault(raw+"\t"+entry.getKey(),0)<3)continue;
+                String identity=entry.getKey()+"\t"+reading;if(found.containsKey(identity))continue;
+                PinyinRow row=pinyinRow(entry.getKey(),reading);
+                if(row!=null)found.put(identity,row);else if(pinyinLearning.getOrDefault(raw+"\t"+entry.getKey(),0)>=3)found.put(identity,new PinyinRow(entry.getKey(),reading,5000));
+            }}
+            rows=new ArrayList<>(found.values());pinyinCache.put(key,rows);if(pinyinCache.size()>256)pinyinCache.remove(pinyinCache.keySet().iterator().next());
+        }
+        String tail=chineseTail(context);Map<String,PinyinEngine.Word> ranked=new HashMap<>();
+        for(PinyinRow row:rows){double score=Math.log1p(Math.max(1,row.weight))+pinyinBonus(pinyinLearning.getOrDefault(raw+"\t"+row.text,0));
+            if(!tail.isEmpty()){score+=.45*pinyinBonus(pinyinLearning.getOrDefault(raw+"\t"+row.text+"\t"+tail,0));score+=.15*contextBonus(tail,row.text);}
+            PinyinEngine.Word previous=ranked.get(row.text);if(previous==null||score>previous.score)ranked.put(row.text,new PinyinEngine.Word(row.text,row.pinyin,score));
+        }
+        List<PinyinEngine.Word> result=new ArrayList<>(ranked.values());result.sort((a,b)->{int order=Double.compare(b.score,a.score);return order==0?a.text.compareTo(b.text):order;});if(result.size()>64)result.subList(64,result.size()).clear();return Collections.unmodifiableList(result);
+    }
+    private static double pinyinBonus(int count){return count<3?0:.8*Math.log1p(count-2);}
+    private static String pinyinCode(String code){if(code==null||code.isEmpty()||code.length()>127)return "";String normalized=code.toLowerCase(Locale.ROOT);if(!normalized.matches("[a-z]+(?:'[a-z]+)*"))return "";String raw=normalized.replace("'","");return raw.length()>64?"":raw;}
+    private static String pinyinInitials(String reading){if(pinyinCode(reading).isEmpty())return "";StringBuilder initials=new StringBuilder();for(String part:reading.split("'"))initials.append(part.charAt(0));return initials.toString();}
+    private static boolean matchesBoundaries(String code,String reading,boolean initials){
+        String normalized=code.toLowerCase(Locale.ROOT);if(normalized.indexOf('\'')<0)return true;
+        String canonical=reading;if(initials){StringBuilder shortReading=new StringBuilder();for(String part:reading.split("'")){if(shortReading.length()>0)shortReading.append('\'');shortReading.append(part.charAt(0));}canonical=shortReading.toString();}
+        int position=0;for(int i=0;i<normalized.length();i++){if(normalized.charAt(i)!='\''){position++;continue;}int letters=0;boolean boundary=false;for(int j=0;j<canonical.length();j++){if(canonical.charAt(j)=='\''){if(letters==position){boundary=true;break;}}else letters++;}if(!boundary)return false;}return true;
+    }
+    private PinyinRow pinyinRow(String text,String reading){
+        if(pinyinDatabase==null)return null;try(Cursor c=pinyinDatabase.rawQuery("SELECT text,pinyin,weight FROM words WHERE raw=? AND text=? AND pinyin=? LIMIT 1",new String[]{pinyinCode(reading),text,reading})){return c.moveToFirst()?new PinyinRow(c.getString(0),c.getString(1),c.getInt(2)):null;}catch(android.database.SQLException ignored){return null;}
+    }
+    @Override public synchronized void learn(String code,String text,String context){learn(code,text,context,"");}
+    @Override public synchronized void learn(String code,String text,String context,String selectedPinyin){
+        String raw=pinyinCode(code);if(!learningEnabled||raw.isEmpty()||text==null||!text.matches("[\u3400-\u9fff]{1,64}"))return;
+        String reading=pinyinCode(selectedPinyin).isEmpty()?"":selectedPinyin.toLowerCase(Locale.ROOT);
+        if(reading.isEmpty()&&pinyinDatabase!=null)try{
+            try(Cursor c=pinyinDatabase.rawQuery("SELECT pinyin FROM words WHERE raw=? AND text=? ORDER BY weight DESC LIMIT 1",new String[]{raw,text})){if(c.moveToFirst())reading=c.getString(0);}
+            if(reading.isEmpty())try(Cursor c=pinyinDatabase.rawQuery("SELECT pinyin FROM words WHERE initials=? AND text=? ORDER BY weight DESC LIMIT 1",new String[]{raw,text})){if(c.moveToFirst())reading=c.getString(0);}
+            if(reading.isEmpty())try(Cursor c=pinyinDatabase.rawQuery("SELECT pinyin FROM words WHERE text=? ORDER BY weight DESC LIMIT 1",new String[]{text})){if(c.moveToFirst())reading=c.getString(0);}
+        }catch(android.database.SQLException ignored){}
+        if(reading.isEmpty()&&(code.indexOf('\'')>=0||text.length()==1))reading=code.toLowerCase(Locale.ROOT);
+        LinkedHashSet<String> codes=new LinkedHashSet<>();codes.add(raw);String canonical=pinyinCode(reading);if(!canonical.isEmpty()){codes.add(canonical);codes.add(pinyinInitials(reading));}
+        String tail=chineseTail(context);for(String alias:codes){learnPinyinKey(alias+"\t"+text);if(!tail.isEmpty())learnPinyinKey(alias+"\t"+text+"\t"+tail);indexPinyin(alias,text,reading);}
+        pinyinCache.clear();pinyinDirty=true;
+    }
+    private static String codeWord(String key){int split=key.indexOf('\t',key.indexOf('\t')+1);return split<0?key:key.substring(0,split);}
+    private void learnPinyinKey(String key){int count=pinyinLearning.getOrDefault(key,0);if(count==0)pinyinReferences.merge(codeWord(key),1,Integer::sum);pinyinLearning.remove(key);pinyinLearning.put(key,Math.min(1000,count+1));while(pinyinLearning.size()>2048){String removed=pinyinLearning.keySet().iterator().next();pinyinLearning.remove(removed);String identity=codeWord(removed);int refs=pinyinReferences.getOrDefault(identity,1)-1;if(refs>0)pinyinReferences.put(identity,refs);else{pinyinReferences.remove(identity);String[] parts=identity.split("\t",2);Map<String,String> words=learnedPinyin.get(parts[0]);if(words!=null){words.remove(parts[1]);if(words.isEmpty())learnedPinyin.remove(parts[0]);}}}}
+    private void indexPinyin(String code,String text,String reading){LinkedHashMap<String,String> words=learnedPinyin.computeIfAbsent(code,ignored->new LinkedHashMap<>());words.remove(text);words.put(text,reading);if(words.size()>32)words.remove(words.keySet().iterator().next());}
+    private void loadPinyinLearning()throws Exception{
+        if(pinyinLearningFile==null||!pinyinLearningFile.isFile()||pinyinLearningFile.length()>1024*1024)return;
+        try(BufferedReader reader=new BufferedReader(new InputStreamReader(new FileInputStream(pinyinLearningFile),StandardCharsets.UTF_8))){String line;while((line=reader.readLine())!=null&&pinyinLearning.size()<2048){String[] fields=line.split("\t",-1);if(fields.length!=4&&fields.length!=5)continue;String code=pinyinCode(fields[0]),word=fields[1],context=fields.length==5?fields[2]:"",reading=fields[fields.length-2];if(code.isEmpty()||!code.equals(fields[0])||!word.matches("[\u3400-\u9fff]{1,64}")||!context.matches("[\u3400-\u9fff]{0,6}")||!reading.isEmpty()&&pinyinCode(reading).isEmpty())continue;try{int count=Integer.parseInt(fields[fields.length-1]);if(count<=0)continue;String key=code+"\t"+word+(context.isEmpty()?"":"\t"+context);if(!pinyinLearning.containsKey(key))pinyinReferences.merge(codeWord(key),1,Integer::sum);pinyinLearning.put(key,Math.min(1000,count));indexPinyin(code,word,reading);}catch(NumberFormatException ignored){}}}
     }
 
     synchronized String lookupEnglish(String word) {
@@ -233,13 +305,14 @@ final class LocalInputDictionary implements AutoCloseable {
         int start=end;while(start>0 && end-start<6 && context.charAt(start-1)>='\u3400' && context.charAt(start-1)<='\u9fff') start--;
         return context.substring(start,end);
     }
-    void flush() throws Exception {
-        if(english==null || learningFile==null) return;
+    synchronized void flush() throws Exception {
+        if(english!=null && learningFile!=null) {
         File temp=new File(learningFile.getParentFile(),"english-learning-v2.tmp");
         try(FileOutputStream bytes=new FileOutputStream(temp);OutputStreamWriter out=new OutputStreamWriter(bytes,StandardCharsets.UTF_8)) {
             english.saveLearning(out);out.flush();bytes.getFD().sync();
         }
         java.nio.file.Files.move(temp.toPath(),learningFile.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
         if(chineseLearningFile!=null) {
             File chineseTemp=new File(chineseLearningFile.getParentFile(),"chinese-learning-v2.tmp");
             try(FileOutputStream bytes=new FileOutputStream(chineseTemp);OutputStreamWriter out=new OutputStreamWriter(bytes,StandardCharsets.UTF_8)) {
@@ -248,12 +321,19 @@ final class LocalInputDictionary implements AutoCloseable {
             }
             java.nio.file.Files.move(chineseTemp.toPath(),chineseLearningFile.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
+        if(pinyinLearningFile!=null&&pinyinDirty){
+            File temp=new File(pinyinLearningFile.getParentFile(),"pinyin-learning-v1.tmp");
+            try(FileOutputStream bytes=new FileOutputStream(temp);OutputStreamWriter out=new OutputStreamWriter(bytes,StandardCharsets.UTF_8)){for(Map.Entry<String,Integer> entry:pinyinLearning.entrySet()){String[] parts=entry.getKey().split("\t");Map<String,String> words=learnedPinyin.get(parts[0]);String reading=words==null?"":words.getOrDefault(parts[1],"");out.write(entry.getKey()+"\t"+reading+"\t"+entry.getValue()+"\n");}out.flush();bytes.getFD().sync();}
+            java.nio.file.Files.move(temp.toPath(),pinyinLearningFile.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);pinyinDirty=false;
+        }
     }
     @Override public synchronized void close() {
         try{flush();}catch(Exception ignored){} // Learning persistence can never suppress input.
         if(database!=null) {database.close();database=null;}
-        english=null;nineCache.clear();glossCache.clear();posCache.clear();chineseLearning.clear();
+        if(pinyinDatabase!=null){pinyinDatabase.close();pinyinDatabase=null;}
+        english=null;nineCache.clear();glossCache.clear();posCache.clear();chineseLearning.clear();pinyinCache.clear();pinyinLearning.clear();pinyinReferences.clear();learnedPinyin.clear();
     }
+    private static final class PinyinRow{final String text,pinyin;final int weight;PinyinRow(String text,String pinyin,int weight){this.text=text;this.pinyin=pinyin;this.weight=weight;}}
     private static final class Row {
         final String text,pinyin;final int weight;
         Row(String text,String pinyin,int weight) {this.text=text;this.pinyin=pinyin;this.weight=weight;}

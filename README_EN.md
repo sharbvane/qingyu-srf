@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sharbvane/qingyu-srf/releases/download/v0.4.0/Qingyu-0.4.0.apk"><img alt="Published APK v0.4.0" src="https://img.shields.io/badge/Published_APK-v0.4.0-476B57"></a>
+  <a href="https://github.com/sharbvane/qingyu-srf/releases/download/v0.5.0/Qingyu-0.5.0.apk"><img alt="Published APK v0.5.0" src="https://img.shields.io/badge/Published_APK-v0.5.0-476B57"></a>
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPL--3.0-blue.svg"></a>
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
 </p>
@@ -23,14 +23,14 @@
 | --- | --- |
 | ![Qingyu light keyboard with candidates and attached pinyin](docs/images/keyboard-v0.4.0-light.png) | ![Qingyu dark keyboard with candidates and attached pinyin](docs/images/keyboard-v0.4.0-dark.png) |
 
-v0.4.0 is now available on [GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.4.0). See the [validation record](docs/validation-v0.4.0.md) for screenshots and the actual check scope.
+v0.5.0 is now available on [GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.5.0). The [validation record](docs/validation-v0.5.0.md) covers common pinyin, sentence learning, signing and real IME checks; the UI previews below illustrate the keyboard themes.
 
 ## Features
 
-- **Full pinyin and nine-key:** AOSP native full-pinyin decoder plus a local nine-key reading index with frequency ranking, sentence and segment candidates. Raw pinyin protrudes at the upper left, attached to the keyboard edge, without taking candidate space. Enter commits those original letters without choosing a Chinese candidate.
+- **Full pinyin and nine-key:** The AOSP decoder uses a pinned modern Rime-ice lexicon, with indexed alternate segmentations and bounded sentence composition. Repeated word, initials and phrase choices gradually improve local ranking. One-edit typo suggestions are optional candidates and preserve the original letters. Enter commits raw pinyin.
 - **English candidates:** Over 121,000 word forms, completions, explicit spelling suggestions and contextual next-word prediction, with Chinese glosses.
 - **Compact keyboard top:** Idle shows a short empty candidate strip and icon navigation. While composing, candidates replace the navigation area; navigation returns when composition ends. Fixed overall top space keeps the keys steady. The expanded grid replaces the keys and scrolls continuously up and down. A prediction chain stops after at most three selections; the rightmost X clears current predictions.
-- **Quiet language learning:** Only Chinese and English dictionaries and local meanings are bundled. Choose English, Japanese, French, German, Russian or Spanish annotations; non-English models download on demand. Tap enters the original word and hold opens details. Swipe up in the candidate strip to enter a translation; the expanded grid offers translation entry through its long-press details page.
+- **Quiet language learning:** The candidate strip shows local definitions only, with no Google model output or branding row. Tap enters the original word; hold opens details. Swipe up enters an available local translation. A model translation opens attributed details and requires an explicit confirmation to enter it. Optional language models remain downloadable for the details page.
 - **Phrases and sentences:** Local phrases first; downloaded on-device models translate other sentences asynchronously. Failure preserves normal input.
 - **Icon navigation:** More, text editing, Emoji, keyboard modes and hide. Tap the same icon again to close its panel. Selection, select all, copy, cut, paste and 100 recent clipboard items.
 - **Updates and project links:** More → Check for updates shows the official GitHub release version, notes and APK size inside the app. Downloads undergo package and signing checks before Android handles installation. Project homepage opens the official repository.
@@ -40,15 +40,15 @@ v0.4.0 is now available on [GitHub Releases](https://github.com/sharbvane/qingyu
 - **Simple keyboard:** Sage light and dark themes, continuous 78%–124% height, two styles, haptics and previews.
 - **Local input:** Input and learned frequencies stay on device. Password fields disable candidates, glosses, learning and clipboard history; sensitive system clips are excluded.
 
-Missing glosses stay blank when no model is ready. Dictionary senses and model translations can be inaccurate. The older AOSP lexicon, nine-key ambiguities and modern English prediction still need real-device feedback.
+Missing local glosses stay blank. Dictionary senses and model translations can be inaccurate. The bounded sentence beam uses source frequencies and local context; complex semantics, nine-key ambiguities and English prediction still need real-device feedback.
 
 ## Install and try it
 
-1. Download and install the [Qingyu v0.4.0 APK](https://github.com/sharbvane/qingyu-srf/releases/download/v0.4.0/Qingyu-0.4.0.apk), or get the checksum from its [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.4.0). Earlier versions are listed under [all GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases). Android 8.0 or newer is required.
+1. Download and install the [Qingyu v0.5.0 APK](https://github.com/sharbvane/qingyu-srf/releases/download/v0.5.0/Qingyu-0.5.0.apk), or get the checksum from its [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.5.0). Earlier versions are listed under [all GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases). Android 8.0 or newer is required.
 2. Install and open Qingyu. Use **Enable Qingyu Input Method**, then **Switch to Qingyu**. Android requires these system settings steps.
-3. In any text field, type `kaifa`, `xiangmu` or `sheji`. Tap a Chinese candidate to enter Chinese only.
+3. In any text field, try `anzhuo`, `dangang` or `nohao`. Tap a Chinese candidate to enter Chinese only.
 
-Version **v0.4.0** uses the same signing certificate as v0.3 and can replace it directly. See the [validation record](docs/validation-v0.4.0.md). Long-term physical-device use remains unverified.
+The current public release is **v0.5.0**. Download the APK, checksum and [validation record](docs/validation-v0.5.0.md) from this repository release. It uses an independent Release key with authenticated rotation. For the first v0.4 upgrade, install the supplied local APK over the existing app without uninstalling. See [signing and backup](docs/release-signing.md). Long-term physical-device use remains unverified.
 
 Choose English, Japanese, French, German, Russian or Spanish under More → annotation language. Explicitly selecting a required non-English language for the first time starts its optional model download, with Wi-Fi required. Normal typing never downloads a model. Translation model management, also available in app settings, shows status and actual installed size and supports deletion. Extra languages reserve no model storage before downloading. Chinese and English keyboards remain available.
 
@@ -66,11 +66,11 @@ Check for updates is also available in app settings. Android requires installati
 ## Architecture
 
 - Android `InputMethodService` and an original Canvas keyboard UI.
-- AOSP PinyinIME C++ decoder connected through JNI; Chinese input events run on one serial engine thread.
+- AOSP PinyinIME through JNI, supplemented by indexed modern full-pinyin/initials candidates and bounded sentence composition; Chinese events run on one serial engine thread.
 - Android-independent interfaces for candidate snapshots, input engines and translation providers live in `core/` to keep future platform work decoupled.
 - A separate low-priority translation worker queries a local SQLite index with an in-memory cache. Lookup failures never block Chinese input.
 - Candidate geometry depends on Chinese text; late English glosses do not change candidate width.
-- The overall keyboard top reserves 100 dp in portrait and 92 dp in landscape, shared between idle candidates/navigation and the composing candidate area, including fixed attribution space. Raw pinyin remains attached to its upper edge. The expanded grid scrolls vertically within the existing keyboard body. Lexical tag lookup shares the auxiliary worker; missing tags do not affect input.
+- The overall keyboard top reserves 100 dp in portrait and 92 dp in landscape, shared between idle candidates/navigation and the composing candidate area. Raw pinyin remains attached to its upper edge. The expanded grid scrolls vertically within the existing keyboard body. Lexical tag lookup shares the auxiliary worker; missing tags do not affect input.
 
 See the [upstream and architecture research](docs/research.md).
 
@@ -91,14 +91,14 @@ pwsh -File scripts/setup-toolchain.ps1
 pwsh -File scripts/build.ps1 -Variant Release -Test
 ```
 
-Build output goes to `releases/`. Local tools and signing files are excluded by `.gitignore`. See the [validation log](docs/validation-v0.4.0.md) for test scope and results.
+Build output goes to `releases/`. Local tools and signing files are excluded by `.gitignore`. Restore the existing signing materials on a new machine; never generate a replacement key. See [signing](docs/release-signing.md) and the [validation log](docs/validation-v0.5.0.md).
 
 ## Roadmap
 
 - [x] Installable Android full-pinyin MVP
 - [x] Offline English candidate glosses and a display toggle
 - [ ] Tune touch feel, app switching and power use on physical devices
-- [ ] Evaluate a more modern Simplified Chinese lexicon and ranking with clear source licenses
+- [x] Pinned modern Chinese lexicon, alternate segmentation, sentence composition and gradual learning
 - [ ] Review gloss quality and expand local dictionary coverage
 - [ ] Design a separate iOS Keyboard Extension
 - [x] English, Japanese, French, German, Russian and Spanish annotations and on-device sentence translation

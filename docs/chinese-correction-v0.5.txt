@@ -1,0 +1,11 @@
+Source SHA-256: 0418D5103D8E40C8FFF4B686A873AD03E9836CD0419ECAE0B7E1E2526312DBA0
+CASE adjacent-key nohao -> 你好 rank=1 queries=14
+CASE missing-letter niho -> 你好 rank=1 queries=10
+CASE extra-letter nihhao -> 你好 rank=2 queries=8
+CASE transposed-letter nhiao -> 你好 rank=1 queries=2
+CASE adjacent-key jintiab -> 今天 rank=1 queries=8
+CASE missing-letter gonyuan -> 公园 rank=1 queries=2
+CASE extra-letter shijjie -> 世界 rank=1 queries=4
+CASE transposed-letter shijei -> 世界 rank=1 queries=11
+PERFORMANCE 1000 suggestions 52.76ms p95=0.112ms max=0.328ms maxQueries=14 sourceRows=554892
+ALL_CHINESE_CORRECTION_CHECKS_PASS

@@ -1400,6 +1400,7 @@ size_t MatrixSearch::get_spl_start(const uint16 *&spl_start) {
 }
 
 size_t MatrixSearch::extend_dmi(DictExtPara *dep, DictMatchInfo *dmi_s) {
+  lpi_total_ = 0;
   if (dmi_pool_used_ >= kDmiPoolSize) return 0;
 
   if (dmi_c_phrase_)
@@ -1416,8 +1417,6 @@ size_t MatrixSearch::extend_dmi(DictExtPara *dep, DictMatchInfo *dmi_s) {
   // number of full Id.
   size_t ret_val = 0;
   PoolPosType mtrx_dmi_fr = (PoolPosType)-1;  // From which dmi node
-
-  lpi_total_ = 0;
 
   MileStoneHandle from_h[3];
   from_h[0] = 0;
@@ -1440,7 +1439,8 @@ size_t MatrixSearch::extend_dmi(DictExtPara *dep, DictMatchInfo *dmi_s) {
     lpi_total_ = lpi_num;
 
   if (NULL == dmi_s) {  // from root
-    assert(0 != handles[0]);
+    // A bounded dictionary pool can decline a new root path. A user path may
+    // still be valid; otherwise the unchanged input simply has no new branch.
     mtrx_dmi_fr = dmi_pool_used_;
   }
 
@@ -1459,6 +1459,13 @@ size_t MatrixSearch::extend_dmi(DictExtPara *dep, DictMatchInfo *dmi_s) {
       }
       lpi_total_ += lpi_num;
     }
+  }
+
+  if (0 == handles[0] && 0 == handles[1]) {
+    // A cached half-spelling list is usable only with an allocated DMI path.
+    // Publishing it without one lets a matrix node refer to unused pool data.
+    lpi_total_ = 0;
+    return 0;
   }
 
   if (0 != handles[0] || 0 != handles[1]) {

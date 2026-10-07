@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sharbvane/qingyu-srf/releases/download/v0.4.0/Qingyu-0.4.0.apk"><img alt="公开下载 APK v0.4.0" src="https://img.shields.io/badge/Published_APK-v0.4.0-476B57"></a>
+  <a href="https://github.com/sharbvane/qingyu-srf/releases/download/v0.5.0/Qingyu-0.5.0.apk"><img alt="公开下载 APK v0.5.0" src="https://img.shields.io/badge/Published_APK-v0.5.0-476B57"></a>
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPL--3.0-blue.svg"></a>
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
 </p>
@@ -23,14 +23,14 @@
 | --- | --- |
 | ![轻语浅色键盘：候选区与贴边凸出的拼音](docs/images/keyboard-v0.4.0-light.png) | ![轻语深色键盘：候选区与贴边凸出的拼音](docs/images/keyboard-v0.4.0-dark.png) |
 
-v0.4.0 已发布至 [GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.4.0)。浅色、深色界面截图及实际检查范围见[验证记录](docs/validation-v0.4.0.md)。
+v0.5.0 已发布至 [GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.5.0)。常用拼音、整句学习、签名和实际交互检查范围见[验证记录](docs/validation-v0.5.0.md)；界面图片保留为主题示意，交互和布局的最新验证见 v0.5 记录。
 
 ## 功能
 
-- **中文全拼与九键**：全拼基于 AOSP PinyinIME，九键使用离线读音索引与词频排序；支持整句、分段候选及展开。原始拼音在左上方凸出并紧贴键盘边缘，不占候选栏；拼音输入中按回车直接提交原始字母，不自动选择中文候选。
+- **中文全拼与九键**：AOSP 原生解码器结合固定版本的 Rime-ice 现代词库及本地索引，支持多种拼音切分、整句组词与分段选词。长期选词习惯在本机逐步提高词语、简拼和短语排序；轻微误触纠错仅作为可选候选，原始拼音始终保留。原始拼音在键盘左上方紧贴边缘凸出显示；回车提交原始拼音。
 - **英文候选与预测**：12 万余词形的补全、拼写建议、上下文下一词预测；英文候选默认显示中文释义，空格保留实际输入的拼写。
 - **紧凑键盘顶部**：空闲时显示较矮的空候选栏与图标导航；正在输入时，候选区覆盖导航区域，结束后恢复导航。顶部整体保留固定空间，按键位置不跳动。展开列表替换按键区域，可上下连续滑动浏览。连续选择预测最多 3 轮，右侧「X」立即清空当前预测。
-- **自然接触外语**：默认仅内置中英词典及本地释义；可选择英语、日语、法语、德语、俄语或西班牙语。非英语模型按需下载。轻点输入原词，长按查看详细释义；候选栏上滑输入译文，展开列表通过长按释义页输入译文。
+- **自然接触外语**：候选栏仅显示本地释义，不展示 Google 模型译文或品牌栏。轻点输入原词，长按查看详细释义，上滑直接输入已有本地译文；需要模型时进入带来源标识的详情页，再由用户确认输入。额外语言模型仍按需下载，仅用于详情页。
 - **短语与句子翻译**：常用短语先查本地；其他句子使用下载后的端侧模型，译文异步返回，失败不改变原输入。
 - **简洁导航与编辑**：更多、文本编辑、Emoji、键盘模式与收起；再次点同一导航图标关闭面板。选择、全选、复制、剪切、粘贴及最近 100 条剪贴板历史。
 - **更新与项目入口**：「更多 → 检查更新」在应用内查看 GitHub 正式版本、更新说明和 APK 大小，下载后校验版本与签名，再进入系统安装流程。「项目主页」打开官方 GitHub 项目页。
@@ -40,15 +40,15 @@ v0.4.0 已发布至 [GitHub Releases](https://github.com/sharbvane/qingyu-srf/re
 - **简洁外观**：墨绿色浅色/深色主题、78%–124% 连续高度、两种键盘风格、轻触反馈与按键预览。
 - **本机输入**：拼音、英文、词频及剪贴板在本机处理。密码字段关闭候选、释义、学习及剪贴板记录；标为敏感的系统剪贴板不留历史。
 
-词典释义表示常见词义，模型翻译也可能不准确。未查到释义且模型未就绪时留空，中文输入始终继续。AOSP 词库较旧；九键歧义、现代英文预测和复杂语境排序仍需真机反馈打磨。
+词典释义表示常见词义，模型翻译也可能不准确。未查到本地释义时候选注释留空，中文输入始终继续。整句组词采用有明确预算的词频和本机上下文排序；复杂语境、九键歧义和英文预测仍需真机反馈打磨。
 
 ## 安装与使用
 
-1. 下载并安装 [Qingyu v0.4.0 APK](https://github.com/sharbvane/qingyu-srf/releases/download/v0.4.0/Qingyu-0.4.0.apk)，也可从 [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.4.0) 下载校验文件。历史版本见[全部 Releases](https://github.com/sharbvane/qingyu-srf/releases)。适用于 Android 8.0 及以上。
+1. 下载并安装 [Qingyu v0.5.0 APK](https://github.com/sharbvane/qingyu-srf/releases/download/v0.5.0/Qingyu-0.5.0.apk)，也可从 [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.5.0) 下载校验文件。历史版本见[全部 Releases](https://github.com/sharbvane/qingyu-srf/releases)。适用于 Android 8.0 及以上。
 2. 安装并打开「轻语输入法」，依次选择「启用轻语输入法」和「切换到轻语」。这是 Android 的系统设置步骤。
-3. 在任意输入框试试 `kaifa`、`xiangmu` 或 `sheji`。点中文候选，上屏的只有中文。
+3. 在任意输入框试试 `anzhuo`、`dangang` 或 `nohao`。点中文候选，上屏的只有中文。
 
-当前版本：**v0.4.0** · 新交互与旧版输入回归的实际结果见[本版验证记录](docs/validation-v0.4.0.md)。使用与 v0.3 相同的签名，可直接覆盖安装；真机长期使用尚未验证。
+当前公开版本：**v0.5.0**。安装包、校验值和[完整验证记录](docs/validation-v0.5.0.md)均见本仓库 Release。v0.5 使用独立 Release 签名及轮换证明，首次从 v0.4 升级请通过本地 APK 覆盖安装，无需卸载；后续继续使用同一正式签名。见[签名及备份说明](docs/release-signing.md)。真机长期使用尚未验证。
 
 在「更多 → 释义显示语言」选择英语、日语、法语、德语、俄语或西班牙语。首次明确选择所需的非英语语言会发起按需模型下载，需连接 Wi-Fi；普通打字不触发下载。点「翻译模型管理」查看状态、实际已安装大小或删除模型，应用设置中也有同名入口。未下载的额外语言不预占模型存储，中文和英文键盘始终保留。
 
@@ -66,11 +66,11 @@ v0.4.0 已发布至 [GitHub Releases](https://github.com/sharbvane/qingyu-srf/re
 ## 技术架构
 
 - Android `InputMethodService` 与自有 Canvas 键盘 UI，中文候选和翻译注释分层呈现。
-- AOSP PinyinIME C++ 解码器通过 JNI 接入，全部中文事件在单一串行引擎线程处理。
+- AOSP PinyinIME C++ 解码器通过 JNI 接入，现代拼音/简拼索引与有界整句组词补充候选；全部中文事件在单一串行引擎线程处理。
 - 与 Android 无关的 `core/` 定义候选快照、引擎及译词 provider 契约，为后续平台扩展留边界。
 - 独立低优先级翻译线程查询本地 SQLite 索引，使用内存缓存；译词失败不阻塞中文输入。
 - 候选栏位置由中文词决定，英文释义异步补充且不会改变候选宽度。
-- 键盘顶部整体固定为竖屏 100 dp、横屏 92 dp，由空闲时的候选/导航与输入中的候选区复用，包含固定模型归因空间；原始拼音紧贴顶部边缘。展开网格在现有键盘 body 内纵向滑动；本地词性查询与译词同在辅助线程，查不到标签不影响输入。
+- 键盘顶部整体固定为竖屏 100 dp、横屏 92 dp，由空闲时的候选/导航与输入中的候选区复用；原始拼音紧贴顶部边缘。展开网格在现有键盘 body 内纵向滑动；本地词性查询与译词同在辅助线程，查不到标签不影响输入。
 
 架构、引擎选择和上游项目对比见[开源研究记录](docs/research.md)。
 
@@ -91,14 +91,14 @@ pwsh -File scripts/setup-toolchain.ps1
 pwsh -File scripts/build.ps1 -Variant Release -Test
 ```
 
-构建产物位于 `releases/`；项目内工具和签名密钥会被 `.gitignore` 排除。测试方法与实际验证范围见[验证记录](docs/validation-v0.4.0.md)。
+构建产物位于 `releases/`；项目内工具和签名密钥会被 `.gitignore` 排除。新环境应先恢复已有签名材料，禁止生成替代密钥；见[签名说明](docs/release-signing.md)。测试方法与实际验证范围见[验证记录](docs/validation-v0.5.0.md)。
 
 ## 路线图
 
 - [x] 可安装的 Android 中文全拼输入法 MVP
 - [x] 候选上方的离线英文释义及开关
 - [ ] 基于真机反馈打磨触摸手感、切换速度和功耗
-- [ ] 评估更现代的简体中文词库与排序，并保留来源许可
+- [x] 固定来源的现代简体中文词库、歧义切分、整句组词与渐进学习
 - [ ] 扩充释义抽样校对和本地词典覆盖
 - [ ] 设计独立 iOS Keyboard Extension
 - [x] 英语、日语、法语、德语、俄语、西班牙语释义与端侧句子翻译

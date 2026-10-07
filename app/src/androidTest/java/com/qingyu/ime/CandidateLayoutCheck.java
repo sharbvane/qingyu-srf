@@ -57,7 +57,7 @@ final class CandidateLayoutCheck {
             int exactHeight=Math.round((landscape?140:198)*oriented.getResources().getDisplayMetrics().density);
             layout(grid,1080,exactHeight);check(grid.getHeight()==exactHeight,"Grid ignored exact body height");
             check(grid.visibleWords().size()>0&&grid.visibleWords().size()<=12&&bounds(grid,100).top==0,"Wrong grid slots or extra composition row");
-            for(int i=0;i<grid.visibleWords().size();i++){Rect box=bounds(grid,100+i);check(box.left>=0&&box.right<=1080&&box.bottom<grid.getHeight(),"Grid candidate outside body");}
+            for(int i=0;i<grid.visibleWords().size();i++){Rect box=bounds(grid,100+i);check(box.left>=0&&box.right<=1080&&box.bottom<=grid.getHeight(),"Grid candidate outside body");}
             check(grid.getAccessibilityNodeProvider().createAccessibilityNodeInfo(1000)==null&&grid.getAccessibilityNodeProvider().createAccessibilityNodeInfo(1001)==null,"Legacy paging controls remain");
             Bitmap bitmap=Bitmap.createBitmap(1080,exactHeight,Bitmap.Config.ARGB_8888);
             grid.draw(new Canvas(bitmap){

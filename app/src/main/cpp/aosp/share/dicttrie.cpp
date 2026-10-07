@@ -368,6 +368,14 @@ MileStoneHandle DictTrie::extend_dict(MileStoneHandle from_handle,
   if (NULL == dep)
     return 0;
 
+  // A larger lexicon reaches the original bounded parsing pools more often.
+  // Stop before allocating a handle; never publish one for an unfilled mark.
+  if (mile_stones_pos_ >= kMaxMileStone ||
+      parsing_marks_pos_ >= kMaxParsingMark) {
+    *lpi_num = 0;
+    return 0;
+  }
+
   // from LmaNodeLE0 (root) to LmaNodeLE0
   if (0 == from_handle) {
     assert(0 == dep->splids_extended);
@@ -495,9 +503,8 @@ MileStoneHandle DictTrie::extend_dict1(MileStoneHandle from_handle,
                 mile_stones_[mile_stones_pos_].mark_start =
                   parsing_marks_pos_;
               parsing_marks_pos_++;
+              ret_val++;
             }
-
-            ret_val++;
           }
           break;
         }  // for son_pos
@@ -573,9 +580,8 @@ MileStoneHandle DictTrie::extend_dict2(MileStoneHandle from_handle,
                 mile_stones_[mile_stones_pos_].mark_start =
                   parsing_marks_pos_;
               parsing_marks_pos_++;
+              ret_val++;
             }
-
-            ret_val++;
           }
           break;
         }

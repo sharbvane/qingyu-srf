@@ -13,6 +13,8 @@ captures/
 # Local SDKs, caches, emulator images, and generated data
 .tools/
 .cache/
+__pycache__/
+*.pyc
 *.log
 *.tmp
 releases/qa/

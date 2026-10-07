@@ -1,0 +1,45 @@
+{
+  "checked_utc": "2026-10-07T09:04:45.570817+00:00",
+  "scope": "Host official GitHub metadata and APK HEAD only; APK not downloaded, no release created, not Android runtime verification",
+  "latest": "0.4.0",
+  "bytes": 59836541,
+  "digest": "sha256:24634aa1d406af73d1ff23dcfb42947473dda6fb0bbd791751112233f18b9bdc",
+  "api": {
+    "status": 403,
+    "remaining": "0",
+    "reset": "1791364847",
+    "has_etag": false
+  },
+  "requests": [
+    {
+      "method": "GET",
+      "host": "github.com",
+      "status": 302
+    },
+    {
+      "method": "GET",
+      "host": "github.com",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "host": "github.com",
+      "status": 200
+    },
+    {
+      "method": "HEAD",
+      "host": "github.com",
+      "status": 302
+    },
+    {
+      "method": "HEAD",
+      "host": "release-assets.githubusercontent.com",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "host": "api.github.com",
+      "status": 403
+    }
+  ]
+}

@@ -84,7 +84,7 @@ public final class SettingsActivity extends Activity {
         label(setup,"首次启用时，Android 会显示输入法通用提示。输入与翻译在本机处理；模型下载不包含输入内容。",12,palette.secondary,Typeface.NORMAL,12);
         LinearLayout options=card(16);
         label(options,"输入偏好",18,palette.text,Typeface.BOLD,0);
-        toggle(options,"候选释义","中文显示所选外语；英文默认显示中文", "translation",true);
+        toggle(options,"候选释义","键盘显示本地词义；英文默认显示中文", "translation",true);
         button(options,"释义显示语言  ·  "+TranslationRepository.languageName(prefs.glossLanguage()),this::languageDialog,false);
         button(options,"翻译模型管理",this::buildModelManager,false);
         button(options,"中文键盘  ·  "+(prefs.keyboardMode().equals("t9")?"九键":"全键盘"),this::keyboardDialog,false);
@@ -97,7 +97,7 @@ public final class SettingsActivity extends Activity {
         button(options,"键盘高度  ·  "+heightName(),this::heightDialog,false);
         LinearLayout practice=card(16);
         label(practice,"试着输入",18,palette.text,Typeface.BOLD,0);
-        label(practice,"输入 kaifa、xiangmu、sheji，看看候选上方的释义。单击输入原文，长按看释义，上滑输入译文。",13,palette.secondary,Typeface.NORMAL,10);
+        label(practice,"输入 kaifa、xiangmu、sheji，看看本地释义。单击输入原文，长按看详情；上滑输入已有本地译文，其他翻译在详情页确认。",13,palette.secondary,Typeface.NORMAL,10);
         EditText edit=new EditText(this);edit.setHint("在这里打几个字…");edit.setTextSize(17);edit.setTextColor(palette.text);edit.setHintTextColor(palette.secondary);edit.setSingleLine(false);edit.setMinLines(2);edit.setGravity(Gravity.TOP);
         editorForInsets=edit;
         edit.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);edit.setBackground(tint(palette.background,12));edit.setPadding(dp(14),dp(12),dp(14),dp(12));
@@ -153,7 +153,7 @@ public final class SettingsActivity extends Activity {
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(palette.background);scroll.setOnApplyWindowInsetsListener((v,insets)->{if(android.os.Build.VERSION.SDK_INT>=30){android.graphics.Insets bars=insets.getInsets(android.view.WindowInsets.Type.systemBars()|android.view.WindowInsets.Type.ime());v.setPadding(bars.left,bars.top,bars.right,bars.bottom);}else v.setPadding(0,insets.getSystemWindowInsetTop(),0,insets.getSystemWindowInsetBottom());return insets;});
         content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(24),dp(20),dp(24),dp(28));scroll.addView(content);setContentView(scroll);
         button(content,"返回设置",this::build,false);label(content,"翻译模型管理",26,palette.text,Typeface.BOLD,22);
-        label(content,"中文与英文词典开箱可用。其他释义语言按需下载，完整句子使用本机模型；模型下载需连接 Wi-Fi。",13,palette.secondary,Typeface.NORMAL,12);
+        label(content,"中文与英文词典开箱可用。键盘仅显示本地词义；额外语言和完整句子的模型译文在详情页展示。模型按需下载，需连接 Wi-Fi。",13,palette.secondary,Typeface.NORMAL,12);
         modelStates=new TextView[MODEL_LANGUAGES.length];modelSizes=new TextView[MODEL_LANGUAGES.length];modelDownloads=new Button[MODEL_LANGUAGES.length];modelDeletes=new Button[MODEL_LANGUAGES.length];
         for(int i=0;i<MODEL_LANGUAGES.length;i++){
             String language=MODEL_LANGUAGES[i];LinearLayout entry=new LinearLayout(this);entry.setOrientation(LinearLayout.VERTICAL);entry.setPadding(0,dp(20),0,dp(20));content.addView(entry,new LinearLayout.LayoutParams(-1,-2));View line=new View(this);line.setBackgroundColor(palette.border);content.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));label(entry,"中文 ↔ "+TranslationRepository.languageName(language),18,palette.text,Typeface.BOLD,0);
@@ -239,7 +239,7 @@ public final class SettingsActivity extends Activity {
         activation.setText(selected?"已就绪 · 轻语是当前输入法":enabled?"已启用 · 还需切换到轻语":"两步开始使用");
     }
     private void about(){
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("轻语输入法 "+updates.currentVersion()).setMessage("Android 8.0 及以上\n\n轻语自有代码：GNU GPL-3.0-only。完整许可证随应用提供。\n\n中文引擎：AOSP PinyinIME\nApache License 2.0\n来源：android.googlesource.com/platform/packages/inputmethods/PinyinIME\n\n本地英文释义：CC-CEDICT\nMDBG 与社区贡献者维护\nCC BY-SA 4.0\n来源：https://www.mdbg.net/chinese/dictionary?page=cc-cedict\n简短释义补充了常用表达；详细词典保留原始义项与拼音。\n\n整句翻译：Google Translate · ML Kit 端侧模型\n输入与翻译内容在本机处理，不发送至 Google 服务器。模型仅用户主动下载；Google SDK 另会联网获取更新和兼容信息，并发送设备信息、安装标识、语言配置、输入输出长度和运行指标以诊断及改进 SDK。\n\n部分译文由 Google Translate 自动生成，可能不准确；非英语语言会经英语中转。Google 不对译文的准确性、可靠性、适销性、特定用途适用性及不侵权性提供担保。\n翻译服务说明：https://cloud.google.com/translate\nSDK 隐私说明：https://developers.google.com/ml-kit/terms\n\n词频与最近 100 条剪贴板记录仅保存在本机。密码字段不学习、不记录。输入内容不写入应用日志。\n\n完整来源、许可证及转换脚本随项目提供。").setPositiveButton("知道了",null).create();
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("轻语输入法 "+updates.currentVersion()).setMessage("Android 8.0 及以上\n\n轻语自有代码：GNU GPL-3.0-only。完整许可证随应用提供。\n\n中文引擎：AOSP PinyinIME\nApache License 2.0\n来源：android.googlesource.com/platform/packages/inputmethods/PinyinIME\n\n现代中文词库：雾凇拼音 Rime Ice\nGPL-3.0-only；经筛选和词频转换融合到现有引擎。\n来源：https://github.com/iDvel/rime-ice\n\n本地英文释义：CC-CEDICT\nMDBG 与社区贡献者维护\nCC BY-SA 4.0\n来源：https://www.mdbg.net/chinese/dictionary?page=cc-cedict\n简短释义补充了常用表达；详细词典保留原始义项与拼音。\n\n整句翻译：Google Translate · ML Kit 端侧模型\n键盘只展示本地释义，模型译文仅在详情页展示。\n输入与翻译内容在本机处理，不发送至 Google 服务器。模型仅用户主动下载；Google SDK 另会联网获取更新和兼容信息，并发送设备信息、安装标识、语言配置、输入输出长度和运行指标以诊断及改进 SDK。\n\n部分译文由 Google Translate 自动生成，可能不准确；非英语语言会经英语中转。Google 不对译文的准确性、可靠性、适销性、特定用途适用性及不侵权性提供担保。\n翻译服务说明：https://cloud.google.com/translate\nSDK 隐私说明：https://developers.google.com/ml-kit/terms\n\n词频与最近 100 条剪贴板记录仅保存在本机。密码字段不学习、不记录。输入内容不写入应用日志。\n\n完整来源、许可证及转换脚本随项目提供。").setPositiveButton("知道了",null).create();
         dialog.show();TextView message=dialog.findViewById(android.R.id.message);if(message!=null)android.text.util.Linkify.addLinks(message,android.text.util.Linkify.WEB_URLS);
     }
 }

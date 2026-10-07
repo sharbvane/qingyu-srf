@@ -1,7 +1,7 @@
 # ML Kit on-device translation
 
 Dependency: `com.google.mlkit:translate:17.0.3`, verified against the official
-Android guide on 2026-10-05:
+Android guide on 2026-10-05; attribution rechecked on 2026-10-07:
 https://developers.google.com/ml-kit/language/translation/android
 
 The model translates complete input on-device. Qingyu never calls a remote
@@ -63,11 +63,16 @@ Two unmodified original source PNGs are retained in `res/drawable-nodpi`:
 Display at the official regular badge ratio, typically 176×16 dp, without
 tint, cropping, brand redraw or distortion. These are Google brand assets
 used for required attribution, not Qingyu original or GPL licensed imagery.
-The v0.4 keyboard top reserves 100 dp in portrait and 92 dp in landscape,
-shared between idle candidates/navigation and composing candidates, including
-fixed model-attribution space. Raw pinyin stays attached to its upper edge;
-the expanded candidate grid scrolls vertically within the keyboard body and
-retains its attribution.
+In v0.5 the ordinary candidate row and expanded grid display only local
+lexicon/phrase meanings. They do not invoke the model, show its results,
+render a brand strip or reserve a 16 dp attribution slot. This preserves the
+user's requested clear input surface without concealing the source of model
+output. Missing local meanings remain blank. A long press opens full details;
+an upward gesture commits a local translation directly, but a model result
+opens the attributed details instead and requires the existing commit action.
+Google model translations, badges and attribution remain in that details view;
+model management and application help retain the source/privacy information.
+The existing keyboard's overall fixed geometry is preserved.
 
 The source PNG files retain the exact official bytes and SHA-256 values
 above. Release packaging applies AAPT lossless PNG encoding optimization,

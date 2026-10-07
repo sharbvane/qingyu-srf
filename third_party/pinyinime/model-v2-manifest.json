@@ -1,0 +1,74 @@
+{
+  "format": "AOSP PinyinIME binary model v2",
+  "sources": {
+    "rime_ice_base": {
+      "url": "https://raw.githubusercontent.com/iDvel/rime-ice/da1fbe602e38f26db846fa10120ee64c2b0324c0/cn_dicts/base.dict.yaml",
+      "revision": "da1fbe602e38f26db846fa10120ee64c2b0324c0",
+      "sha256": "0418d5103d8e40c8fff4b686a873ad03e9836cd0419ecae0b7e1e2526312dba0",
+      "license": "GPL-3.0-only",
+      "readings": 554892
+    },
+    "aosp_raw": {
+      "revision": "05cc8f8f2465553bc6d19b2ede24073d079eeed7",
+      "sha256": "408700f28a56091fa07f3b849a0f134fbfc71e6b2ae9b3f52973a5b076f599ff",
+      "license": "Apache-2.0",
+      "readings": 65105
+    },
+    "rime_ice_ext": {
+      "url": "https://raw.githubusercontent.com/iDvel/rime-ice/da1fbe602e38f26db846fa10120ee64c2b0324c0/cn_dicts/ext.dict.yaml",
+      "revision": "da1fbe602e38f26db846fa10120ee64c2b0324c0",
+      "sha256": "8e49a0294c0139e63c815cc33a2d438cc144eb7889297d30cec899a368697c06",
+      "license": "GPL-3.0-only"
+    },
+    "cedict_companion": {
+      "sha256_gzip": "fd16b26f991724564037d7eb19105397c5f1b17938ebda95bbbe67d642cf5fda",
+      "license": "CC BY-SA 4.0",
+      "provenance": "third_party/cedict/manifest.json"
+    }
+  },
+  "readings": 235000,
+  "unique_words": 233642,
+  "modern_readings_added": 169895,
+  "lengths": {
+    "1": 17037,
+    "2": 104999,
+    "3": 52489,
+    "4": 53556,
+    "5": 4058,
+    "6": 1998,
+    "7": 580,
+    "8": 283
+  },
+  "legacy_spelling_count": 416,
+  "legacy_spelling_ids_retained": true,
+  "hanzi_reading_index_items": 17106,
+  "trie_prefix_nodes": 224998,
+  "max_deep_children": 142,
+  "max_multi_syllable_homophones": 31,
+  "transformations": "Retain all old legal readings; select up to 235000 total readings by upstream frequency with 3x admission priority for two-character words; modern weights replace old counts, 0.15 legacy-only fallback prior; shared maximum word weight across polyphonic readings; lve/nve map to legacy lue/nue; reject non-BMP/non-Chinese, length >8, unsupported syllables and mismatched character/syllable counts; no benchmark-specific weights or words; builder removes obsolete >4-character and <60-frequency filters.",
+  "raw_source": {
+    "bytes": 15026056,
+    "sha256": "016165afec6c78f6dfcf44350a1d0797af8ca0d8ed7b2e05a214e61a90d54466"
+  },
+  "lexicon": {
+    "path": "app/src/main/assets/pinyin/lexicon-v2.db",
+    "readings": 599320,
+    "bytes": 67260416,
+    "sha256": "ef4c9c9f22deea61e02a0cdf71ad6be2e906af3088f0d3abd2657385034ad4ff",
+    "license": "GPL-3.0-only; CEDICT-derived companion entries additionally retain CC BY-SA 4.0 attribution",
+    "indexes": "raw_rank, initials_rank, text_rank"
+  },
+  "output": {
+    "path": "app/src/main/assets/pinyin/dict_pinyin.dat",
+    "bytes": 4539440,
+    "sha256": "ae80997b6e2b2de23bc11276767a15cd00b1e8e6308823a2761769d811a3513a",
+    "serialized_bounds": {
+      "full_spelling_count": 413,
+      "character_reading_index_items": 17102,
+      "lemma_readings": 234996,
+      "system_end_id_exclusive": 234996,
+      "max_word_characters": 8
+    },
+    "actual_spelling_id_order_matches_v0_4": true
+  }
+}

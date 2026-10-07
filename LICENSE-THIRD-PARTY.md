@@ -10,6 +10,7 @@ Qingyu-authored source code is licensed under GNU GPL-3.0-only. The APK also bun
 | SCOWL / Hunspell American English words | `assets/input/english-words.tsv` | Original permissive source notices | `assets/licenses/SCOWL-README.txt`, `third_party/input-data/` |
 | jieba frequency data and lexical tags | Nine-key ranking and Chinese candidate colors | MIT | `assets/licenses/jieba-LICENSE.txt` |
 | Four original public-domain literary works | Aggregated English frequency and bigram counts | Public-domain original prose | URLs, authors, years and snapshot hashes in input-data manifest; no Gutenberg headers bundled |
+| Rime Ice modern Chinese full-pinyin lexicon, merged and frequency-adapted | `app/src/main/assets/pinyin/dict_pinyin.dat` | GPL-3.0-only | Pinned snapshot, transforms and upstream license in `third_party/pinyinime/`; rebuild with `tools/build-pinyin-model.ps1` |
 | Google ML Kit Translation SDK and downloaded models | Optional on-device translation | Google ML Kit / SDK terms | `third_party/mlkit/SOURCE.md`; these components are not Qingyu-authored GPL content |
 | Official Google Translate attribution badges | Next to model output | Google brand attribution guidelines | Unmodified official images, source and hashes in ML Kit provenance |
 

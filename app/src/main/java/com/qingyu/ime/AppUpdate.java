@@ -32,6 +32,8 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -39,6 +41,7 @@ import java.util.concurrent.Executors;
 final class AppUpdate {
     static final String PROJECT_URL="https://github.com/sharbvane/qingyu-srf";
     static final String API_URL="https://api.github.com/repos/sharbvane/qingyu-srf/releases/latest";
+    private static final long CHECK_INTERVAL=60_000L;
     static final String MIME="application/vnd.android.package-archive";
     private final Context context;
     private final SharedPreferences prefs;
@@ -104,17 +107,82 @@ final class AppUpdate {
     boolean hasDownload(){return prefs.getLong("download_id",0)>0;}
     private void notifyChanged(){if(!closed)changed.run();}
     void check(){
-        if(checking||hasDownload())return;checking=true;message="正在检查最新版本…";notifyChanged();long request=++generation;
+        if(checking||hasDownload())return;
+        long now=System.currentTimeMillis(),checked=prefs.getLong("checked_at",0),retry=prefs.getLong("web_retry_at",0);
+        if(release!=null&&now>=checked&&now-checked<CHECK_INTERVAL){message="使用刚刚检查的发布信息";notifyChanged();return;}
+        if(retry>now&&retry-now<=CHECK_INTERVAL){long apiRetry=prefs.getLong("api_retry_at",0);message=(apiRetry>now?limitedMessage(apiRetry,now):"刚刚检查未成功，请在约 1 分钟后重试。")+(release==null?"":" 已显示上次成功检查的版本，尚未确认最新。");notifyChanged();return;}
+        checking=true;message="正在检查最新版本…";notifyChanged();long request=++generation;
         worker.execute(()->{
-            Release found=null;String failure=null;HttpURLConnection connection=null;
+            Release found=null;String failure=null,etag="",modified="";boolean web=false,apiSuccess=false;long retryAt=prefs.getLong("api_retry_at",0);int failures=prefs.getInt("api_failures",0);HttpURLConnection connection=null;
             try{
-                connection=(HttpURLConnection)new URL(API_URL).openConnection();connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(12000);connection.setReadTimeout(15000);
-                connection.setRequestProperty("Accept","application/vnd.github+json");connection.setRequestProperty("X-GitHub-Api-Version","2022-11-28");connection.setRequestProperty("User-Agent","Qingyu-Android");
-                int code=connection.getResponseCode();if(code!=200)throw new IllegalArgumentException(code==403||code==429?"GitHub 请求暂时受限，请稍后重试。":code==404?"项目尚未发布可下载的正式版本。":"检查失败（HTTP "+code+"），请稍后重试。");
-                try(InputStream input=connection.getInputStream();ByteArrayOutputStream output=new ByteArrayOutputStream()){byte[] buffer=new byte[8192];int count;while((count=input.read(buffer))!=-1){if(output.size()+count>512*1024)throw new IllegalArgumentException("发布信息过大，请前往项目主页查看。");output.write(buffer,0,count);}found=parse(new String(output.toByteArray(),StandardCharsets.UTF_8));}
+                long started=System.currentTimeMillis();if(retryAt<=started||retryAt-started>86400_000L)retryAt=0;
+                if(retryAt>started&&retryAt-started<=86400_000L){web=true;found=webRelease();}
+                else{
+                    connection=open(API_URL,"GET");connection.setRequestProperty("Accept","application/vnd.github+json");connection.setRequestProperty("X-GitHub-Api-Version","2022-11-28");
+                    String apiJson=prefs.getString("api_release","");Release cached=null;try{if(!apiJson.isEmpty())cached=parse(apiJson);}catch(Exception ignored){}
+                    if(cached!=null){etag=prefs.getString("etag","");modified=prefs.getString("last_modified","");if(!etag.isEmpty())connection.setRequestProperty("If-None-Match",etag);else if(!modified.isEmpty())connection.setRequestProperty("If-Modified-Since",modified);}
+                    int code=connection.getResponseCode();
+                    if(code==200){found=parse(read(connection));etag=header(connection,"ETag");modified=header(connection,"Last-Modified");apiSuccess=true;retryAt=0;failures=0;}
+                    else if(code==304&&cached!=null){found=cached;apiSuccess=true;retryAt=0;failures=0;}
+                    else if(code==403||code==429){retryAt=retryUntil(started,header(connection,"Retry-After"),header(connection,"X-RateLimit-Reset"),header(connection,"X-RateLimit-Remaining"),failures);failures=Math.min(6,failures+1);connection.disconnect();connection=null;web=true;found=webRelease();}
+                    else throw new IllegalArgumentException(code==404?"项目尚未发布可下载的正式版本。":"检查失败（HTTP "+code+"），请稍后重试。");
+                }
             }catch(Exception error){failure=error instanceof IllegalArgumentException?error.getMessage():"无法连接 GitHub，请检查网络后重试。";}finally{if(connection!=null)connection.disconnect();}
-            Release result=found;String error=failure;main.post(()->{if(closed||request!=generation)return;checking=false;if(result!=null){release=result;prefs.edit().putString("release",result.json).apply();message=newer()?"发现新版本":"当前已是最新版本";}else message=error;notifyChanged();});
+            Release result=found;String error=failure,newEtag=etag,newModified=modified;boolean viaWeb=web,viaApi=apiSuccess;long nextRetry=retryAt;int failureCount=failures;
+            main.post(()->{if(closed||request!=generation)return;checking=false;long finished=System.currentTimeMillis();SharedPreferences.Editor saved=prefs.edit().putLong("api_retry_at",nextRetry).putInt("api_failures",failureCount);
+                if(result!=null){release=result;saved.putString("release",result.json).putLong("checked_at",finished).remove("web_retry_at");if(viaApi)saved.putString("api_release",result.json).putString("etag",newEtag).putString("last_modified",newModified);message=(newer()?"发现新版本":"当前已是最新版本")+(viaWeb?"（已通过官方发布页检查）":"");}
+                else{saved.putLong("web_retry_at",finished+CHECK_INTERVAL);message=(nextRetry>finished?limitedMessage(nextRetry,finished)+" 官方发布页暂时无法读取。":error)+(release==null?"":" 已显示上次成功检查的版本，尚未确认最新。");}
+                saved.apply();notifyChanged();});
         });
+    }
+    static String header(HttpURLConnection connection,String name){String value=connection.getHeaderField(name);int limit="Location".equalsIgnoreCase(name)?8192:512;return value==null||value.length()>limit?"":value;}
+    private static HttpURLConnection open(String address,String method)throws Exception{
+        HttpURLConnection connection=(HttpURLConnection)new URL(address).openConnection();connection.setInstanceFollowRedirects(false);connection.setConnectTimeout(12000);connection.setReadTimeout(15000);connection.setRequestMethod(method);connection.setRequestProperty("User-Agent","Qingyu-Android");return connection;
+    }
+    private static String read(HttpURLConnection connection)throws Exception{
+        try(InputStream input=connection.getInputStream();ByteArrayOutputStream output=new ByteArrayOutputStream()){byte[] buffer=new byte[8192];int count;while((count=input.read(buffer))!=-1){if(Thread.currentThread().isInterrupted())throw new java.io.InterruptedIOException();if(output.size()+count>512*1024)throw new IllegalArgumentException("发布信息过大，请前往项目主页查看。");output.write(buffer,0,count);}return new String(output.toByteArray(),StandardCharsets.UTF_8);}
+    }
+    static long retryUntil(long now,String after,String reset,String remaining,int failures){
+        long wait=0;
+        try{long seconds=Long.parseLong(after);if(seconds>0)wait=Math.min(seconds,86400L)*1000L;}catch(Exception ignored){try{java.text.SimpleDateFormat format=new java.text.SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z",Locale.US);format.setLenient(false);java.util.Date date=format.parse(after);if(date!=null)wait=Math.max(0,date.getTime()-now);}catch(Exception ignoredDate){}}
+        if("0".equals(remaining))try{long seconds=Long.parseLong(reset);if(seconds>0&&seconds<Long.MAX_VALUE/1000)wait=Math.max(wait,seconds*1000-now);}catch(Exception ignored){}
+        if(wait<=0)wait=CHECK_INTERVAL*(1L<<Math.max(0,Math.min(6,failures)));
+        return now+Math.min(86400_000L,Math.max(CHECK_INTERVAL,wait));
+    }
+    private static String limitedMessage(long until,long now){long minutes=Math.max(1,(Math.max(0,until-now)+59999)/60000);return "GitHub API 暂时受限，约 "+minutes+" 分钟后可重试。";}
+    static String releaseTag(String address){
+        String prefix=PROJECT_URL+"/releases/tag/";if(address==null||!address.startsWith(prefix))return "";String tag=address.substring(prefix.length());return normalizedVersion(tag).isEmpty()?"":tag;
+    }
+    static boolean trustedAssetRedirect(String address){
+        try{URI uri=new URI(address);return "https".equals(uri.getScheme())&&uri.getUserInfo()==null&&uri.getPort()==-1&&uri.getRawFragment()==null&&("release-assets.githubusercontent.com".equals(uri.getHost())||trustedAsset(address));}catch(Exception ignored){return false;}
+    }
+    static Release parseWeb(String tag,String page,String assets,long size)throws Exception{
+        String version=normalizedVersion(tag);if(version.isEmpty()||!tag.matches("[A-Za-z0-9._-]+"))throw new IllegalArgumentException("无法识别官方发布版本。");
+        // ponytail: GitHub's bounded server-rendered asset rows; fail closed if
+        // their markup changes. Replace with an official manifest if it becomes unstable.
+        String name="Qingyu-"+version+".apk",path="/sharbvane/qingyu-srf/releases/download/"+tag+"/"+name;Matcher rows=Pattern.compile("(?s)<li\\b[^>]*>.*?</li>").matcher(assets);String digest="";
+        while(rows.find()){String row=rows.group();if(!row.contains("href=\""+path+"\""))continue;Matcher sha=Pattern.compile("value=\"(sha256:[0-9a-fA-F]{64})\"").matcher(row);if(sha.find())digest=sha.group(1);break;}
+        if(digest.isEmpty())throw new IllegalArgumentException("官方发布页缺少安装包校验信息，请稍后重试。");
+        Matcher notes=Pattern.compile("(?s)<div\\b[^>]*data-test-selector=\"body-content\"[^>]*>(.*?)</div>").matcher(page);String body=notes.find()?android.text.Html.fromHtml(notes.group(1),android.text.Html.FROM_HTML_MODE_LEGACY).toString().trim():"更新说明暂时无法读取，请查看项目主页。";
+        JSONObject asset=new JSONObject().put("name",name).put("state","uploaded").put("browser_download_url","https://github.com"+path).put("size",size).put("digest",digest);
+        return parse(new JSONObject().put("tag_name",tag).put("draft",false).put("prerelease",false).put("body",body).put("assets",new JSONArray().put(asset)).toString());
+    }
+    static Release webRelease()throws Exception{
+        HttpURLConnection connection=null;String tag,page,assets;
+        try{
+            connection=open(PROJECT_URL+"/releases/latest","GET");int code=connection.getResponseCode();if(code!=301&&code!=302&&code!=303&&code!=307&&code!=308)throw new IllegalArgumentException("官方发布页暂时不可用。");
+            String address=new URL(connection.getURL(),header(connection,"Location")).toString();tag=releaseTag(address);if(tag.isEmpty())throw new IllegalArgumentException("官方发布页未提供正式版本。");connection.disconnect();connection=open(address,"GET");if(connection.getResponseCode()!=200)throw new IllegalArgumentException("官方更新说明暂时不可用。");page=read(connection);
+            connection.disconnect();connection=open(PROJECT_URL+"/releases/expanded_assets/"+tag,"GET");if(connection.getResponseCode()!=200)throw new IllegalArgumentException("官方安装包信息暂时不可用。");assets=read(connection);
+            // GitHub's human-readable rounded size is unsuitable for archive validation.
+            String addressApk=PROJECT_URL+"/releases/download/"+tag+"/Qingyu-"+normalizedVersion(tag)+".apk";long size=-1;
+            for(int redirects=0;redirects<5;redirects++){
+                connection.disconnect();connection=open(addressApk,"HEAD");int status=connection.getResponseCode();
+                if(status==200){size=connection.getContentLengthLong();break;}
+                if(status!=301&&status!=302&&status!=303&&status!=307&&status!=308)throw new IllegalArgumentException("正式安装包暂时不可用。");
+                addressApk=new URL(connection.getURL(),header(connection,"Location")).toString();if(!trustedAssetRedirect(addressApk))throw new IllegalArgumentException("安装包跳转地址不可信。");
+            }
+            return parseWeb(tag,page,assets,size);
+        }finally{if(connection!=null)connection.disconnect();}
     }
     void download(){
         if(release==null||!newer()||hasDownload()||manager==null)return;
@@ -186,7 +254,16 @@ final class AppUpdate {
         long next=Build.VERSION.SDK_INT>=28?archive.getLongVersionCode():archive.versionCode,current=Build.VERSION.SDK_INT>=28?installed.getLongVersionCode():installed.versionCode;
         if(next<=current||compareVersions(archive.versionName,installed.versionName)<=0)throw new IllegalArgumentException("此安装包不是更新版本，无需安装。");
         Signature[] old=Build.VERSION.SDK_INT>=28&&installed.signingInfo!=null?installed.signingInfo.getApkContentsSigners():installed.signatures,newer=Build.VERSION.SDK_INT>=28&&archive.signingInfo!=null?archive.signingInfo.getApkContentsSigners():archive.signatures;
-        if(!signaturesMatch(old,newer))throw new IllegalArgumentException("安装包签名与当前应用不一致，已阻止安装。");
+        boolean signed=Build.VERSION.SDK_INT>=28?authorizedSigner(old,newer,archive.signingInfo==null||archive.signingInfo.hasMultipleSigners()?null:archive.signingInfo.getSigningCertificateHistory()):signaturesMatch(old,newer);
+        if(!signed)throw new IllegalArgumentException("安装包签名与当前应用不一致，已阻止安装。");
+    }
+    // PackageManager verifies APK v3 proof-of-rotation; only a forward chain from
+    // the currently installed signer is accepted, never shared historic roots.
+    static boolean authorizedSigner(Signature[] installed,Signature[] archive,Signature[] verifiedHistory){
+        if(installed==null||archive==null||installed.length!=1||archive.length!=1||installed[0]==null||archive[0]==null)return false;
+        if(installed[0].equals(archive[0]))return true;
+        if(verifiedHistory==null||verifiedHistory.length<2||!archive[0].equals(verifiedHistory[verifiedHistory.length-1]))return false;
+        boolean authorized=false;for(int i=0;i<verifiedHistory.length;i++){if(verifiedHistory[i]==null)return false;for(int j=0;j<i;j++)if(verifiedHistory[i].equals(verifiedHistory[j]))return false;if(i<verifiedHistory.length-1&&installed[0].equals(verifiedHistory[i]))authorized=true;}return authorized;
     }
     static boolean signaturesMatch(Signature[] installed,Signature[] archive){if(installed==null||archive==null||installed.length==0||installed.length!=archive.length)return false;for(Signature signer:installed)if(signer==null||!Arrays.asList(archive).contains(signer))return false;return true;}
     boolean consumeAutoInstall(){boolean value=prefs.getBoolean("auto_install",false);if(value&&verified)prefs.edit().remove("auto_install").apply();return value&&verified;}

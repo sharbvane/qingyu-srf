@@ -16,6 +16,9 @@ if (-not (Test-Path -LiteralPath "$projectRoot\.tools\gradle\gradle-$gradleVersi
 if (-not (Test-Path -LiteralPath "$projectRoot\.tools\android-sdk\platforms\android-35\android.jar")) {
     throw 'The project Android SDK is missing. Run scripts/setup-toolchain.ps1 first.'
 }
+if ($Variant -eq 'Release') {
+    & "$PSScriptRoot\release-signing.ps1" -Action Check -JavaHome $JavaHome
+}
 
 # The NDK and CMake must receive an ASCII workspace path on Windows.
 $buildRoot = $projectRoot
@@ -62,6 +65,13 @@ try {
     $variantPath = $Variant.ToLowerInvariant()
     $builtApk = Join-Path $projectRoot "app\build\outputs\apk\$variantPath\app-$variantPath.apk"
     if (-not (Test-Path -LiteralPath $builtApk)) { throw "APK was not generated: $builtApk" }
+    if ($Variant -eq 'Release') {
+        & "$PSScriptRoot\release-signing.ps1" -Action Sign -Apk $builtApk -JavaHome $JavaHome
+        if ($AndroidTest) {
+            $testApk = Join-Path $projectRoot 'app\build\outputs\apk\androidTest\release\app-release-androidTest.apk'
+            & "$PSScriptRoot\release-signing.ps1" -Action Sign -Apk $testApk -JavaHome $JavaHome
+        }
+    }
     $buildText = Get-Content -LiteralPath (Join-Path $projectRoot 'app\build.gradle') -Raw
     $version = [regex]::Match($buildText, "versionName\s+'([^']+)'").Groups[1].Value
     if (-not $version) { $version = 'mvp' }

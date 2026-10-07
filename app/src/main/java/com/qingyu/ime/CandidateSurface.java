@@ -7,7 +7,6 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -36,7 +35,7 @@ final class CandidateSurface extends View {
         default void visibleWordsChanged(){}
         default void clearCandidates(){}
     }
-    private static final int EXPAND=3, GOOGLE_ATTRIBUTION=4, CLEAR=5, CANDIDATE=100;
+    private static final int EXPAND=3, CLEAR=5, CANDIDATE=100;
     private static final int ACTION_TRANSLATE=0x02000001;
     private final Listener listener;
     private final ImePreferences prefs;
@@ -51,8 +50,6 @@ final class CandidateSurface extends View {
     private VelocityTracker velocity;
     private Palette colors;
     private boolean dark;
-    private boolean googleTranslation;
-    private Drawable googleBadge;
     private List<String> words=Collections.emptyList();
     private Map<String,String> glosses=Collections.emptyMap();
     private Map<String,String> partsOfSpeech=Collections.emptyMap();
@@ -81,7 +78,7 @@ final class CandidateSurface extends View {
         super(c);this.prefs=prefs;this.listener=listener;density=c.getResources().getDisplayMetrics().density;fontDensity=c.getResources().getDisplayMetrics().scaledDensity;
         scroller=new OverScroller(c);ViewConfiguration touch=ViewConfiguration.get(c);touchSlop=touch.getScaledTouchSlop();minimumFling=touch.getScaledMinimumFlingVelocity();maximumFling=touch.getScaledMaximumFlingVelocity();
         accessibility=(AccessibilityManager)c.getSystemService(Context.ACCESSIBILITY_SERVICE);
-        dark=prefs.dark(c);colors=new Palette(dark);googleBadge=c.getDrawable(dark?R.drawable.google_translate_badge_dark:R.drawable.google_translate_badge);setFocusable(false);
+        dark=prefs.dark(c);colors=new Palette(dark);setFocusable(false);
         setContentDescription("候选词，上方为释义；左右滑动浏览，长按查看详情，上滑输入翻译");
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
     }
@@ -93,7 +90,7 @@ final class CandidateSurface extends View {
         if(changed){cancelTouch();clearVirtualFocus();generation++;scroll=0;notifiedFirst=notifiedLast=-1;}
         this.composing=composing;if(wordsChanged)this.words=new ArrayList<>(words);translations=translate;
         // Retain matching annotations while the next asynchronous batch is loading.
-        boolean nextDark=prefs.dark(getContext());if(nextDark!=dark){dark=nextDark;colors=new Palette(dark);googleBadge=getContext().getDrawable(dark?R.drawable.google_translate_badge_dark:R.drawable.google_translate_badge);}
+        boolean nextDark=prefs.dark(getContext());if(nextDark!=dark){dark=nextDark;colors=new Palette(dark);}
         if(wordsChanged)calculate();invalidate();accessibilityChanged();
     }
     void glosses(Map<String,String> glosses){this.glosses=glosses;invalidate();accessibilityChanged();}
@@ -113,11 +110,6 @@ final class CandidateSurface extends View {
     void setPredicting(boolean value){
         if(predicting==value)return;cancelTouch();clearVirtualFocus();generation++;predicting=value;
         scroll=Math.min(scroll,maxScroll());invalidate();accessibilityChanged();
-    }
-    /** Describes the current gloss batch's source; toggling attribution never changes candidate geometry. */
-    void setGoogleTranslation(boolean value){
-        if(Looper.myLooper()!=Looper.getMainLooper()){post(()->setGoogleTranslation(value));return;}
-        if(googleTranslation==value)return;googleTranslation=value;invalidate();accessibilityChanged();
     }
     void setInteractiveComposition(boolean value){
         if(interactiveComposition==value)return;
@@ -150,9 +142,7 @@ final class CandidateSurface extends View {
     private float rowHeight(){return Math.max(dp(64),fontDensity*40+dp(12));}
     private int firstVisible(){return Math.min(words.size(),Math.max(0,(int)(scroll/rowHeight())*3));}
     private int lastVisible(){return Math.min(words.size(),Math.max(0,(int)Math.ceil((scroll+candidateBottom())/rowHeight())*3));}
-    // Fixed slot: an asynchronous model result must not move the word row or keyboard.
-    private float candidateBottom(){return Math.max(0,getHeight()-dp(16));}
-    private boolean hasGoogleAttribution(){return googleTranslation&&translations&&!words.isEmpty();}
+    private float candidateBottom(){return getHeight();}
     private boolean hasExpand(){return !embeddedGrid&&!predicting&&interactiveComposition&&!words.isEmpty();}
     private boolean hasClear(){return !embeddedGrid&&predicting&&!words.isEmpty();}
     // Snap the shared edge once: separately rounding adjacent virtual nodes
@@ -203,7 +193,6 @@ final class CandidateSurface extends View {
             RectF bounds=virtualBounds(accessibilityFocus);
             if(bounds!=null){paint.setColor(colors.accent);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(2));c.drawRoundRect(bounds,dp(9),dp(9),paint);paint.setStyle(Paint.Style.FILL);}
         }
-        if(hasGoogleAttribution()&&googleBadge!=null){RectF badge=virtualBounds(GOOGLE_ATTRIBUTION);googleBadge.setBounds(Math.round(badge.left),Math.round(badge.top),Math.round(badge.right),Math.round(badge.bottom));googleBadge.draw(c);}
     }
     private void drawWord(Canvas c,int index,RectF bounds) {
         String word=words.get(index);float center=bounds.centerX(),mid=bounds.centerY();
@@ -282,7 +271,6 @@ final class CandidateSurface extends View {
     }
     private RectF virtualBounds(int id) {
         float width=getWidth(),height=candidateBottom(),top=0;if(width<=0||height<=0)return null;
-        if(id==GOOGLE_ATTRIBUTION&&hasGoogleAttribution()){float badgeWidth=Math.min(dp(176),width),badgeHeight=badgeWidth/11f;return new RectF((width-badgeWidth)/2,height,(width+badgeWidth)/2,height+badgeHeight);}
         if(id==EXPAND&&hasExpand())return new RectF(expandLeft(),top,expandLeft()+dp(48),height);
         if(id==CLEAR&&hasClear())return new RectF(listWidth(),top,width,height);
         int index=id-CANDIDATE;if(index<0||index>=words.size())return null;
@@ -298,10 +286,9 @@ final class CandidateSurface extends View {
     private List<Integer> visibleNodes() {
         List<Integer> ids=new ArrayList<>();
         for(int i=0;i<words.size();i++)if(virtualBounds(CANDIDATE+i)!=null)ids.add(CANDIDATE+i);
-        if(hasExpand())ids.add(EXPAND);if(hasClear())ids.add(CLEAR);if(hasGoogleAttribution())ids.add(GOOGLE_ATTRIBUTION);return ids;
+        if(hasExpand())ids.add(EXPAND);if(hasClear())ids.add(CLEAR);return ids;
     }
     private String virtualName(int id) {
-        if(id==GOOGLE_ATTRIBUTION)return "powered by Google Translate";
         if(id==EXPAND)return expandIndicator?"收起候选":"展开候选";
         if(id==CLEAR)return "清空预测候选";
         int index=id-CANDIDATE;
@@ -358,15 +345,15 @@ final class CandidateSurface extends View {
             }
             RectF box=virtualBounds(id);if(box==null)return null;
             AccessibilityNodeInfo node=AccessibilityNodeInfo.obtain();node.setSource(CandidateSurface.this,id);node.setParent(CandidateSurface.this);
-            boolean attribution=id==GOOGLE_ATTRIBUTION;node.setPackageName(getContext().getPackageName());node.setClassName(attribution?"android.widget.TextView":"android.widget.Button");
-            String resourceId=attribution?"candidate_attribution":id==EXPAND?"candidate_expand":id==CLEAR?"candidate_clear":"candidate_"+(id-CANDIDATE);
+            node.setPackageName(getContext().getPackageName());node.setClassName("android.widget.Button");
+            String resourceId=id==EXPAND?"candidate_expand":id==CLEAR?"candidate_clear":"candidate_"+(id-CANDIDATE);
             node.setViewIdResourceName(getContext().getPackageName()+":id/"+resourceId);node.setContentDescription(virtualName(id));
             boolean candidate=id>=CANDIDATE&&id<CANDIDATE+words.size();node.setText(candidate?words.get(id-CANDIDATE):virtualName(id));
-            node.setEnabled(virtualEnabled(id));node.setFocusable(true);node.setClickable(!attribution&&virtualEnabled(id));node.setVisibleToUser(isShown());
+            node.setEnabled(virtualEnabled(id));node.setFocusable(true);node.setClickable(virtualEnabled(id));node.setVisibleToUser(isShown());
             Rect bounds=new Rect();box.roundOut(bounds);node.setBoundsInParent(bounds);int[] screen=new int[2];getLocationOnScreen(screen);bounds.offset(screen[0],screen[1]);node.setBoundsInScreen(bounds);
             node.setAccessibilityFocused(accessibilityFocus==id);node.addAction(accessibilityFocus==id?AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS:AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS);
             if(node.isClickable())node.addAction(AccessibilityNodeInfo.ACTION_CLICK);
-            if(candidate){node.setLongClickable(true);String hint=embeddedGrid?"长按查看完整释义并输入译文":"长按查看完整释义，上滑输入翻译";node.setHintText(hasGoogleAttribution()?hint+"；机器译文 Translate with Google":hint);if(embeddedGrid)node.setCollectionItemInfo(AccessibilityNodeInfo.CollectionItemInfo.obtain((id-CANDIDATE)/3,1,(id-CANDIDATE)%3,1,false));node.addAction(AccessibilityNodeInfo.ACTION_LONG_CLICK);node.addAction(new AccessibilityNodeInfo.AccessibilityAction(ACTION_TRANSLATE,hasGoogleAttribution()?"Translate with Google，输入此候选的翻译":"输入此候选的翻译"));}return node;
+            if(candidate){node.setLongClickable(true);node.setHintText(embeddedGrid?"长按查看完整释义并输入译文":"长按查看完整释义，上滑输入本地译文或查看完整翻译");if(embeddedGrid)node.setCollectionItemInfo(AccessibilityNodeInfo.CollectionItemInfo.obtain((id-CANDIDATE)/3,1,(id-CANDIDATE)%3,1,false));node.addAction(AccessibilityNodeInfo.ACTION_LONG_CLICK);node.addAction(new AccessibilityNodeInfo.AccessibilityAction(ACTION_TRANSLATE,"输入本地译文或查看完整翻译"));}return node;
         }
         @Override public AccessibilityNodeInfo findFocus(int focus){return focus==AccessibilityNodeInfo.FOCUS_ACCESSIBILITY&&accessibilityFocus!=NO_ID?createAccessibilityNodeInfo(accessibilityFocus):null;}
         @Override public boolean performAction(int id,int action,Bundle arguments) {
