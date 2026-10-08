@@ -29,6 +29,7 @@ public final class ChineseQualitySmoke {
             java.lang.reflect.Method open=sqlite.getMethod("openDatabase",String.class,Class.forName("android.database.sqlite.SQLiteDatabase$CursorFactory"),int.class);
             Object database=open.invoke(null,args[4],null,1);
             java.lang.reflect.Field field=dictionaryClass.getDeclaredField("pinyinDatabase");field.setAccessible(true);field.set(dictionary,database);
+            if(args.length>5){java.lang.reflect.Field model=dictionaryClass.getDeclaredField("contextModel");model.setAccessible(true);model.set(dictionary,ChineseContextModel.load(Files.newInputStream(Paths.get(args[5]))));}
             engine.setLexicon((PinyinEngine.Lexicon)dictionary);
         }
         int total=0,top1=0,top5=0,top10=0,found=0,strictFailures=0;

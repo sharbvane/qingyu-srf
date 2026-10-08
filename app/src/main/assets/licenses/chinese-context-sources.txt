@@ -1,0 +1,14 @@
+Chinese context statistics and exact source examples
+
+UD Chinese GSDSimp r2.18; contributors Peng Qi and Koichi Yasuoka.
+https://github.com/UniversalDependencies/UD_Chinese-GSDSimp/tree/7b61ed473f963e911788efdf1f478154bc1053e4
+Upstream license: Creative Commons Attribution-ShareAlike 4.0 International
+https://creativecommons.org/licenses/by-sa/4.0/
+
+The simplified treebank was converted from Chinese GSD with OpenCC and manual corrections. Genre in upstream metadata: wiki. Google's removal of the old NC condition applies to annotations; Google claims no ownership or copyright over underlying content. This caveat and the upstream attribution/share-alike terms remain applicable.
+
+Changes by Qingyu: deterministic TRAIN-only character/UPOS/next-token statistics; log-weighted word-internal evidence from the already licensed modern v2 lexicon; lexical tags from MIT jieba; numeric/gzip encoding; bounded short exact TRAIN example excerpts with broad sensitive-domain filtering. No DEV/TEST sentence is used for model statistics or examples. No generated/rephrased Chinese examples.
+
+TRAIN sentences 3997; tokens 98614; source examples 384; indexed example words 1207. Source and model SHA-256 records and reproducible builder are in third_party/input-data/chinese-context/manifest.json and tools/build_chinese_context.py in the Qingyu project.
+
+Rime Ice GPL-3.0-only, AOSP Apache-2.0, CC-CEDICT CC BY-SA 4.0 and jieba MIT notices are included separately. The model is distributed with the project's GPL-3.0 terms and retains attribution to all source data; exact corpus excerpts retain their CC BY-SA 4.0 source attribution.

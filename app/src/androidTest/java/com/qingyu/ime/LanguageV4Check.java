@@ -13,9 +13,9 @@ final class LanguageV4Check {
         ImeV2Instrumentation ime=(ImeV2Instrumentation)test;
         for(String language:new String[]{"de","ru","es"}) {
             test.clear();selectLanguage(test,language);test.type("wenhua");test.awaitCandidate("文化");
-            String translated=modelDetail(ime);test.closePanel();test.keyboardReady();SystemClock.sleep(200);test.check(!String.valueOf(test.candidate("文化").getContentDescription()).contains("释义"),"Model output leaked into keyboard annotations");
-            ime.upCandidate("文化");test.awaitNodeText("translation_detail","Google Translate · 端侧翻译");test.check(test.text().equals("wenhua"),"Model gesture committed before detail confirmation");test.buttonClick("Translate with Google");test.awaitText(translated);
-            test.pass(languageName(language)+" model remains absent from keyboard and opens attributed details before matching translation commit");
+            String translated=modelDetail(ime);test.closePanel();test.keyboardReady();test.awaitGloss("文化",translated);
+            ime.upCandidate("文化");test.awaitText(translated);
+            test.pass(languageName(language)+" candidate gloss, attributed details and direct upward translation remain synchronized");
         }
 
         test.clear();selectLanguage(test,"de");openManager(test);
@@ -36,8 +36,8 @@ final class LanguageV4Check {
 
         test.clear();openManager(test);clickEnabled(test,"下载 · 德语");awaitModelState(test,"德语","模型已就绪");
         awaitSize(test,"德语",false);test.screenshot("v4-models-restored.png");leaveManager(test);
-        test.type("wenhua");test.awaitCandidate("文化");String restored=modelDetail(ime);test.closePanel();test.keyboardReady();ime.upCandidate("文化");test.awaitNodeText("translation_detail","Google Translate · 端侧翻译");test.buttonClick("Translate with Google");test.awaitText(restored);
-        test.pass("Explicit German model re-download restores detail translation and explicit commit");
+        test.type("wenhua");test.awaitCandidate("文化");String restored=modelDetail(ime);test.closePanel();test.keyboardReady();test.awaitGloss("文化",restored);ime.upCandidate("文化");test.awaitText(restored);
+        test.pass("Explicit German model re-download restores candidate translation, details and direct upward commit");
         test.clear();selectLanguage(test,"en");test.newEditor(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);test.keyboardReady();
     }
 
@@ -47,7 +47,7 @@ final class LanguageV4Check {
         test.check(language.equals(test.getTargetContext().getSharedPreferences("qingyu",0).getString("gloss_language","en")),"Language selection not saved: "+language);
     }
     private static String modelDetail(ImeV2Instrumentation test) {
-        test.holdCandidate("文化");test.awaitNodeText("translation_detail","Google Translate · 端侧翻译");
+        test.holdCandidate("文化");test.awaitNode("translation_attribution");
         String value=test.awaitNode("translation_detail").getText().toString().split("\n",2)[0].trim();
         test.check(!value.isEmpty()&&!value.equals("文化"),"Optional language did not produce a translated word: "+value);test.check(test.text().equals("wenhua"),"Viewing model details unexpectedly committed the candidate");return value;
     }

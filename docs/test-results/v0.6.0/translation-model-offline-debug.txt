@@ -1,0 +1,6 @@
+PASS six-language catalog, preferences and invalid download guard
+PASS model ABI/page-size guard
+PASS concise translations, honest progress and safe failure reasons
+PASS selected-language local lookup isolation
+PASS real disconnected download, prompt failure and no fabricated progress
+ALL_MODEL_OFFLINE_CHECKS_PASS

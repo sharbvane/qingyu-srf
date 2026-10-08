@@ -12,7 +12,7 @@ import java.io.FileInputStream;
 import java.security.MessageDigest;
 
 /** v0.5 acceptance through the actual installed IME, followed by prior regressions. */
-public final class ImeV5Instrumentation extends ImeV4Instrumentation {
+public class ImeV5Instrumentation extends ImeV4Instrumentation {
     @Override protected String successMarker(){return "ALL_V5_IME_CHECKS_PASS";}
     @Override protected void runChecks() throws Exception {
         String[][] words={{"anzhuo","安卓"},{"dangang","单杠"},{"kuaidi","快递"},{"gaotie","高铁"},{"erweima","二维码"},{"rengongzhineng","人工智能"}};

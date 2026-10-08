@@ -1,0 +1,86 @@
+# Original daily regressions plus deterministic UD DEV assessment; no rank-based admission.
+woyaokanduanshipin	我要看短视频	daily-sentence	5
+qingsaomazhifu	请扫码支付	daily-sentence	5
+woxiangdawangyueche	我想打网约车	daily-sentence	5
+woxiangkandianying	我想看电影	daily-sentence	5
+jintianwoyaoqushangban	今天我要去上班	daily-sentence	5
+wanshangwomenyiqichifan	晚上我们一起吃饭	daily-sentence	5
+mingtianyiqiqugongyuan	明天一起去公园	daily-sentence	5
+nikeyibangwokankanma	你可以帮我看看吗	daily-sentence	5
+woxihuanxuexizhongwen	我喜欢学习中文	daily-sentence	5
+nixianzaiyoushijianma	你现在有时间吗	daily-sentence	5
+woxiangmaiyibeikafei	我想买一杯咖啡	daily-sentence	5
+kuaidiyijingdaole	快递已经到了	daily-sentence	5
+womenxuyaochongxinsheji	我们需要重新设计	daily-sentence	5
+qingbangwodakaishezhi	请帮我打开设置	daily-sentence	5
+mingtiankenenghuixiayu	明天可能会下雨	daily-sentence	5
+wozhengzaixuexibiancheng	我正在学习编程	daily-sentence	5
+qinggaosuwonidexiangfa	请告诉我你的想法	daily-sentence	5
+zhegewentiyijingjiejue	这个问题已经解决	daily-sentence	5
+woxiangzuogaotiehuijia	我想坐高铁回家	daily-sentence	5
+jintiandetianqihenhao	今天的天气很好	daily-sentence	5
+zhegebanbenkeyigengxin	这个版本可以更新	daily-sentence	5
+niyoumeiyoudaichongdianqi	你有没有带充电器	daily-sentence	5
+woxianzaizhunbeichumen	我现在准备出门	daily-sentence	5
+dengyixiawomashanghuilai	等一下我马上回来	daily-sentence	5
+qingbawenjianfageiwo	请把文件发给我	daily-sentence	5
+womenmingtianzaitaolun	我们明天再讨论	daily-sentence	5
+woxiangtingyishougequ	我想听一首歌曲	daily-sentence	5
+wojuedezheyangbijiaohao	我觉得这样比较好	daily-sentence	5
+jintiangongzuoyoudianmang	今天工作有点忙	daily-sentence	5
+woyijingshoudaoxiaoxi	我已经收到消息	daily-sentence	5
+qingwenfujinyoumeiyouditiezhan	请问附近有没有地铁站	daily-sentence	5
+zhegeerweimawufashibie	这个二维码无法识别	daily-sentence	5
+woxiangxianshiyixia	我想先试一下	daily-sentence	5
+xindeanzhuobanbenhenliuchang	新的安卓版本很流畅	daily-sentence	5
+woxuyaoyuyuemingtiandeshijian	我需要预约明天的时间	daily-sentence	5
+woxiangqubeijing	我想去北京	daily-sentence	5
+jintiantianqihenhao	今天天气很好	daily-sentence	5
+shilidedaxiaobutong	施力的大小不同	ud-dev-heldout	5	assessment
+yinqidejiasudubutong	引起的加速度不同	ud-dev-heldout	5	assessment
+zuizhongdejieguoyebuyiyang	最终的结果也不一样	ud-dev-heldout	5	assessment
+yikeyicongxiangliangdejiachengxinglaikan	亦可以从向量的加成性来看	ud-dev-heldout	5	assessment
+zhezhongcheliangruguoguisirenyongyou	这种车辆如果归私人拥有	ud-dev-heldout	5	assessment
+duobanhuishezhiangguideyinpinshebei	多半会设置昂贵的音频设备	ud-dev-heldout	5	assessment
+yijibataihebingxiang	以及吧台和冰箱	ud-dev-heldout	5	assessment
+dongzuomaoxianyouxi	动作冒险游戏	ud-dev-heldout	5	assessment
+shimaoxianyouxidefenzhi	是冒险游戏的分支	ud-dev-heldout	5	assessment
+jiceshibaohanlemeishuzhiliaofa	其测试包含了美术治疗法	ud-dev-heldout	5	assessment
+renzhixingweizhiliaohedongchaliaofa	认知行为治疗和洞察疗法	ud-dev-heldout	5	assessment
+zezhongduanleshengchan	则中断了生产	ud-dev-heldout	5	assessment
+dejingjiyiyuyeweizhu	的经济以渔业为主	ud-dev-heldout	5	assessment
+xueyuyexiangdangfada	鳕鱼业相当发达	ud-dev-heldout	5	assessment
+renxiangjidingjuyuci	人相继定居于此	ud-dev-heldout	5	assessment
+wuyueershiyiri	五月二十一日	ud-dev-heldout	5	assessment
+chuchengyingjieqianlai	出城迎接前来	ud-dev-heldout	5	assessment
+tahuafeilexuduoshijianlaibijiao	他花费了许多时间来比较	ud-dev-heldout	5	assessment
+shouciyaoqingshuming	首次邀请数名	ud-dev-heldout	5	assessment
+qiandingmengyuezhihou	签订盟约之后	ud-dev-heldout	5	assessment
+diguofaqideshisannianzhanzheng	帝国发起的十三年战争	ud-dev-heldout	5	assessment
+haihuomigongzhongyidongshi	海或迷宫中移动时	ud-dev-heldout	5	assessment
+dezhimingdushishenzhishui	的知名度时甚至说	ud-dev-heldout	5	assessment
+bingchengweilexilieguanfangdejixiangwu	并成为了系列官方的吉祥物	ud-dev-heldout	5	assessment
+wulunguafengxiayu	无论刮风下雨	ud-dev-heldout	5	assessment
+bugujingchahebaotusaorao	不顾警察和暴徒骚扰	ud-dev-heldout	5	assessment
+desuoyouliangxinfan	的所有良心犯	ud-dev-heldout	5	assessment
+yigejiatingshourudezhongjianshuwei	一个家庭收入的中间数为	ud-dev-heldout	5	assessment
+jiatingshourudezhongjianshuwei	家庭收入的中间数为	ud-dev-heldout	5	assessment
+guominpingjunshouruwei	国民平均收入为	ud-dev-heldout	5	assessment
+tebiexingzhengoufuzeguanxia	特别行政区负责管辖	ud-dev-heldout	5	assessment
+tieluquanxiangongsheyouchezhan	铁路全线共设有车站	ud-dev-heldout	5	assessment
+suozaidedisanou	所在的第三区	ud-dev-heldout	5	assessment
+zaoyibudanshizhixuexiao	早已不单是指学校	ud-dev-heldout	5	assessment
+shoucituixingdexuduogaigecuoshizai	首次推行的许多改革措施在	ud-dev-heldout	5	assessment
+dangzhengqijiansuiyiranbaoliu	当政期间虽依然保留	ud-dev-heldout	5	assessment
+wenmingdiquyiwaidedifang	文明地区以外的地方	ud-dev-heldout	5	assessment
+jimeiyoukaihuadedifang	即没有开化的地方	ud-dev-heldout	5	assessment
+dixiaercengweiditie	地下二层为地铁	ud-dev-heldout	5	assessment
+dixiasancengweizhengzaijianshededitie	地下三层为正在建设的地铁	ud-dev-heldout	5	assessment
+niankuojianweifuzhukeyunzhan	年扩建为辅助客运站	ud-dev-heldout	5	assessment
+yizhiyuliansaikaishishi	以至于联赛开始时	ud-dev-heldout	5	assessment
+zaicitiqianyilunsuodingliansaijijun	再次提前一轮锁定联赛季军	ud-dev-heldout	5	assessment
+liansaixiaozusaidezhijiecansaixiwei	联赛小组赛的直接参赛席位	ud-dev-heldout	5	assessment
+duihuodelexiasaiji	队获得了下赛季	ud-dev-heldout	5	assessment
+gaigongchengbingweiwangong	该工程并未完工	ud-dev-heldout	5	assessment
+waichenggongyouqimen	外城共有七门	ud-dev-heldout	5	assessment
+ciwaihaiyouliangzuobianmen	此外还有两座便门	ud-dev-heldout	5	assessment

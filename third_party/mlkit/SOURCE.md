@@ -1,13 +1,17 @@
 # ML Kit on-device translation
 
 Dependency: `com.google.mlkit:translate:17.0.3`, verified against the official
-Android guide on 2026-10-05; attribution rechecked on 2026-10-07:
+Android guide on 2026-10-08; attribution rechecked on 2026-10-07:
 https://developers.google.com/ml-kit/language/translation/android
 
 The model translates complete input on-device. Qingyu never calls a remote
 text translation endpoint. An explicit model-download action or the user's
 first explicit selection of a required non-English annotation language calls
-`downloadModelIfNeeded`, with Wi-Fi required. Model existence checks do not
+`downloadModelIfNeeded`. Wi-Fi is the default; the model manager offers an
+explicit choice to allow mobile data. Missing connectivity, server failures,
+storage failures and model validation failures show a readable reason and a
+retry action. A non-Wi-Fi request without permission fails promptly instead
+of remaining in an ambiguous waiting state. Model existence checks do not
 download files. Candidate generation and editor operations do not wait for
 dictionary lookup, model checks, downloads or inference.
 
@@ -16,11 +20,42 @@ English, Japanese, French, German, Russian or Spanish; English annotations
 select Chinese. The APK bundles only Chinese/English dictionaries and local
 phrase meanings, not these optional model weights. Extra languages occupy no
 model storage before downloading. The model-management page reports download
-state and actual installed file size and supports deletion. English is the
+state, actual transfer bytes when available, installed file size and deletion. English is the
 built-in pivot. Non-English translation additionally requires that language's
 model and may lose nuance because it routes through English.
 Model output is intended for casual translation, not guaranteed accuracy.
 https://developers.google.com/ml-kit/language/translation
+
+## Download observation and lifecycle
+
+ML Kit's public `Task` does not expose download byte progress. The pinned
+17.0.3 translation downloader calls Android `DownloadManager` and persists
+its request ID via common 18.11.0's `SharedPrefManager`. Qingyu reads only
+`com.google.mlkit.internal` / `downloading_model_id_` followed by
+`TranslateRemoteModel.getUniqueModelNameForPersist()`. A public
+`DownloadManager.Query` restricted to those app-owned IDs supplies real
+`COLUMN_BYTES_DOWNLOADED_SO_FAR`, `COLUMN_TOTAL_SIZE_BYTES`, state and pause
+or failure reason. This does not change SDK requests, model contents, hashes
+or install behavior. No arbitrary model URL, mirror or text translation
+endpoint is used. Unknown IDs or totals use an indeterminate indicator;
+there is no synthetic progress. The byte total describes requests currently
+known to the SDK, rather than guessing the total for an entire language pair.
+The task's successful completion alone marks the pair ready after validation.
+
+Verified against the cached 17.0.3 `internal.zzh` downloader and 18.11.0
+`SharedPrefManager` bytecode. This is a version-specific, read-only observer;
+if a future SDK changes the preference format, it falls back to an
+indeterminate status without disabling downloads. Model checks and queries
+run on the translation worker. Visible model management polls download
+status every 800 ms and checks idle state every four seconds, so activity
+recreation can reconnect to SDK-owned downloads. Polling stops when the
+page is left, paused or destroyed.
+
+https://developer.android.com/reference/android/app/DownloadManager
+
+Model hosting still requires a network able to reach Google's official
+endpoints. Qingyu cannot make a blocked endpoint reachable through retries;
+it reports the failure rather than claiming that a model was installed.
 
 ## Privacy
 
@@ -73,6 +108,23 @@ opens the attributed details instead and requires the existing commit action.
 Google model translations, badges and attribution remain in that details view;
 model management and application help retain the source/privacy information.
 The existing keyboard's overall fixed geometry is preserved.
+
+The v0.6 request changes that earlier local-only policy: installed models may
+fill missing visible annotations asynchronously, and upward gestures may
+commit the selected language's model translation. Local lexicon/phrase
+results remain first. The user's subsequent v0.6 instruction removes all
+Google branding from the compact candidate row and expanded candidate list,
+while retaining the real model annotations and direct upward commits. Model
+source notes, badges and attributed actions remain in long-press details and
+model management. This is the current UI scope, not a claim that attribution
+only in details satisfies the official adjacent-output requirement above;
+distribution must account for that difference. English dictionary descriptions
+are offered only for Chinese-to-English details; other selected languages
+use their own model instead of falling back to an English explanation.
+Compact dictionary translations commit one sense without part-of-speech
+prefixes; full dictionary definitions remain in the detail view. Inference
+is bounded at eight active requests; saturated callers retry at most three
+times, 350 ms apart, with model-generation and closed-instance guards.
 
 The source PNG files retain the exact official bytes and SHA-256 values
 above. Release packaging applies AAPT lossless PNG encoding optimization,

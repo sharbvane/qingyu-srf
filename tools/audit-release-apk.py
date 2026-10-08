@@ -4,6 +4,7 @@ Usage: python tools/audit-release-apk.py [final.apk] [previous.apk]
 Version and expected paths come from app/build.gradle. No Android device needed.
 """
 import hashlib
+import gzip
 import io
 import json
 import re
@@ -132,9 +133,13 @@ with zipfile.ZipFile(apk) as archive:
         if not source.is_file():
             continue
         name = "assets/" + source.relative_to(ROOT / "app/src/main/assets").as_posix()
+        expected = source.read_bytes()
+        if source.suffix == ".gz":
+            name = name[:-3]
+            expected = gzip.decompress(expected)  # AAPT expands gzip source assets.
         source_assets.add(name)
         blob = archive.read(name)
-        assert blob == source.read_bytes(), name
+        assert blob == expected, name
         metadata["assets"][name] = {"bytes": len(blob), "sha256": digest(blob)}
     # AGP's compiled ART startup profiles are build output, not language models.
     metadata["build_generated_assets"] = {}
@@ -193,6 +198,14 @@ with zipfile.ZipFile(apk) as archive:
             plan = " ".join(str(row[-1]) for row in lexicon.execute(f"EXPLAIN QUERY PLAN SELECT text,pinyin,weight FROM words WHERE {field}=? ORDER BY weight DESC LIMIT 64", (code,)))
             assert "USING INDEX" in plan and "TEMP B-TREE" not in plan, plan
     metadata["chinese_pinyin"] = pinyin_manifest
+    context_manifest = json.loads((ROOT / "third_party/input-data/chinese-context/manifest.json").read_text(encoding="utf-8-sig"))
+    context_source = (ROOT / "app/src/main/assets/input/chinese-context-v1.bin.gz").read_bytes()
+    assert {"bytes": len(context_source), "sha256": digest(context_source)} == {"bytes": context_manifest["model_bytes"], "sha256": context_manifest["model_sha256"]}
+    context_binary = gzip.decompress(context_source)
+    assert metadata["assets"]["assets/input/chinese-context-v1.bin"] == {"bytes": len(context_binary), "sha256": digest(context_binary)}
+    assert context_manifest["training_split"] == "train only" and context_manifest["source_license"] == "CC BY-SA 4.0"
+    assert archive.read("assets/licenses/UD-GSDSimp-LICENSE.txt") == (ROOT / "third_party/input-data/chinese-context/UD-GSDSimp-LICENSE.txt").read_bytes()
+    metadata["chinese_context"] = context_manifest
     for manifest_name, asset in [("manifest.json", "zh-en.db"), ("details-manifest.json", "zh-en-details.db")]:
         provenance = json.loads((ROOT / "third_party/cedict" / manifest_name).read_text(encoding="utf-8-sig"))
         assert metadata["assets"]["assets/translation/" + asset]["sha256"] == provenance["database_sha256"], asset

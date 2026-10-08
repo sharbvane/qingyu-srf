@@ -7,7 +7,9 @@ import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Rect;
+import android.graphics.RectF;
 import android.os.SystemClock;
+import android.text.StaticLayout;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
@@ -84,7 +86,47 @@ final class CandidateLayoutCheck {
             }
             check(tones.size()==5&&palette.partOfSpeech(null)==palette.text&&palette.partOfSpeech("eng")==palette.text,"Fake POS or missing coordinated tones");
         }
+        sentenceRows(context);
     }
+    private static void sentenceRows(Context context){
+        Configuration config=new Configuration(context.getResources().getConfiguration());config.fontScale=1.3f;config.orientation=Configuration.ORIENTATION_PORTRAIT;
+        Context large=context.createConfigurationContext(config);float density=large.getResources().getDisplayMetrics().density;
+        int[] chosen={-1};CandidateSurface grid=new CandidateSurface(large,new ImePreferences(large),new CandidateSurface.Listener(){
+            public void choose(int index){chosen[0]=index;}public void detail(int index){}public void translate(int index){}public void expand(){}public void settings(){}public void toggleTranslation(){}public void punctuation(String value){}
+        });grid.setEmbeddedGrid(true);
+        String sentence="我今天想和朋友一起去公园散步然后回家吃晚饭，明天我们还可以再去看电影。";
+        String translation="Today I would like to take a walk in the park with my friends and then return home for dinner. Tomorrow we can go to see a film together.";
+        grid.update("wojintian",Arrays.asList(sentence,"今天","朋友","公园","散步","回家","晚饭","明天","电影"),true,"");
+        grid.glosses(Collections.singletonMap(sentence,translation));grid.modelWords(Collections.singleton(sentence));layout(grid,Math.round(360*density),Math.round(210*density));
+        int fixed=grid.getHeight();Rect first=bounds(grid,100);check(first.left==0&&first.right==grid.getWidth(),"Long sentence is still squeezed into a narrow column");
+        try{
+            Object cell=((java.util.List<?>)field(grid,"gridCells")).get(0);
+            StaticLayout word=(StaticLayout)field(cell,"word"),gloss=(StaticLayout)field(cell,"gloss");
+            check(word.getLineCount()>1&&gloss.getLineCount()>1,"Expanded sentence/translation did not wrap");
+            fullText(word,sentence);fullText(gloss,translation);
+            RectF box=(RectF)field(cell,"bounds");check(box.height()>=word.getHeight()+gloss.getHeight(),"Dynamic sentence row clips its text");
+            check(grid.getHeight()==fixed&&first.bottom<=fixed,"Sentence rows expanded the IME window");
+            check(!grid.getAccessibilityNodeProvider().createAccessibilityNodeInfo(100).getContentDescription().toString().contains("Google Translate"),"Expanded sentence still exposes candidate branding");
+        }catch(ReflectiveOperationException error){throw new AssertionError(error);}
+
+        // A late translation can change expanded row height, but may not move
+        // the touched cell or cancel the tap that was already in progress.
+        grid.update("jintian",Arrays.asList("今天","朋友","公园","散步","回家","晚饭","明天","电影","你好"),true,"");grid.glosses(Collections.emptyMap());grid.modelWords(Collections.emptySet());
+        grid.glosses(Collections.singletonMap("今天","today"));Rect shortModel=bounds(grid,100);grid.modelWords(Collections.singleton("今天"));check(bounds(grid,100).equals(shortModel)&&shortModel.right<grid.getWidth(),"Model branding metadata changed a short candidate layout");
+        grid.modelWords(Collections.emptySet());check(bounds(grid,100).right<grid.getWidth(),"Local short words lost the compact three-column layout");grid.glosses(Collections.emptyMap());
+        Rect before=bounds(grid,100);long now=SystemClock.uptimeMillis();MotionEvent down=MotionEvent.obtain(now,now,MotionEvent.ACTION_DOWN,before.centerX(),before.centerY(),0);grid.onTouchEvent(down);down.recycle();
+        grid.glosses(Collections.singletonMap("今天",translation));grid.modelWords(Collections.singleton("今天"));check(bounds(grid,100).equals(before),"Asynchronous translation moved a live candidate touch");
+        MotionEvent up=MotionEvent.obtain(now,now+30,MotionEvent.ACTION_UP,before.centerX(),before.centerY(),0);grid.onTouchEvent(up);up.recycle();check(chosen[0]==0,"Late translation canceled/changed candidate selection");
+        check(bounds(grid,100).right==grid.getWidth()&&grid.getHeight()==fixed,"Deferred translation reflow changed the keyboard footprint");
+
+        try{
+            android.widget.OverScroller scroller=(android.widget.OverScroller)field(grid,"scroller");scroller.startScroll(0,0,0,20,180);
+            Rect during=bounds(grid,100);grid.glosses(Collections.singletonMap("今天",translation+" We enjoy this quiet afternoon."));
+            check(!scroller.isFinished()&&bounds(grid,100).equals(during),"Annotation interrupted candidate scrolling");scroller.abortAnimation();grid.computeScroll();
+        }catch(ReflectiveOperationException error){throw new AssertionError(error);}
+    }
+    private static Object field(Object object,String name)throws ReflectiveOperationException{java.lang.reflect.Field field=object.getClass().getDeclaredField(name);field.setAccessible(true);return field.get(object);}
+    private static void fullText(StaticLayout layout,String expected){check(layout.getText().toString().equals(expected)&&layout.getLineEnd(layout.getLineCount()-1)==expected.length(),"Expanded text was shortened");for(int line=0;line<layout.getLineCount();line++)check(layout.getEllipsisCount(line)==0,"Expanded text still uses ellipsis");}
     private static void layout(View view,int width,int exactHeight){view.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(exactHeight,exactHeight==0?View.MeasureSpec.UNSPECIFIED:View.MeasureSpec.EXACTLY));view.layout(0,0,view.getMeasuredWidth(),view.getMeasuredHeight());}
     private static Rect bounds(CandidateSurface view,int id){AccessibilityNodeInfo node=view.getAccessibilityNodeProvider().createAccessibilityNodeInfo(id);check(node!=null,"Missing candidate control "+id);Rect rect=new Rect();node.getBoundsInParent(rect);return rect;}
     private static double luminance(int color){double value=0;int[] channels={Color.red(color),Color.green(color),Color.blue(color)};double[] weights={.2126,.7152,.0722};for(int i=0;i<3;i++){double c=channels[i]/255.0;value+=weights[i]*(c<=.04045?c/12.92:Math.pow((c+.055)/1.055,2.4));}return value;}

@@ -1,0 +1,87 @@
+CONTEXT_LOAD 257.241ms source=UD Chinese GSDSimp r2.18 · Wikipedia (CC BY-SA 4.0); Rime Ice; jieba
+CONTEXT_CASE	woyaokanduanshipin	我要看短视频	daily-sentence	0	我要砍断视频|我要砍断食品|我要砍断饰品
+CONTEXT_CASE	qingsaomazhifu	请扫码支付	daily-sentence	0	清扫吗支付|清扫么支付|清扫吗致富
+CONTEXT_CASE	woxiangdawangyueche	我想打网约车	daily-sentence	0	我想大王余额车|我想大王说车|我向大王余额车
+CONTEXT_CASE	woxiangkandianying	我想看电影	daily-sentence	1	我想看电影|我向看电影|我像看电影
+CONTEXT_CASE	jintianwoyaoqushangban	今天我要去上班	daily-sentence	1	今天我要去上班|今天我要去上半|今天我要去商办
+CONTEXT_CASE	wanshangwomenyiqichifan	晚上我们一起吃饭	daily-sentence	1	晚上我们一起吃饭|晚上我们仪器吃饭|晚上我们义气吃饭
+CONTEXT_CASE	mingtianyiqiqugongyuan	明天一起去公园	daily-sentence	1	明天一起去公园|明天一起去公元|明天仪器去公园
+CONTEXT_CASE	nikeyibangwokankanma	你可以帮我看看吗	daily-sentence	1	你可以帮我看看吗|你可以帮我看看么|你可以帮我看看嘛
+CONTEXT_CASE	woxihuanxuexizhongwen	我喜欢学习中文	daily-sentence	1	我喜欢学习中文|我喜欢学系中文|我喜欢血洗中文
+CONTEXT_CASE	nixianzaiyoushijianma	你现在有时间吗	daily-sentence	0	你现在优势见吗|你现在有时见吗|你现在又是见吗
+CONTEXT_CASE	woxiangmaiyibeikafei	我想买一杯咖啡	daily-sentence	2	我想买已被咖啡|我想买一杯咖啡|我想买一倍咖啡
+CONTEXT_CASE	kuaidiyijingdaole	快递已经到了	daily-sentence	1	快递已经到了|酷爱的已经到了|会的已经到了
+CONTEXT_CASE	womenxuyaochongxinsheji	我们需要重新设计	daily-sentence	1	我们需要重新设计|我们需要重新涉及|我们须要重新设计
+CONTEXT_CASE	qingbangwodakaishezhi	请帮我打开设置	daily-sentence	1	请帮我打开设置|青帮我打开设置|清帮我打开设置
+CONTEXT_CASE	mingtiankenenghuixiayu	明天可能会下雨	daily-sentence	0
+CONTEXT_CASE	wozhengzaixuexibiancheng	我正在学习编程	daily-sentence	1	我正在学习编程|我正再学习编程|喔正在学习编程
+CONTEXT_CASE	qinggaosuwonidexiangfa	请告诉我你的想法	daily-sentence	1	请告诉我你的想法|请告诉我你得想法|请告诉我呢的想法
+CONTEXT_CASE	zhegewentiyijingjiejue	这个问题已经解决	daily-sentence	1	这个问题已经解决|这个问题一经解决|这个问题意境解决
+CONTEXT_CASE	woxiangzuogaotiehuijia	我想坐高铁回家	daily-sentence	0
+CONTEXT_CASE	jintiandetianqihenhao	今天的天气很好	daily-sentence	1	今天的天气很好|今天的天启很好|今天地天气很好
+CONTEXT_CASE	zhegebanbenkeyigengxin	这个版本可以更新	daily-sentence	1	这个版本可以更新|这个版本刻意更新|这个版本可疑更新
+CONTEXT_CASE	niyoumeiyoudaichongdianqi	你有没有带充电器	daily-sentence	0
+CONTEXT_CASE	woxianzaizhunbeichumen	我现在准备出门	daily-sentence	1	我现在准备出门|我现在准备楚门|我先在准备出门
+CONTEXT_CASE	dengyixiawomashanghuilai	等一下我马上回来	daily-sentence	1	等一下我马上回来|等以下我马上回来|等一下喔马上回来
+CONTEXT_CASE	qingbawenjianfageiwo	请把文件发给我	daily-sentence	1	请把文件发给我|请把稳健发给我|请吧文件发给我
+CONTEXT_CASE	womenmingtianzaitaolun	我们明天再讨论	daily-sentence	0	我们明天在讨论|我们命题按在讨论|我们命题俺在讨论
+CONTEXT_CASE	woxiangtingyishougequ	我想听一首歌曲	daily-sentence	2	我想听一手歌曲|我想听一首歌曲|我想听一手各区
+CONTEXT_CASE	wojuedezheyangbijiaohao	我觉得这样比较好	daily-sentence	1	我觉得这样比较好|我觉得遮阳比较好|我觉得这样比较号
+CONTEXT_CASE	jintiangongzuoyoudianmang	今天工作有点忙	daily-sentence	0
+CONTEXT_CASE	woyijingshoudaoxiaoxi	我已经收到消息	daily-sentence	1	我已经收到消息|我已经收到小溪|我已经受到消息
+CONTEXT_CASE	qingwenfujinyoumeiyouditiezhan	请问附近有没有地铁站	daily-sentence	0
+CONTEXT_CASE	zhegeerweimawufashibie	这个二维码无法识别	daily-sentence	1	这个二维码无法识别|这个而为吗无法识别|这个而未吗无法识别
+CONTEXT_CASE	woxiangxianshiyixia	我想先试一下	daily-sentence	0	我想显示一下|我想现实一下|我想西安市一下
+CONTEXT_CASE	xindeanzhuobanbenhenliuchang	新的安卓版本很流畅	daily-sentence	0
+CONTEXT_CASE	woxuyaoyuyuemingtiandeshijian	我需要预约明天的时间	daily-sentence	0
+CONTEXT_CASE	woxiangqubeijing	我想去北京	daily-sentence	1	我想去北京|我想去背景|我向去北京
+CONTEXT_CASE	jintiantianqihenhao	今天天气很好	daily-sentence	1	今天天气很好|今天天启很好|今天田七很好
+CONTEXT_CASE	shilidedaxiaobutong	施力的大小不同	ud-dev-heldout	0	实力的大小不同|实例的大小不同|势力的大小不同
+CONTEXT_CASE	yinqidejiasudubutong	引起的加速度不同	ud-dev-heldout	1	引起的加速度不同|因其的加速度不同|引起的家速度不同
+CONTEXT_CASE	zuizhongdejieguoyebuyiyang	最终的结果也不一样	ud-dev-heldout	0
+CONTEXT_CASE	yikeyicongxiangliangdejiachengxinglaikan	亦可以从向量的加成性来看	ud-dev-heldout	0
+CONTEXT_CASE	zhezhongcheliangruguoguisirenyongyou	这种车辆如果归私人拥有	ud-dev-heldout	0
+CONTEXT_CASE	duobanhuishezhiangguideyinpinshebei	多半会设置昂贵的音频设备	ud-dev-heldout	0
+CONTEXT_CASE	yijibataihebingxiang	以及吧台和冰箱	ud-dev-heldout	1	以及吧台和冰箱|一级吧台和冰箱|以及吧台和并向
+CONTEXT_CASE	dongzuomaoxianyouxi	动作冒险游戏	ud-dev-heldout	1	动作冒险游戏|动作毛线游戏|动作茂县游戏
+CONTEXT_CASE	shimaoxianyouxidefenzhi	是冒险游戏的分支	ud-dev-heldout	1	是冒险游戏的分支|是冒险游戏的分值|时髦现有戏的分支
+CONTEXT_CASE	jiceshibaohanlemeishuzhiliaofa	其测试包含了美术治疗法	ud-dev-heldout	0
+CONTEXT_CASE	renzhixingweizhiliaohedongchaliaofa	认知行为治疗和洞察疗法	ud-dev-heldout	0
+CONTEXT_CASE	zezhongduanleshengchan	则中断了生产	ud-dev-heldout	2	则终端了生产|则中断了生产|咋终端了生产
+CONTEXT_CASE	dejingjiyiyuyeweizhu	的经济以渔业为主	ud-dev-heldout	0	的经济易于也围住|的经济已于也围住|的经济抑郁也围住
+CONTEXT_CASE	xueyuyexiangdangfada	鳕鱼业相当发达	ud-dev-heldout	0	雪域也相当发达|鳕鱼也相当发达|学渔业相当发达
+CONTEXT_CASE	renxiangjidingjuyuci	人相继定居于此	ud-dev-heldout	2	人相机定居于此|人相继定居于此|人相机定居与此
+CONTEXT_CASE	wuyueershiyiri	五月二十一日	ud-dev-heldout	1	五月二十一日
+CONTEXT_CASE	chuchengyingjieqianlai	出城迎接前来	ud-dev-heldout	1	出城迎接前来|出城应届前来|出城硬解前来
+CONTEXT_CASE	tahuafeilexuduoshijianlaibijiao	他花费了许多时间来比较	ud-dev-heldout	0
+CONTEXT_CASE	shouciyaoqingshuming	首次邀请数名	ud-dev-heldout	3	首次邀请书名|首次邀请署名|首次邀请数名
+CONTEXT_CASE	qiandingmengyuezhihou	签订盟约之后	ud-dev-heldout	1	签订盟约之后|签订盟约滞后|签订盟约置后
+CONTEXT_CASE	diguofaqideshisannianzhanzheng	帝国发起的十三年战争	ud-dev-heldout	0
+CONTEXT_CASE	haihuomigongzhongyidongshi	海或迷宫中移动时	ud-dev-heldout	0	还获迷宫中移动式|还获米公众移动式|海货迷宫中移动式
+CONTEXT_CASE	dezhimingdushishenzhishui	的知名度时甚至说	ud-dev-heldout	0	的知名度失神汁水|的知名度失身汁水|的知名度失神治水
+CONTEXT_CASE	bingchengweilexilieguanfangdejixiangwu	并成为了系列官方的吉祥物	ud-dev-heldout	0
+CONTEXT_CASE	wulunguafengxiayu	无论刮风下雨	ud-dev-heldout	1	无论刮风下雨|五轮刮风下雨|无论刮风夏雨
+CONTEXT_CASE	bugujingchahebaotusaorao	不顾警察和暴徒骚扰	ud-dev-heldout	0
+CONTEXT_CASE	desuoyouliangxinfan	的所有良心犯	ud-dev-heldout	1	的所有良心犯|的所有良心饭|的所有良心反
+CONTEXT_CASE	yigejiatingshourudezhongjianshuwei	一个家庭收入的中间数为	ud-dev-heldout	0
+CONTEXT_CASE	jiatingshourudezhongjianshuwei	家庭收入的中间数为	ud-dev-heldout	0
+CONTEXT_CASE	guominpingjunshouruwei	国民平均收入为	ud-dev-heldout	1	国民平均收入为|过敏平均收入为|国民平均收入未
+CONTEXT_CASE	tebiexingzhengoufuzeguanxia	特别行政区负责管辖	ud-dev-heldout	0
+CONTEXT_CASE	tieluquanxiangongsheyouchezhan	铁路全线共设有车站	ud-dev-heldout	0
+CONTEXT_CASE	suozaidedisanou	所在的第三区	ud-dev-heldout	1	所在的第三区|所在的第三偶|所载的第三区
+CONTEXT_CASE	zaoyibudanshizhixuexiao	早已不单是指学校	ud-dev-heldout	0	早已不但是指学校|早已不但使之学校|早已不但实质学校
+CONTEXT_CASE	shoucituixingdexuduogaigecuoshizai	首次推行的许多改革措施在	ud-dev-heldout	0
+CONTEXT_CASE	dangzhengqijiansuiyiranbaoliu	当政期间虽依然保留	ud-dev-heldout	0
+CONTEXT_CASE	wenmingdiquyiwaidedifang	文明地区以外的地方	ud-dev-heldout	2	文明地区意外的地方|文明地区以外的地方|闻名地区意外的地方
+CONTEXT_CASE	jimeiyoukaihuadedifang	即没有开化的地方	ud-dev-heldout	0	既没有开花的地方|既没有开化的地方|既没有开花的敌方
+CONTEXT_CASE	dixiaercengweiditie	地下二层为地铁	ud-dev-heldout	1	地下二层为地铁|地下而曾为地铁|底下二层为地铁
+CONTEXT_CASE	dixiasancengweizhengzaijianshededitie	地下三层为正在建设的地铁	ud-dev-heldout	0
+CONTEXT_CASE	niankuojianweifuzhukeyunzhan	年扩建为辅助客运站	ud-dev-heldout	0
+CONTEXT_CASE	yizhiyuliansaikaishishi	以至于联赛开始时	ud-dev-heldout	1	以至于联赛开始时|以至于联赛开始是|一直与联赛开始时
+CONTEXT_CASE	zaicitiqianyilunsuodingliansaijijun	再次提前一轮锁定联赛季军	ud-dev-heldout	0
+CONTEXT_CASE	liansaixiaozusaidezhijiecansaixiwei	联赛小组赛的直接参赛席位	ud-dev-heldout	0
+CONTEXT_CASE	duihuodelexiasaiji	队获得了下赛季	ud-dev-heldout	0	对获得了下赛季|对火得了下赛季|对火的了下赛季
+CONTEXT_CASE	gaigongchengbingweiwangong	该工程并未完工	ud-dev-heldout	0
+CONTEXT_CASE	waichenggongyouqimen	外城共有七门	ud-dev-heldout	0	外城共有气门|外城共有奇门|外城共有祁门
+CONTEXT_CASE	ciwaihaiyouliangzuobianmen	此外还有两座便门	ud-dev-heldout	0
+HOST_CORE_BEAM daily=37 top1=22 top5=24; heldout=48 top1=13 top5=17; p50=2.278ms p95=13.611ms max=70.371ms (no JNI/SQLite in timing)

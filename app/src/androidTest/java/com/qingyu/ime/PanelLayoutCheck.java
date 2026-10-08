@@ -22,6 +22,12 @@ final class PanelLayoutCheck {
             panels.height();check(panels,keyboard,height,"more");View slider=panels.body.findViewById(R.id.height_slider);prefs.store.edit().putFloat("height",.78f).apply();layout(panels.body,4000);require(panels.body.findViewById(R.id.height_slider)==slider,"Height adjustment replaced the active slider");require(panels.body.getMeasuredHeight()==keyboard.getMeasuredHeight(),"Height panel diverged from keyboard measurement");
             prefs.store.edit().putFloat("height",previous).apply();layout(panels.body,4000);height=panels.body.getMeasuredHeight();
             panels.styles();check(panels,keyboard,height,"more");panels.detail("开发","develop");check(panels,keyboard,height,"more");
+            String longExample="这是一段用于核对例句完整换行和固定面板滚动的较长文本，所有真实例句都应当可以完整阅读，不应因为键盘高度受到限制而被省略。";
+            panels.detailResult("开发","develop","本地短语","to create, improve or make something grow","v","en",longExample,"This example remains fully readable in the same fixed panel even when several lines are needed.","本地词典");check(panels,keyboard,height,"more");
+            TextView example=panels.body.findViewById(R.id.translation_example);require(example.getText().toString().equals(longExample)&&example.getLineCount()>1&&example.getEllipsize()==null,"Details truncated a real example");
+            for(int id:new int[]{R.id.translation_commit,R.id.translation_copy})require(panels.body.findViewById(id).getMeasuredHeight()>=Math.round(48*context.getResources().getDisplayMetrics().density),"Translation action is too small to touch");
+            panels.detailResult("开发","","等待本地模型下载","","","en","","","");require(!panels.body.findViewById(R.id.translation_commit).isEnabled()&&!panels.body.findViewById(R.id.translation_copy).isEnabled(),"Missing translation leaves active copy/input actions");
+            panels.toolbar.findViewById(R.id.toolbar_more).performClick();require(actions.get(actions.size()-1).equals("keyboard"),"Detail did not close through the same More icon");
             panels.edit(false,false);check(panels,keyboard,height,"edit");panels.clipboard(Collections.singletonList("最近内容"),value->{},value->{});check(panels,keyboard,height,"edit");
             panels.toolbar.findViewById(R.id.toolbar_edit).performClick();require(actions.get(actions.size()-1).equals("keyboard"),"Clipboard did not toggle via Edit");
             panels.emoji();check(panels,keyboard,height,"emoji");panels.modes();check(panels,keyboard,height,"mode");

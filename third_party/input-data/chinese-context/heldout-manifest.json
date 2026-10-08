@@ -1,0 +1,654 @@
+{
+  "source_commit": "7b61ed473f963e911788efdf1f478154bc1053e4",
+  "source_split": "DEV (not trained)",
+  "source_sha256": "d03f1eeb93b16071bfbbe6c76b971554be87c9a2307b3f3a820dd7c07f73fb63",
+  "selection": "first48 source-order, complete known-token Chinese runs length6..12, >=3tokens, no PROPN, <=48pinyinletters, no rank filtering",
+  "cases": [
+    {
+      "code": "shilidedaxiaobutong",
+      "text": "施力的大小不同",
+      "sentence_id_1_based": 1,
+      "full_sentence": "同样，施力的大小不同，引起的加速度不同，最终的结果也不一样，亦可以从向量的加成性来看。",
+      "tokens": [
+        "施力",
+        "的",
+        "大小",
+        "不同"
+      ]
+    },
+    {
+      "code": "yinqidejiasudubutong",
+      "text": "引起的加速度不同",
+      "sentence_id_1_based": 1,
+      "full_sentence": "同样，施力的大小不同，引起的加速度不同，最终的结果也不一样，亦可以从向量的加成性来看。",
+      "tokens": [
+        "引起",
+        "的",
+        "加速",
+        "度",
+        "不同"
+      ]
+    },
+    {
+      "code": "zuizhongdejieguoyebuyiyang",
+      "text": "最终的结果也不一样",
+      "sentence_id_1_based": 1,
+      "full_sentence": "同样，施力的大小不同，引起的加速度不同，最终的结果也不一样，亦可以从向量的加成性来看。",
+      "tokens": [
+        "最终",
+        "的",
+        "结果",
+        "也",
+        "不",
+        "一样"
+      ]
+    },
+    {
+      "code": "yikeyicongxiangliangdejiachengxinglaikan",
+      "text": "亦可以从向量的加成性来看",
+      "sentence_id_1_based": 1,
+      "full_sentence": "同样，施力的大小不同，引起的加速度不同，最终的结果也不一样，亦可以从向量的加成性来看。",
+      "tokens": [
+        "亦",
+        "可以",
+        "从",
+        "向量",
+        "的",
+        "加成",
+        "性",
+        "来",
+        "看"
+      ]
+    },
+    {
+      "code": "zhezhongcheliangruguoguisirenyongyou",
+      "text": "这种车辆如果归私人拥有",
+      "sentence_id_1_based": 3,
+      "full_sentence": "这种车辆如果归私人拥有，多半会设置昂贵的音频设备、电视机、影碟机，以及吧台和冰箱。",
+      "tokens": [
+        "这种",
+        "车辆",
+        "如果",
+        "归",
+        "私人",
+        "拥有"
+      ]
+    },
+    {
+      "code": "duobanhuishezhiangguideyinpinshebei",
+      "text": "多半会设置昂贵的音频设备",
+      "sentence_id_1_based": 3,
+      "full_sentence": "这种车辆如果归私人拥有，多半会设置昂贵的音频设备、电视机、影碟机，以及吧台和冰箱。",
+      "tokens": [
+        "多半",
+        "会",
+        "设置",
+        "昂贵",
+        "的",
+        "音频",
+        "设备"
+      ]
+    },
+    {
+      "code": "yijibataihebingxiang",
+      "text": "以及吧台和冰箱",
+      "sentence_id_1_based": 3,
+      "full_sentence": "这种车辆如果归私人拥有，多半会设置昂贵的音频设备、电视机、影碟机，以及吧台和冰箱。",
+      "tokens": [
+        "以及",
+        "吧台",
+        "和",
+        "冰箱"
+      ]
+    },
+    {
+      "code": "dongzuomaoxianyouxi",
+      "text": "动作冒险游戏",
+      "sentence_id_1_based": 4,
+      "full_sentence": "动作冒险游戏（A-AVG）：是冒险游戏的分支，它融合了动作游戏的一些特征。",
+      "tokens": [
+        "动作",
+        "冒险",
+        "游戏"
+      ]
+    },
+    {
+      "code": "shimaoxianyouxidefenzhi",
+      "text": "是冒险游戏的分支",
+      "sentence_id_1_based": 4,
+      "full_sentence": "动作冒险游戏（A-AVG）：是冒险游戏的分支，它融合了动作游戏的一些特征。",
+      "tokens": [
+        "是",
+        "冒险",
+        "游戏",
+        "的",
+        "分支"
+      ]
+    },
+    {
+      "code": "jiceshibaohanlemeishuzhiliaofa",
+      "text": "其测试包含了美术治疗法",
+      "sentence_id_1_based": 5,
+      "full_sentence": "其测试包含了美术治疗法，认知行为治疗和洞察疗法，同时给行为分析提供了一个理论性的交流平台。",
+      "tokens": [
+        "其",
+        "测试",
+        "包含",
+        "了",
+        "美术",
+        "治疗",
+        "法"
+      ]
+    },
+    {
+      "code": "renzhixingweizhiliaohedongchaliaofa",
+      "text": "认知行为治疗和洞察疗法",
+      "sentence_id_1_based": 5,
+      "full_sentence": "其测试包含了美术治疗法，认知行为治疗和洞察疗法，同时给行为分析提供了一个理论性的交流平台。",
+      "tokens": [
+        "认知",
+        "行为",
+        "治疗",
+        "和",
+        "洞察",
+        "疗法"
+      ]
+    },
+    {
+      "code": "zezhongduanleshengchan",
+      "text": "则中断了生产",
+      "sentence_id_1_based": 6,
+      "full_sentence": "数百万的巧克力棒被撤下柜台，而玛氏则中断了生产，公司损失达四百五十万美元。",
+      "tokens": [
+        "则",
+        "中断",
+        "了",
+        "生产"
+      ]
+    },
+    {
+      "code": "dejingjiyiyuyeweizhu",
+      "text": "的经济以渔业为主",
+      "sentence_id_1_based": 7,
+      "full_sentence": "努克的经济以渔业为主，1960年代，鳕鱼业相当发达，现已没落，目前主要出产螃蟹和大比目鱼。",
+      "tokens": [
+        "的",
+        "经济",
+        "以",
+        "渔业",
+        "为",
+        "主"
+      ]
+    },
+    {
+      "code": "xueyuyexiangdangfada",
+      "text": "鳕鱼业相当发达",
+      "sentence_id_1_based": 7,
+      "full_sentence": "努克的经济以渔业为主，1960年代，鳕鱼业相当发达，现已没落，目前主要出产螃蟹和大比目鱼。",
+      "tokens": [
+        "鳕鱼",
+        "业",
+        "相当",
+        "发达"
+      ]
+    },
+    {
+      "code": "renxiangjidingjuyuci",
+      "text": "人相继定居于此",
+      "sentence_id_1_based": 8,
+      "full_sentence": "随后爱斯基摩人和维京人相继定居于此。",
+      "tokens": [
+        "人",
+        "相继",
+        "定居",
+        "于",
+        "此"
+      ]
+    },
+    {
+      "code": "wuyueershiyiri",
+      "text": "五月二十一日",
+      "sentence_id_1_based": 9,
+      "full_sentence": "五月二十一日，努尔哈赤出城迎接前来沈阳的科尔沁部奥巴贝勒。",
+      "tokens": [
+        "五",
+        "月",
+        "二十一",
+        "日"
+      ]
+    },
+    {
+      "code": "chuchengyingjieqianlai",
+      "text": "出城迎接前来",
+      "sentence_id_1_based": 9,
+      "full_sentence": "五月二十一日，努尔哈赤出城迎接前来沈阳的科尔沁部奥巴贝勒。",
+      "tokens": [
+        "出城",
+        "迎接",
+        "前来"
+      ]
+    },
+    {
+      "code": "tahuafeilexuduoshijianlaibijiao",
+      "text": "他花费了许多时间来比较",
+      "sentence_id_1_based": 10,
+      "full_sentence": "他花费了许多时间来比较加拿大地质调查局博物馆中的恐龙化石。",
+      "tokens": [
+        "他",
+        "花费",
+        "了",
+        "许多",
+        "时间",
+        "来",
+        "比较"
+      ]
+    },
+    {
+      "code": "shouciyaoqingshuming",
+      "text": "首次邀请数名",
+      "sentence_id_1_based": 13,
+      "full_sentence": "华特迪士尼首次邀请数名香港人气博客，参与动画《勇敢传说之幻险森林》配音工作，让他们与其他明星及专业配音员齐齐声演动画。",
+      "tokens": [
+        "首次",
+        "邀请",
+        "数",
+        "名"
+      ]
+    },
+    {
+      "code": "qiandingmengyuezhihou",
+      "text": "签订盟约之后",
+      "sentence_id_1_based": 14,
+      "full_sentence": "1594年秋，在与特兰西瓦尼亚和摩尔达维亚签订盟约之后，米哈伊起兵反抗奥斯曼帝国，参加神圣罗马帝国发起的十三年战争。",
+      "tokens": [
+        "签订",
+        "盟约",
+        "之后"
+      ]
+    },
+    {
+      "code": "diguofaqideshisannianzhanzheng",
+      "text": "帝国发起的十三年战争",
+      "sentence_id_1_based": 14,
+      "full_sentence": "1594年秋，在与特兰西瓦尼亚和摩尔达维亚签订盟约之后，米哈伊起兵反抗奥斯曼帝国，参加神圣罗马帝国发起的十三年战争。",
+      "tokens": [
+        "帝国",
+        "发起",
+        "的",
+        "十三",
+        "年",
+        "战争"
+      ]
+    },
+    {
+      "code": "haihuomigongzhongyidongshi",
+      "text": "海或迷宫中移动时",
+      "sentence_id_1_based": 15,
+      "full_sentence": "在平原、塔、洞窟、海或迷宫中移动时，玩家将会和随机遇到的敌人作战。",
+      "tokens": [
+        "海",
+        "或",
+        "迷宫",
+        "中",
+        "移动",
+        "时"
+      ]
+    },
+    {
+      "code": "dezhimingdushishenzhishui",
+      "text": "的知名度时甚至说",
+      "sentence_id_1_based": 16,
+      "full_sentence": "当《Game Informer》提到游戏在日本的知名度时甚至说“四百万日本人可能错了”。",
+      "tokens": [
+        "的",
+        "知名",
+        "度",
+        "时",
+        "甚至",
+        "说"
+      ]
+    },
+    {
+      "code": "bingchengweilexilieguanfangdejixiangwu",
+      "text": "并成为了系列官方的吉祥物",
+      "sentence_id_1_based": 17,
+      "full_sentence": "史莱姆是由鸟山明为《勇者斗恶龙》设计的，并成为了系列官方的吉祥物。",
+      "tokens": [
+        "并",
+        "成",
+        "为",
+        "了",
+        "系列",
+        "官方",
+        "的",
+        "吉祥",
+        "物"
+      ]
+    },
+    {
+      "code": "wulunguafengxiayu",
+      "text": "无论刮风下雨",
+      "sentence_id_1_based": 20,
+      "full_sentence": "年复一年，无论刮风下雨，不顾警察和暴徒骚扰，白衣女士们坚持着她们无声的周日步行，抗议关押古巴的所有良心犯。",
+      "tokens": [
+        "无论",
+        "刮风",
+        "下雨"
+      ]
+    },
+    {
+      "code": "bugujingchahebaotusaorao",
+      "text": "不顾警察和暴徒骚扰",
+      "sentence_id_1_based": 20,
+      "full_sentence": "年复一年，无论刮风下雨，不顾警察和暴徒骚扰，白衣女士们坚持着她们无声的周日步行，抗议关押古巴的所有良心犯。",
+      "tokens": [
+        "不顾",
+        "警察",
+        "和",
+        "暴徒",
+        "骚扰"
+      ]
+    },
+    {
+      "code": "desuoyouliangxinfan",
+      "text": "的所有良心犯",
+      "sentence_id_1_based": 20,
+      "full_sentence": "年复一年，无论刮风下雨，不顾警察和暴徒骚扰，白衣女士们坚持着她们无声的周日步行，抗议关押古巴的所有良心犯。",
+      "tokens": [
+        "的",
+        "所有",
+        "良心",
+        "犯"
+      ]
+    },
+    {
+      "code": "yigejiatingshourudezhongjianshuwei",
+      "text": "一个家庭收入的中间数为",
+      "sentence_id_1_based": 21,
+      "full_sentence": "一个家庭收入的中间数为$16,250，家庭收入的中间数为$16,250，国民平均收入为$5,467。",
+      "tokens": [
+        "一",
+        "个",
+        "家庭",
+        "收入",
+        "的",
+        "中间",
+        "数",
+        "为"
+      ]
+    },
+    {
+      "code": "jiatingshourudezhongjianshuwei",
+      "text": "家庭收入的中间数为",
+      "sentence_id_1_based": 21,
+      "full_sentence": "一个家庭收入的中间数为$16,250，家庭收入的中间数为$16,250，国民平均收入为$5,467。",
+      "tokens": [
+        "家庭",
+        "收入",
+        "的",
+        "中间",
+        "数",
+        "为"
+      ]
+    },
+    {
+      "code": "guominpingjunshouruwei",
+      "text": "国民平均收入为",
+      "sentence_id_1_based": 21,
+      "full_sentence": "一个家庭收入的中间数为$16,250，家庭收入的中间数为$16,250，国民平均收入为$5,467。",
+      "tokens": [
+        "国民",
+        "平均",
+        "收入",
+        "为"
+      ]
+    },
+    {
+      "code": "tebiexingzhengoufuzeguanxia",
+      "text": "特别行政区负责管辖",
+      "sentence_id_1_based": 22,
+      "full_sentence": "劳特塔瓦尔湖是印度尼西亚的湖泊，位于苏门答腊岛北部，由亚齐特别行政区负责管辖，长17公里、宽3公里，面积70平方公里，海拔高度1,100米，最大水深80米，蓄水量25亿立方米。",
+      "tokens": [
+        "特别",
+        "行政",
+        "区",
+        "负责",
+        "管辖"
+      ]
+    },
+    {
+      "code": "tieluquanxiangongsheyouchezhan",
+      "text": "铁路全线共设有车站",
+      "sentence_id_1_based": 24,
+      "full_sentence": "包白铁路全线共设有车站19座。",
+      "tokens": [
+        "铁路",
+        "全线",
+        "共",
+        "设有",
+        "车站"
+      ]
+    },
+    {
+      "code": "suozaidedisanou",
+      "text": "所在的第三区",
+      "sentence_id_1_based": 25,
+      "full_sentence": "包盈盈所在的第三区，有卫冕冠军、6号种子玛丽埃尔·扎格尼斯。",
+      "tokens": [
+        "所",
+        "在",
+        "的",
+        "第三",
+        "区"
+      ]
+    },
+    {
+      "code": "zaoyibudanshizhixuexiao",
+      "text": "早已不单是指学校",
+      "sentence_id_1_based": 26,
+      "full_sentence": "由于包浩斯学校对于现代建筑学的深远影响，今日的包浩斯早已不单是指学校，而是其倡导的建筑流派或风格的统称，注重建筑造型与实用机能合而为一。",
+      "tokens": [
+        "早",
+        "已",
+        "不单",
+        "是",
+        "指",
+        "学校"
+      ]
+    },
+    {
+      "code": "shoucituixingdexuduogaigecuoshizai",
+      "text": "首次推行的许多改革措施在",
+      "sentence_id_1_based": 27,
+      "full_sentence": "1956年，首次推行的许多改革措施在卡达尔当政期间虽依然保留，但在外交上却没有任何大的改变。",
+      "tokens": [
+        "首次",
+        "推行",
+        "的",
+        "许多",
+        "改革",
+        "措施",
+        "在"
+      ]
+    },
+    {
+      "code": "dangzhengqijiansuiyiranbaoliu",
+      "text": "当政期间虽依然保留",
+      "sentence_id_1_based": 27,
+      "full_sentence": "1956年，首次推行的许多改革措施在卡达尔当政期间虽依然保留，但在外交上却没有任何大的改变。",
+      "tokens": [
+        "当政",
+        "期间",
+        "虽",
+        "依然",
+        "保留"
+      ]
+    },
+    {
+      "code": "wenmingdiquyiwaidedifang",
+      "text": "文明地区以外的地方",
+      "sentence_id_1_based": 28,
+      "full_sentence": "化外之地，文明地区以外的地方，即没有开化的地方。",
+      "tokens": [
+        "文明",
+        "地区",
+        "以外",
+        "的",
+        "地方"
+      ]
+    },
+    {
+      "code": "jimeiyoukaihuadedifang",
+      "text": "即没有开化的地方",
+      "sentence_id_1_based": 28,
+      "full_sentence": "化外之地，文明地区以外的地方，即没有开化的地方。",
+      "tokens": [
+        "即",
+        "没有",
+        "开化",
+        "的",
+        "地方"
+      ]
+    },
+    {
+      "code": "dixiaercengweiditie",
+      "text": "地下二层为地铁",
+      "sentence_id_1_based": 29,
+      "full_sentence": "地下一层南北两侧设有公交站，地下二层为地铁4号线，地下三层为正在建设的地铁14号线。",
+      "tokens": [
+        "地下",
+        "二",
+        "层",
+        "为",
+        "地铁"
+      ]
+    },
+    {
+      "code": "dixiasancengweizhengzaijianshededitie",
+      "text": "地下三层为正在建设的地铁",
+      "sentence_id_1_based": 29,
+      "full_sentence": "地下一层南北两侧设有公交站，地下二层为地铁4号线，地下三层为正在建设的地铁14号线。",
+      "tokens": [
+        "地下",
+        "三",
+        "层",
+        "为",
+        "正",
+        "在",
+        "建设",
+        "的",
+        "地铁"
+      ]
+    },
+    {
+      "code": "niankuojianweifuzhukeyunzhan",
+      "text": "年扩建为辅助客运站",
+      "sentence_id_1_based": 30,
+      "full_sentence": "它的前身是1901年的永定门站，到1957年至1958年扩建为辅助客运站，2006年至2008年拆除重建。",
+      "tokens": [
+        "年",
+        "扩建",
+        "为",
+        "辅助",
+        "客运",
+        "站"
+      ]
+    },
+    {
+      "code": "yizhiyuliansaikaishishi",
+      "text": "以至于联赛开始时",
+      "sentence_id_1_based": 31,
+      "full_sentence": "当时国安二队的年轻球员普遍达不到一队的水平，以至于联赛开始时国安一线队的注册队员只有十八名。",
+      "tokens": [
+        "以至",
+        "于",
+        "联赛",
+        "开始",
+        "时"
+      ]
+    },
+    {
+      "code": "zaicitiqianyilunsuodingliansaijijun",
+      "text": "再次提前一轮锁定联赛季军",
+      "sentence_id_1_based": 32,
+      "full_sentence": "更新日期：2013年8月26日本赛季，北京国安再次提前一轮锁定联赛季军，由于亚足联确认中超联赛获得3.5个亚冠联赛小组赛的直接参赛席位，故国安队获得了下赛季亚冠联赛的席位，但需等到中国足协杯赛事结束后方可确定是否能够直接晋级小组赛。",
+      "tokens": [
+        "再次",
+        "提前",
+        "一",
+        "轮",
+        "锁定",
+        "联赛",
+        "季军"
+      ]
+    },
+    {
+      "code": "liansaixiaozusaidezhijiecansaixiwei",
+      "text": "联赛小组赛的直接参赛席位",
+      "sentence_id_1_based": 32,
+      "full_sentence": "更新日期：2013年8月26日本赛季，北京国安再次提前一轮锁定联赛季军，由于亚足联确认中超联赛获得3.5个亚冠联赛小组赛的直接参赛席位，故国安队获得了下赛季亚冠联赛的席位，但需等到中国足协杯赛事结束后方可确定是否能够直接晋级小组赛。",
+      "tokens": [
+        "联赛",
+        "小组",
+        "赛",
+        "的",
+        "直接",
+        "参赛",
+        "席位"
+      ]
+    },
+    {
+      "code": "duihuodelexiasaiji",
+      "text": "队获得了下赛季",
+      "sentence_id_1_based": 32,
+      "full_sentence": "更新日期：2013年8月26日本赛季，北京国安再次提前一轮锁定联赛季军，由于亚足联确认中超联赛获得3.5个亚冠联赛小组赛的直接参赛席位，故国安队获得了下赛季亚冠联赛的席位，但需等到中国足协杯赛事结束后方可确定是否能够直接晋级小组赛。",
+      "tokens": [
+        "队",
+        "获得",
+        "了",
+        "下",
+        "赛季"
+      ]
+    },
+    {
+      "code": "gaigongchengbingweiwangong",
+      "text": "该工程并未完工",
+      "sentence_id_1_based": 33,
+      "full_sentence": "2008年，该工程并未完工。",
+      "tokens": [
+        "该",
+        "工程",
+        "并",
+        "未",
+        "完工"
+      ]
+    },
+    {
+      "code": "waichenggongyouqimen",
+      "text": "外城共有七门",
+      "sentence_id_1_based": 34,
+      "full_sentence": "北京外城共有七门，南面三门，东西各一门，此外还有两座便门。",
+      "tokens": [
+        "外城",
+        "共",
+        "有",
+        "七",
+        "门"
+      ]
+    },
+    {
+      "code": "ciwaihaiyouliangzuobianmen",
+      "text": "此外还有两座便门",
+      "sentence_id_1_based": 34,
+      "full_sentence": "北京外城共有七门，南面三门，东西各一门，此外还有两座便门。",
+      "tokens": [
+        "此外",
+        "还",
+        "有",
+        "两",
+        "座",
+        "便门"
+      ]
+    }
+  ]
+}

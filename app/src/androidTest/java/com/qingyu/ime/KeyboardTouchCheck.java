@@ -59,12 +59,10 @@ final class KeyboardTouchCheck {
             instrumentation.runOnMainSync(()->layout(view));
             Rect a=bounds(view,11),q=bounds(view,1),p=bounds(view,10),shift=bounds(view,20),space=bounds(view,32),delete=bounds(view,28);
             tap(instrumentation,view,a);expect(output,"KEY_a");
-            tap(instrumentation,view,shift);tap(instrumentation,view,a);expect(output,"DIRECT_A");
-            check(!view.uppercase(),"Temporary Chinese Shift was not consumed");
-            tap(instrumentation,view,shift);tap(instrumentation,view,shift);
-            tap(instrumentation,view,a);tap(instrumentation,view,a);expect(output,"DIRECT_A","DIRECT_A");
-            check(view.uppercase(),"Double Shift did not lock uppercase");tap(instrumentation,view,shift);
-            check(!view.uppercase(),"Locked Shift did not turn off");
+            check(view.getAccessibilityNodeProvider().createAccessibilityNodeInfo(20).getContentDescription().toString().equals("拼音分词"),"Chinese full keyboard did not replace Shift with 分词");
+            tap(instrumentation,view,shift);tap(instrumentation,view,a);expect(output,"KEY_SPLIT","KEY_a");
+            tap(instrumentation,view,shift);tap(instrumentation,view,shift);expect(output,"KEY_SPLIT","KEY_SPLIT");
+            check(!view.uppercase(),"Chinese split changed letter case");
 
             hold(instrumentation,view,a);check(output.isEmpty(),"Letter hold committed before release");
             popupInside(instrumentation,view);up(instrumentation,view,a.centerX(),a.centerY());expect(output,"DIRECT_a");
@@ -81,6 +79,8 @@ final class KeyboardTouchCheck {
             tap(instrumentation,view,a);expect(output,"KEY_a");
             tap(instrumentation,view,shift);tap(instrumentation,view,a);expect(output,"KEY_a");
             check(!view.uppercase(),"English caller cannot consume temporary Shift");
+            tap(instrumentation,view,shift);tap(instrumentation,view,shift);tap(instrumentation,view,a);expect(output,"KEY_a");
+            check(view.uppercase(),"English double Shift did not lock uppercase");tap(instrumentation,view,shift);check(!view.uppercase(),"English caps lock did not turn off");
 
             instrumentation.runOnMainSync(()->view.configure(false,false,"↵",false));
             event(instrumentation,view,MotionEvent.ACTION_DOWN,a.centerX(),a.centerY());

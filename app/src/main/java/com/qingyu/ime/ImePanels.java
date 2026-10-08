@@ -36,9 +36,9 @@ final class ImePanels {
     private final View keyboard;
     private Palette colors;
     private String active="";
-    private TextView detailText,detailSource,modelStatus;
-    private ImageView detailBadge;
-    private Button detailCommit;
+    private TextView detailText,detailSource,detailMeta,detailNote,detailExplanation,detailExample,detailExampleTranslation,detailExampleHeading,modelStatus;
+    private ImageView detailBadge,detailExampleBadge;
+    private Button detailCommit,detailCopy;
     private String detailTranslation="";
     private ValueAnimator outgoing;
     private Bitmap transitionBitmap;
@@ -133,18 +133,38 @@ final class ImePanels {
         for(int i=0;i<emojis.length;i+=8){LinearLayout row=new LinearLayout(context);for(int j=i;j<Math.min(i+8,emojis.length);j++){String emoji=emojis[j];Button b=button(emoji,()->action.accept("emoji_"+emoji));b.setTextSize(23);row.addView(b,new LinearLayout.LayoutParams(0,dp(43),1));}grid.addView(row);}
     }
     void detail(String source,String subtitle){
-        LinearLayout p=begin("detail","释义与整句翻译");ScrollView scroll=new ScrollView(context);LinearLayout reading=new LinearLayout(context);reading.setOrientation(LinearLayout.VERTICAL);reading.setPadding(dp(8),dp(8),dp(8),dp(8));
-        detailSource=text(source,15,colors.text);detailSource.setTextIsSelectable(true);reading.addView(detailSource,new LinearLayout.LayoutParams(-1,-2));
-        detailBadge=new ImageView(context);detailBadge.setId(R.id.translation_attribution);detailBadge.setContentDescription("powered by Google Translate");detailBadge.setScaleType(ImageView.ScaleType.FIT_CENTER);detailBadge.setImageResource(prefs.dark(context)?R.drawable.google_translate_badge_dark:R.drawable.google_translate_badge);detailBadge.setVisibility(View.GONE);LinearLayout.LayoutParams badgeLayout=new LinearLayout.LayoutParams(dp(176),dp(16));badgeLayout.topMargin=dp(8);badgeLayout.bottomMargin=dp(8);reading.addView(detailBadge,badgeLayout);
-        detailText=text(subtitle,15,colors.text);detailText.setId(R.id.translation_detail);detailText.setTextIsSelectable(true);reading.addView(detailText,new LinearLayout.LayoutParams(-1,-2));scroll.addView(reading);p.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout row=new LinearLayout(context);detailCommit=button("输入译文",()->action.accept("commit_translation"));detailCommit.setId(R.id.translation_commit);detailCommit.setEnabled(false);row.addView(detailCommit,new LinearLayout.LayoutParams(0,dp(36),1));Button copy=button("复制译文",()->{if(!detailTranslation.isEmpty())action.accept("copy_translation");});row.addView(copy,new LinearLayout.LayoutParams(0,dp(36),1));p.addView(row);
+        LinearLayout p=begin("detail","释义");ScrollView scroll=new ScrollView(context);scroll.setFillViewport(false);LinearLayout reading=new LinearLayout(context);reading.setOrientation(LinearLayout.VERTICAL);reading.setPadding(dp(8),dp(6),dp(8),dp(12));
+        detailSource=text(source,18,colors.text);detailSource.setId(R.id.translation_source);detailSource.setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);detailSource.setTextIsSelectable(true);reading.addView(detailSource,new LinearLayout.LayoutParams(-1,-2));
+        detailText=text(subtitle,20,colors.accent);detailText.setId(R.id.translation_detail);detailText.setTextIsSelectable(true);detailText.setPadding(0,dp(6),0,0);reading.addView(detailText,new LinearLayout.LayoutParams(-1,-2));
+        detailBadge=detailBadge(reading,"powered by Google Translate");detailBadge.setId(R.id.translation_attribution);
+        detailMeta=text("",12,colors.secondary);detailMeta.setId(R.id.translation_meta);detailMeta.setPadding(0,dp(8),0,dp(6));reading.addView(detailMeta,new LinearLayout.LayoutParams(-1,-2));
+        detailNote=text("",11,colors.secondary);detailNote.setId(R.id.translation_note);detailNote.setPadding(0,0,0,dp(8));reading.addView(detailNote,new LinearLayout.LayoutParams(-1,-2));
+        detailExplanation=text("",14,colors.text);detailExplanation.setId(R.id.translation_explanation);detailExplanation.setTextIsSelectable(true);detailExplanation.setLineSpacing(dp(3),1f);reading.addView(detailExplanation,new LinearLayout.LayoutParams(-1,-2));
+        detailExampleHeading=text("例句",12,colors.secondary);detailExampleHeading.setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD);detailExampleHeading.setPadding(0,dp(16),0,dp(5));reading.addView(detailExampleHeading,new LinearLayout.LayoutParams(-1,-2));
+        detailExample=text("",14,colors.text);detailExample.setId(R.id.translation_example);detailExample.setTextIsSelectable(true);detailExample.setLineSpacing(dp(3),1f);reading.addView(detailExample,new LinearLayout.LayoutParams(-1,-2));
+        detailExampleTranslation=text("",13,colors.secondary);detailExampleTranslation.setId(R.id.translation_example_translation);detailExampleTranslation.setTextIsSelectable(true);detailExampleTranslation.setPadding(0,dp(5),0,0);reading.addView(detailExampleTranslation,new LinearLayout.LayoutParams(-1,-2));
+        detailExampleBadge=detailBadge(reading,"例句，powered by Google Translate");detailExampleBadge.setId(R.id.translation_example_attribution);
+        for(View hidden:new View[]{detailMeta,detailNote,detailExplanation,detailExampleHeading,detailExample,detailExampleTranslation})hidden.setVisibility(View.GONE);
+        scroll.addView(reading);p.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout row=new LinearLayout(context);row.setPadding(0,dp(6),0,0);detailCommit=button("输入译文",()->action.accept("commit_translation"));detailCommit.setId(R.id.translation_commit);detailCommit.setTextColor(colors.accentText);GradientDrawable primary=new GradientDrawable();primary.setColor(colors.accent);primary.setCornerRadius(dp(10));detailCommit.setBackground(new RippleDrawable(ColorStateList.valueOf((colors.accentText&0x00ffffff)|0x24000000),primary,null));
+        detailCopy=button("复制译文",()->{if(!detailTranslation.isEmpty())action.accept("copy_translation");});detailCopy.setId(R.id.translation_copy);LinearLayout.LayoutParams left=new LinearLayout.LayoutParams(0,dp(48),1);left.rightMargin=dp(4);row.addView(detailCommit,left);LinearLayout.LayoutParams right=new LinearLayout.LayoutParams(0,dp(48),1);right.leftMargin=dp(4);row.addView(detailCopy,right);p.addView(row);detailActions(false);
     }
+    private ImageView detailBadge(LinearLayout parent,String description){ImageView image=new ImageView(context);image.setContentDescription(description);image.setScaleType(ImageView.ScaleType.FIT_START);image.setImageResource(prefs.dark(context)?R.drawable.google_translate_badge_dark:R.drawable.google_translate_badge);image.setVisibility(View.GONE);LinearLayout.LayoutParams layout=new LinearLayout.LayoutParams(dp(176),dp(16));layout.topMargin=dp(4);layout.bottomMargin=dp(4);parent.addView(image,layout);return image;}
+    private void detailActions(boolean enabled){detailCommit.setEnabled(enabled);detailCopy.setEnabled(enabled);detailCommit.setAlpha(enabled?1f:.45f);detailCopy.setAlpha(enabled?1f:.45f);}
     void detailResult(String source,String translation,String note){
-        if(android.os.Looper.myLooper()!=android.os.Looper.getMainLooper()){body.post(()->detailResult(source,translation,note));return;}
-        if(!active.equals("detail"))return;detailTranslation=translation;detailSource.setText(source);detailText.setText(translation.isEmpty()?note:translation+"\n\n"+note);
-        boolean google=!translation.isEmpty()&&note!=null&&note.startsWith("Google Translate");detailBadge.setImageResource(prefs.dark(context)?R.drawable.google_translate_badge_dark:R.drawable.google_translate_badge);detailBadge.setVisibility(google?View.VISIBLE:View.GONE);
-        detailCommit.setText(google?"Translate with Google":"输入译文");detailCommit.setContentDescription(google?"Translate with Google，输入译文":"输入译文");detailCommit.setEnabled(!translation.isEmpty());
+        detailResult(source,translation,note,"","",prefs.glossLanguage(),"","","");
     }
+    void detailResult(String source,String translation,String note,String explanation,String pos,String target,String example,String exampleTranslation){detailResult(source,translation,note,explanation,pos,target,example,exampleTranslation,"");}
+    void detailResult(String source,String translation,String note,String explanation,String pos,String target,String example,String exampleTranslation,String exampleNote){
+        if(android.os.Looper.myLooper()!=android.os.Looper.getMainLooper()){body.post(()->detailResult(source,translation,note,explanation,pos,target,example,exampleTranslation,exampleNote));return;}
+        if(!active.equals("detail"))return;detailTranslation=translation==null?"":translation;detailSource.setText(source);detailText.setText(detailTranslation.isEmpty()?note:detailTranslation);detailText.setTextColor(detailTranslation.isEmpty()?colors.secondary:colors.accent);
+        boolean google=!detailTranslation.isEmpty()&&note!=null&&note.startsWith("Google Translate");detailBadge.setImageResource(prefs.dark(context)?R.drawable.google_translate_badge_dark:R.drawable.google_translate_badge);detailBadge.setVisibility(google?View.VISIBLE:View.GONE);
+        String role=partOfSpeech(pos),language=TranslationRepository.languageName(target),metadata=(role.isEmpty()?"":role+" · ")+language;
+        detailMeta.setText(metadata);detailMeta.setVisibility(View.VISIBLE);detailNote.setText(note);detailNote.setVisibility(note!=null&&!note.isEmpty()&&!detailTranslation.isEmpty()?View.VISIBLE:View.GONE);detailExplanation.setText(explanation);detailExplanation.setVisibility(explanation==null||explanation.isEmpty()?View.GONE:View.VISIBLE);
+        boolean realExample=example!=null&&!example.isEmpty();detailExampleHeading.setVisibility(realExample?View.VISIBLE:View.GONE);detailExample.setText(example);detailExample.setVisibility(realExample?View.VISIBLE:View.GONE);detailExampleTranslation.setText(exampleTranslation);detailExampleTranslation.setVisibility(realExample&&exampleTranslation!=null&&!exampleTranslation.isEmpty()?View.VISIBLE:View.GONE);
+        boolean modelExample=realExample&&exampleTranslation!=null&&!exampleTranslation.isEmpty()&&exampleNote!=null&&exampleNote.startsWith("Google Translate");detailExampleBadge.setImageResource(prefs.dark(context)?R.drawable.google_translate_badge_dark:R.drawable.google_translate_badge);detailExampleBadge.setVisibility(modelExample?View.VISIBLE:View.GONE);detailCommit.setText(google?"Translate with Google":"输入译文");detailCommit.setContentDescription(detailCommit.getText());detailActions(!detailTranslation.isEmpty());
+    }
+    private String partOfSpeech(String tag){if(tag==null||tag.isEmpty())return "";switch(tag.charAt(0)){case 'n':return "名词";case 'v':return "动词";case 'a':return "形容词";case 'd':return "副词";case 'r':return "代词";case 'p':return "介词";case 'c':return "连词";case 'u':return "助词";case 'm':return "数词";case 'q':return "量词";case 'e':return "叹词";case 'y':return "语气词";default:return tag;}}
     private static final class NavIcon extends Drawable {
         private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);private final int kind,size;
         NavIcon(int kind,int color,int size){this.kind=kind;this.size=size;paint.setColor(color);paint.setStrokeWidth(1.65f);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStyle(Paint.Style.STROKE);}

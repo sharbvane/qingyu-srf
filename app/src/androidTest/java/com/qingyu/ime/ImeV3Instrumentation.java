@@ -35,11 +35,10 @@ public class ImeV3Instrumentation extends ImeV2Instrumentation {
         runOnMainSync(()->{editor.setText("");editor.setSelection(0);});keyboardReady();check(find("candidate_0")==null,"Empty preedit did not clear expanded candidates");
         type("xiangmu");awaitCandidate("项目");clickCandidate("项目");awaitText("项目");pass("rapid expand/collapse and cleared composition never lose the keyboard");
 
-        clear();key("SHIFT");key("a");awaitText("A");check(find("candidate_expand")==null,"Chinese temporary uppercase composed pinyin");
-        type("kaifa");awaitCandidate("开发");clickCandidate("开发");awaitText("A开发");
-        clear();key("SHIFT");key("SHIFT");type("az");awaitText("AZ");check(find("candidate_expand")==null,"Chinese caps lock composed pinyin");key("SHIFT");type("nihao");awaitCandidate("你好");clickCandidate("你好");awaitText("AZ你好");
-        clear();type("kaifa");awaitCandidate("开发");key("SHIFT");key("a");awaitText("开发A");
-        pass("Chinese Shift once outputs one literal uppercase; double Shift locks; lowercase resumes pinyin");
+        clear();key("SPLIT");awaitText("");type("dan");key("SPLIT");key("SPLIT");type("gang");awaitCandidate("单杠");key("ENTER");awaitText("dan'gang");
+        clear();type("kaifa");awaitCandidate("开发");clickCandidate("开发");awaitText("开发");
+        check(find("key_SHIFT")==null&&find("key_SPLIT")!=null,"Chinese full keyboard did not replace Shift with segmentation");
+        pass("Chinese manual segmentation inserts one separator, ignores empty/repeated separators and keeps lowercase pinyin; English Shift is tested below");
         clear();holdSlide("s",-1,false);awaitText("S");holdSlide("s",1,false);awaitText("Ss");holdSlide("q",0,false);awaitText("Ssq");holdSlide("q",1,false);awaitText("Ssq1");holdSlide("q",-1,false);awaitText("Ssq1Q");holdSlide("s",-1,true);awaitText("Ssq1Q");
         screenshot("v3-letters.png");pass("real letter hold-slide commits upper/lower/digit once and cancellation commits nothing");
 
@@ -62,7 +61,7 @@ public class ImeV3Instrumentation extends ImeV2Instrumentation {
         clear();type("hel");awaitCandidate("hello");clickCandidate("hello");awaitText("hello ");
         for(int round=0;round<3;round++){awaitCandidate("world");String before=text();upCandidate("world");awaitText(before+"世界");}
         SystemClock.sleep(350);check(find("candidate_0")==null&&find("candidate_clear")==null,"Translated prediction gesture bypassed the 3-round limit");pass("upward translated prediction picks obey the same 3-round limit");
-        clear();selectMode("中文 · 全键拼音");type("zhongguo");awaitCandidate("中国");clickCandidate("中国");awaitCandidate("人");nodeClick("candidate_clear");SystemClock.sleep(250);check(find("candidate_0")==null&&text().equals("中国"),"Chinese prediction X failed");type("kaifa");awaitCandidate("开发");
+        clear();selectMode("中文 · 全键拼音");type("zhongguo");awaitCandidate("中国");clickCandidate("中国");awaitCandidate("人民");nodeClick("candidate_clear");SystemClock.sleep(250);check(find("candidate_0")==null&&text().equals("中国"),"Chinese prediction X failed");type("kaifa");awaitCandidate("开发");
         screenshot("v3-pinyin.png");pass("Chinese prediction X clears immediately and manual pinyin reactivates candidates");
         clear();
         super.runChecks();
@@ -71,14 +70,14 @@ public class ImeV3Instrumentation extends ImeV2Instrumentation {
     private Rect bounds(String id){Rect bounds=new Rect();awaitNode(id).getBoundsInScreen(bounds);return bounds;}
     private void assertReservedArea(Rect candidate){int[] imeTop={-1};runOnMainSync(()->{View decor=activity.getWindow().getDecorView();WindowInsets insets=decor.getRootWindowInsets();int[] location=new int[2];decor.getLocationOnScreen(location);imeTop[0]=location[1]+decor.getHeight()-insets.getInsets(WindowInsets.Type.ime()).bottom;});check(imeTop[0]>=0&&candidate.top>=imeTop[0],"Candidate overlaps unreserved app content: "+candidate+" IME top="+imeTop[0]);}
     private void checkModelManagement()throws Exception{
-        clear();setLanguage("日语");type("wenhua");awaitCandidate("文化");holdCandidate("文化");awaitNodeText("translation_detail","Google Translate · 端侧翻译");closePanel();keyboardReady();clear();openManager();
+        clear();setLanguage("日语");type("wenhua");awaitCandidate("文化");holdCandidate("文化");awaitNode("translation_attribution");closePanel();keyboardReady();clear();openManager();
         for(String language:new String[]{"英语","日语","法语"}){check(description(language+"模型状态")!=null,"Missing language model state "+language);check(description(language+"模型占用")!=null,"Missing installed file size "+language);}
         awaitModelState("日语","模型已就绪");long oldRevision=getTargetContext().getSharedPreferences("qingyu",0).getLong("models_revision",0);clickEnabled("删除 · 日语");awaitModelState("日语","未下载");check(getTargetContext().getSharedPreferences("qingyu",0).getLong("models_revision",0)>oldRevision,"SDK deletion did not publish model revision");screenshot("v3-models.png");leaveManager();
         type("wenhua");awaitCandidate("文化");SystemClock.sleep(450);check(!String.valueOf(candidate("文化").getContentDescription()).contains("释义"),"Deleted Japanese model retained cached candidate gloss");holdCandidate("文化");awaitNodeText("translation_detail","模型未下载");closePanel();keyboardReady();clickCandidate("文化");awaitText("文化");
         pass("model manager shows 3 languages and actual sizes; SDK deletion clears cached Japanese gloss without blocking Chinese");
-        clear();openManager();clickEnabled("下载 · 日语");awaitModelState("日语","模型已就绪");leaveManager();type("wenhua");awaitCandidate("文化");holdCandidate("文化");awaitNodeText("translation_detail","Google Translate · 端侧翻译");closePanel();keyboardReady();clickCandidate("文化");awaitText("文化");clear();setLanguage("英语");
+        clear();openManager();clickEnabled("下载 · 日语");awaitModelState("日语","模型已就绪");leaveManager();type("wenhua");awaitCandidate("文化");holdCandidate("文化");awaitNode("translation_attribution");closePanel();keyboardReady();clickCandidate("文化");awaitText("文化");clear();setLanguage("英语");
         pass("user-initiated model download restores Japanese candidate/detail translation after deletion");
-        setLanguage("法语");type("womenmingtianqubeijing");awaitCandidate("我们明天去北京");holdCandidate("我们明天去北京");awaitNodeText("translation_detail","Google Translate · 端侧翻译");String sentence=awaitNode("translation_detail").getText().toString().split("\n",2)[0];check(!sentence.isEmpty()&&!sentence.equals("我们明天去北京"),"French sentence translation missing");closePanel();keyboardReady();upCandidate("我们明天去北京");awaitNodeText("translation_detail","Google Translate · 端侧翻译");buttonClick("Translate with Google");awaitText(sentence);clear();setLanguage("英语");pass("complete seven-syllable French model translation remains in details and commits on confirmation");
+        setLanguage("法语");type("womenmingtianqubeijing");awaitCandidate("我们明天去北京");holdCandidate("我们明天去北京");awaitNode("translation_attribution");String sentence=awaitNode("translation_detail").getText().toString().split("\n",2)[0];check(!sentence.isEmpty()&&!sentence.equals("我们明天去北京"),"French sentence translation missing");closePanel();keyboardReady();awaitGloss("我们明天去北京",sentence);upCandidate("我们明天去北京");awaitText(sentence);clear();setLanguage("英语");pass("complete seven-syllable French translation synchronizes details, candidate gloss and direct upward commit");
     }
     private void openManager(){nodeClick("toolbar_more");buttonClick("释义显示语言 · 日语");buttonClick("翻译模型管理");long until=SystemClock.uptimeMillis()+5000;while(description("日语模型状态")==null&&SystemClock.uptimeMillis()<until)SystemClock.sleep(30);check(description("日语模型状态")!=null,"Model manager intent did not open settings page");}
     private void leaveManager()throws Exception{shell("input keyevent 4");SystemClock.sleep(180);newEditor(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);keyboardReady();}

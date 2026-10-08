@@ -65,8 +65,11 @@ public class ImeSmokeInstrumentation extends Instrumentation {
             clear();type("zhongguorenmin");key("SPACE");awaitText("中国人民");pass("sentence composition");
 
             clear();type("shi");awaitCandidate(null);nodeClick("candidate_expand");SystemClock.sleep(160);
-            AccessibilityNodeInfo gridCandidate=find("candidate_8");check(gridCandidate!=null,"expanded candidates missing");check(gridCandidate.getParent().performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD),"continuous candidate scroll failed");SystemClock.sleep(250);
-            AccessibilityNodeInfo scrolled=find("candidate_12");check(scrolled!=null,"scrolled candidate missing");String chosen=scrolled.getText().toString();scrolled.performAction(AccessibilityNodeInfo.ACTION_CLICK);awaitText(chosen);keyboardReady();pass("candidate expand, vertical scroll and choose");
+            AccessibilityNodeInfo gridHost=awaitNode("panel_host"),gridCandidate=walk(gridHost,"candidate_0");check(gridCandidate!=null,"expanded candidates missing");
+            int lastVisible=0;for(int i=1;i<128;i++)if(walk(gridHost,"candidate_"+i)!=null)lastVisible=i;
+            check(gridCandidate.getParent().performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD),"continuous candidate scroll failed");SystemClock.sleep(250);
+            AccessibilityNodeInfo scrolled=null;gridHost=awaitNode("panel_host");for(int i=lastVisible+1;i<128&&scrolled==null;i++)scrolled=walk(gridHost,"candidate_"+i);
+            check(scrolled!=null,"scroll did not reveal a later candidate");String chosen=scrolled.getText().toString();scrolled.performAction(AccessibilityNodeInfo.ACTION_CLICK);awaitText(chosen);keyboardReady();pass("candidate expand, vertical scroll and choose with variable-height complete gloss rows");
 
             clear();type("nihao");key("SPACE");key("LANG");type("abc");key("?123");SystemClock.sleep(100);collectKeys();key("1");key("2");key("ABC");SystemClock.sleep(100);collectKeys();
             awaitText("你好abc12");pass("rapid Chinese/English/number commit order");

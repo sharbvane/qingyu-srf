@@ -20,6 +20,11 @@ public final class PinyinEngine implements ChineseEngine {
         List<Word> lookup(String code, String context);
         void learn(String code, String text, String context);
         default void learn(String code,String text,String context,String pinyin) { learn(code,text,context); }
+        default boolean contextReady(){return false;}
+        default double transitionScore(String before,String text){return 0;}
+        default double transitionScore(String before,Word word){return transitionScore(before,word.text);}
+        default List<String> predict(String context){return Collections.emptyList();}
+        default String sourceExample(String text){return "";}
     }
     public static final class Word {
         public final String text, pinyin;
@@ -319,6 +324,7 @@ public final class PinyinEngine implements ChineseEngine {
         if (!activeInput.isEmpty() || !completedPrefix.isEmpty() || context == null || context.isEmpty()) {
             return Collections.emptyList();
         }
+        if(lexicon!=null)try {return Collections.unmodifiableList(new ArrayList<>(lexicon.predict(context)));}catch(RuntimeException ignored){return Collections.emptyList();}
         String[] result = NativeDecoder.predict(context);
         if (result == null || result.length == 0) return Collections.emptyList();
         return Collections.unmodifiableList(java.util.Arrays.asList(result));
@@ -375,7 +381,10 @@ public final class PinyinEngine implements ChineseEngine {
         boolean completeWord=exact.stream().anyMatch(word->fullReading(word,raw));
         // Exact dictionary words already resolve the whole composition. Do
         // not spend a sentence search budget recreating the same known word.
-        List<Word> sentences=completeWord||raw.length()<8?Collections.emptyList():sentenceWords(raw,before,queried,160);
+        boolean contextual=lexicon.contextReady();
+        boolean[] phonetic=contextual?ChineseCorrection.completePrefixes(raw):null;
+        boolean completePhonetic=phonetic==null||phonetic[raw.length()];
+        List<Word> sentences=completeWord||raw.length()<8||!completePhonetic?Collections.emptyList():sentenceWords(raw,before,queried,160);
         LinkedHashMap<String,Candidate> merged=new LinkedHashMap<>();
         Map<String,Candidate> nativeWords=new HashMap<>();
         for(Candidate candidate:nativeList)nativeWords.putIfAbsent(candidate.text,candidate);
@@ -391,14 +400,18 @@ public final class PinyinEngine implements ChineseEngine {
         // by the modern word graph. An alternate syllable split is promoted
         // only when its complete lexical path beats the obsolete one.
         Candidate first=nativeList.isEmpty()?null:nativeList.get(0);
-        boolean nativeSupported=first!=null&&sentences.stream().anyMatch(word->word.text.equals(first.text));
-        if(nativeSupported&&first!=null)merged.putIfAbsent(first.text,first);
+        Word supportedNative=null;if(first!=null)for(Word word:sentences)if(word.text.equals(first.text)){supportedNative=word;break;}
+        if(supportedNative!=null&&(!lexicon.contextReady()||sentences.get(0).text.equals(first.text)||sentences.get(0).score-supportedNative.score<2))merged.putIfAbsent(first.text,first);
         for(Word word:sentences)appendWord(merged,nativeWords,word);
         if(exact.isEmpty()) {
             // A legal decomposition can still contain an extra accidental
             // letter (nihaoo). Append corrections without replacing that path.
-            for(Word word:ChineseCorrection.suggest(raw,before,lexicon))appendWord(merged,nativeWords,word);
-            if(sentences.isEmpty()&&raw.length()>=10) {
+            if(raw.length()<=12||sentences.isEmpty())for(Word word:ChineseCorrection.suggest(raw,before,lexicon))appendWord(merged,nativeWords,word);
+            int completeEnd=0;if(phonetic!=null)for(int i=0;i<phonetic.length;i++)if(phonetic[i])completeEnd=i;
+            // The last few letters of a long sentence are normally a key in
+            // progress. Do not expand three speculative correction graphs on
+            // each of those keys; internal typos still receive that search.
+            if(sentences.isEmpty()&&raw.length()>=10&&(phonetic==null||completePhonetic||raw.length()-completeEnd>5)) {
                 for(ChineseCorrection.Variant variant:ChineseCorrection.variants(raw,3)) {
                     for(Word word:sentenceWords(variant.code,before,new HashMap<>(),48))appendWord(merged,nativeWords,new Word(word.text,word.pinyin,word.score-variant.penalty));
                 }
@@ -462,32 +475,41 @@ public final class PinyinEngine implements ChineseEngine {
         if(raw.length()<4||raw.length()>MAX_PINYIN_LENGTH)return Collections.emptyList();
         ArrayList<ArrayList<Path>> paths=new ArrayList<>();for(int i=0;i<=raw.length();i++)paths.add(new ArrayList<>());
         paths.get(0).add(new Path("","",0,0));
-        int used=0;
+        int used=0,expansions=0;
         for(int start=0;start<raw.length()&&used<budget;start++) {
             List<Path> preceding=paths.get(start);if(preceding.isEmpty())continue;
-            // ponytail: three paths per boundary and one best-prefix context
-            // hint; use a corpus-backed language model if this measured beam
-            // ceiling becomes the quality bottleneck, never on the UI thread.
-            String precedingContext=before+preceding.get(0).text;
+            // Indexed lexical edges are shared, but corpus/user context is
+            // scored for each path's own selected prefix. SQL work stays bounded.
+            boolean contextual=lexicon.contextReady();
+            String precedingContext=contextual?"":before+preceding.get(0).text;
+            boolean[] complete=contextual?ChineseCorrection.completePrefixes(raw.substring(start)):null;
             for(int end=start+1;end<=Math.min(raw.length(),start+32)&&used<budget;end++) {
+                if(complete!=null&&!complete[end-start])continue;
                 String code=raw.substring(start,end);if(code.replace("'","").isEmpty())continue;
                 List<Word> options=words(code,precedingContext,queried);used++;
                 int next=end;while(next<raw.length()&&raw.charAt(next)=='\'')next++;
+                int optionsUsed=0;
                 for(Word word:options) {
                     if(!fullReading(word,code))continue;
                     // Isolated interjections n/m/ng are accepted normally by
                     // AOSP, but are weak evidence inside a typed sentence. In
                     // particular n+o+hao must not suppress nohao -> 你好.
                     if(java.util.Arrays.stream(word.pinyin.split("'" )).anyMatch(s->s.equals("n")||s.equals("m")||s.equals("ng")||s.equals("hm")||s.equals("hng")))continue;
+                    if(contextual&&optionsUsed++>=24)break;
                     for(Path previous:preceding) {
                         if(previous.text.length()+word.text.length()>24)continue;
-                        Path candidate=new Path(previous.text+word.text,previous.pinyin+(previous.pinyin.isEmpty()?"":"'")+word.pinyin,previous.score+Math.min(30,word.score)-15.5,previous.words+1);
+                        if(contextual&&expansions>=8192)break;
+                        expansions++;
+                        double transition=0;if(contextual)try{transition=lexicon.transitionScore(before+previous.text,word);if(!Double.isFinite(transition))transition=0;}catch(RuntimeException ignored){}
+                        Path candidate=new Path(previous.text+word.text,previous.pinyin+(previous.pinyin.isEmpty()?"":"'")+word.pinyin,previous.score+Math.min(30,word.score)-15.5+transition,previous.words+1);
                         ArrayList<Path> destination=paths.get(next);
                         boolean better=true;
                         for(int index=0;index<destination.size();index++)if(destination.get(index).text.equals(candidate.text)) {
                             if(destination.get(index).score>=candidate.score)better=false;else destination.remove(index);break;
                         }
-                        if(better){destination.add(candidate);destination.sort((a,b)->Double.compare(b.score,a.score));while(destination.size()>3)destination.remove(destination.size()-1);}
+                        if(better){destination.add(candidate);destination.sort((a,b)->Double.compare(b.score,a.score));
+                            while(destination.size()>(contextual?12:3))destination.remove(destination.size()-1);
+                        }
                     }
                 }
             }

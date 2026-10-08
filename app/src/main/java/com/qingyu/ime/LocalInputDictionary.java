@@ -6,6 +6,7 @@ import android.database.sqlite.SQLiteDatabase;
 import com.qingyu.core.EnglishEngine;
 import com.qingyu.core.NineKeyCandidate;
 import com.qingyu.core.PinyinEngine;
+import com.qingyu.core.ChineseContextModel;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -22,16 +23,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.function.Consumer;
 
 /** Own serial worker: asset installation, queries and learning never run on UI thread. */
 final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon {
     private SQLiteDatabase database;
     private SQLiteDatabase pinyinDatabase;
-    private EnglishEngine english;
+    private ChineseContextModel contextModel;
+    private volatile EnglishEngine english;
     private File learningFile;
     private File chineseLearningFile;
     private File pinyinLearningFile;
-    private boolean learningEnabled=true;
+    private volatile boolean learningEnabled=true;
     private final LinkedHashMap<String,Integer> chineseLearning=new LinkedHashMap<>();
     private final LinkedHashMap<String,Integer> pinyinLearning=new LinkedHashMap<>();
     private final Map<String,Integer> pinyinReferences=new HashMap<>();
@@ -43,17 +46,17 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
     private final Map<String,String> posCache=new LinkedHashMap<>();
 
     static LocalInputDictionary open(Context context) throws Exception {
+        return open(context,null);
+    }
+    static LocalInputDictionary open(Context context,Consumer<LocalInputDictionary> chineseReady) throws Exception {
+        long start=android.os.SystemClock.uptimeMillis();
         LocalInputDictionary dictionary=new LocalInputDictionary();
         // The filename is the asset schema version; v0.2's installed database
         // cannot be reused because it does not contain lexical tags.
         File target=installAsset(context,"input/input-v3.db","input-v3.db");
         try {
             dictionary.database=SQLiteDatabase.openDatabase(target.getPath(),null,SQLiteDatabase.OPEN_READONLY);
-            dictionary.english=new EnglishEngine(context.getAssets().open("input/english-words.tsv"),context.getAssets().open("input/english-bigrams.tsv"));
-            dictionary.learningFile=new File(context.getFilesDir(),"english-learning-v2.tsv");
-            if(dictionary.learningFile.exists()) try(InputStreamReader in=new InputStreamReader(new FileInputStream(dictionary.learningFile),StandardCharsets.UTF_8)) {
-                dictionary.english.loadLearning(in);
-            }
+            android.util.Log.i("QingyuData","Input metadata ready in "+(android.os.SystemClock.uptimeMillis()-start)+" ms");
             dictionary.chineseLearningFile=new File(context.getFilesDir(),"chinese-learning-v2.tsv");
             if(dictionary.chineseLearningFile.exists()) try(BufferedReader in=new BufferedReader(new InputStreamReader(new FileInputStream(dictionary.chineseLearningFile),StandardCharsets.UTF_8))) {
                 String line;
@@ -70,8 +73,23 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
             try{File modern=installAsset(context,"pinyin/lexicon-v2.db","lexicon-v2.db");dictionary.pinyinDatabase=SQLiteDatabase.openDatabase(modern.getPath(),null,SQLiteDatabase.OPEN_READONLY);}catch(Exception ignored){}
             dictionary.pinyinLearningFile=new File(context.getFilesDir(),"pinyin-learning-v1.tsv");
             try{dictionary.loadPinyinLearning();}catch(Exception ignored){} // Malformed personal data is not an input failure.
-            return dictionary;
+            android.util.Log.i("QingyuData","Modern Chinese + personal data ready in "+(android.os.SystemClock.uptimeMillis()-start)+" ms");
+            long modelStart=android.os.SystemClock.uptimeMillis();
+            try{dictionary.contextModel=ChineseContextModel.loadUncompressed(context.getAssets().open("input/chinese-context-v1.bin"));}catch(Exception failure){android.util.Log.w("QingyuData","Chinese context unavailable; native and modern words remain ready",failure);}
+            android.util.Log.i("QingyuData","Chinese context phase "+(android.os.SystemClock.uptimeMillis()-modelStart)+" ms; Chinese ready "+(android.os.SystemClock.uptimeMillis()-start)+" ms; context="+dictionary.contextReady());
         } catch(Exception failure) { dictionary.close();throw failure; }
+        if(chineseReady!=null)chineseReady.accept(dictionary);
+        // The existing worker finishes English separately. Only a fully built
+        // and restored engine is published, never its mutating internal maps.
+        long englishStart=android.os.SystemClock.uptimeMillis();
+        try {
+            EnglishEngine loaded=new EnglishEngine(context.getAssets().open("input/english-words.tsv"),context.getAssets().open("input/english-bigrams.tsv"));
+            dictionary.learningFile=new File(context.getFilesDir(),"english-learning-v2.tsv");
+            if(dictionary.learningFile.exists())try(InputStreamReader in=new InputStreamReader(new FileInputStream(dictionary.learningFile),StandardCharsets.UTF_8)){loaded.loadLearning(in);}
+            synchronized(dictionary){loaded.setLearningEnabled(dictionary.learningEnabled);dictionary.english=loaded;}
+        }catch(Exception failure){android.util.Log.w("QingyuData","English initialization unavailable; Chinese remains ready",failure);}
+        android.util.Log.i("QingyuData","English phase "+(android.os.SystemClock.uptimeMillis()-englishStart)+" ms; total "+(android.os.SystemClock.uptimeMillis()-start)+" ms");
+        return dictionary;
     }
     private static File installAsset(Context context,String asset,String name)throws Exception{
         File target=new File(context.getFilesDir(),name);if(target.exists())return target;
@@ -79,12 +97,22 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
         try{try(InputStream in=context.getAssets().open(asset);FileOutputStream out=new FileOutputStream(temp)){byte[] buffer=new byte[32768];int count;while((count=in.read(buffer))!=-1)out.write(buffer,0,count);out.getFD().sync();}if(!temp.renameTo(target))throw new java.io.IOException("Input dictionary installation failed");}finally{if(temp.exists())temp.delete();}return target;
     }
     EnglishEngine english() { return english; }
-    void setLearningEnabled(boolean enabled) {
+    synchronized void setLearningEnabled(boolean enabled) {
         learningEnabled=enabled;if(english!=null) english.setLearningEnabled(enabled);
     }
 
     /** Indexed exact full-pinyin/initials; spelling boundaries remain the engine's choice. */
     @Override public synchronized List<PinyinEngine.Word> lookup(String code,String context){return pinyinSuggestions(code,context,false);}
+    @Override public boolean contextReady(){return contextModel!=null;}
+    @Override public synchronized double transitionScore(String before,String text){return (contextModel==null?0:contextModel.score(before,text))+personalContextBonus(before,text);}
+    @Override public synchronized double transitionScore(String before,PinyinEngine.Word word){
+        double value=transitionScore(before,word.text);String tail=chineseTail(before),code=pinyinCode(word.pinyin);
+        if(!tail.isEmpty()&&!code.isEmpty())value+=.45*pinyinBonus(pinyinLearning.getOrDefault(code+"\t"+word.text+"\t"+tail,0));
+        return value;
+    }
+    @Override public List<String> predict(String context){return predictChinese(context);}
+    @Override public synchronized String sourceExample(String text){return contextModel==null?"":contextModel.example(text);}
+    synchronized String example(String text){return sourceExample(text);}
     synchronized List<PinyinEngine.Word> completePinyin(String code,String context){return pinyinSuggestions(code,context,true);}
     private List<PinyinEngine.Word> pinyinSuggestions(String code,String context,boolean prefix){
         String raw=pinyinCode(code);if(raw.isEmpty())return Collections.emptyList();
@@ -107,7 +135,8 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
         }
         String tail=chineseTail(context);Map<String,PinyinEngine.Word> ranked=new HashMap<>();
         for(PinyinRow row:rows){double score=Math.log1p(Math.max(1,row.weight))+pinyinBonus(pinyinLearning.getOrDefault(raw+"\t"+row.text,0));
-            if(!tail.isEmpty()){score+=.45*pinyinBonus(pinyinLearning.getOrDefault(raw+"\t"+row.text+"\t"+tail,0));score+=.15*contextBonus(tail,row.text);}
+            if(!tail.isEmpty()){score+=.45*pinyinBonus(pinyinLearning.getOrDefault(raw+"\t"+row.text+"\t"+tail,0));score+=.15*contextBonus(tail,row.text);
+                if(contextModel!=null)score+=Math.max(-3,Math.min(3,contextModel.score(tail,row.text)-contextModel.score("",row.text)));}
             PinyinEngine.Word previous=ranked.get(row.text);if(previous==null||score>previous.score)ranked.put(row.text,new PinyinEngine.Word(row.text,row.pinyin,score));
         }
         List<PinyinEngine.Word> result=new ArrayList<>(ranked.values());result.sort((a,b)->{int order=Double.compare(b.score,a.score);return order==0?a.text.compareTo(b.text):order;});if(result.size()>64)result.subList(64,result.size()).clear();return Collections.unmodifiableList(result);
@@ -251,14 +280,15 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
         return text[length]==null?null:new NineKeyCandidate(text[length],pinyin[length],length);
     }
 
-    List<String> predictChinese(String context) {
-        if(database==null) return Collections.emptyList();
+    synchronized List<String> predictChinese(String context) {
         String tail=chineseTail(context);if(tail.isEmpty()) return Collections.emptyList();
         Map<String,Double> scores=new HashMap<>();
         for(String key:chineseLearning.keySet()) {
             String[] fields=key.split("\t");
-            if(fields.length==2 && tail.endsWith(fields[0])) scores.merge(fields[1],500.0+chineseLearning.get(key)*25,Math::max);
+            int count=chineseLearning.get(key);
+            if(fields.length==2 && tail.endsWith(fields[0])&&count>=3) scores.merge(fields[1],500.0+Math.log1p(count-2)*25,Math::max);
         }
+        if(contextModel!=null){List<String> observed=contextModel.predict(context);for(int i=0;i<observed.size();i++)scores.merge(observed.get(i),300.0-i*5,Math::max);}
         for(int size=Math.min(6,tail.length());size>0;size--) {
             String prefix=tail.substring(tail.length()-size);
             String curated=PAIRS.get(prefix);
@@ -266,13 +296,8 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
                 String[] words=curated.split(" ");
                 for(int index=0;index<words.length;index++) scores.merge(words[index],250.0-index*5+size*15,Math::max);
             }
-            try(Cursor c=database.rawQuery("SELECT text,weight FROM chinese WHERE text>=? AND text<? ORDER BY weight DESC LIMIT 24",new String[]{prefix,prefix+"\uffff"})) {
-                while(c.moveToNext()) {
-                    String whole=c.getString(0);if(whole.length()<=prefix.length()) continue;
-                    String rest=whole.substring(prefix.length());
-                    scores.merge(rest,Math.log1p(c.getInt(1))*15+size*20,Math::max);
-                }
-            }
+            // The audited legacy phrase pairs remain useful for everyday chat.
+            // Arbitrary dictionary-prefix tails are not evidence of a next word.
         }
         List<String> result=new ArrayList<>(scores.keySet());
         result.sort((a,b)->{int difference=Double.compare(scores.get(b),scores.get(a));return difference==0?a.compareTo(b):difference;});
@@ -295,10 +320,11 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
         for(int length=1;length<=tail.length();length++) {
             String prefix=tail.substring(tail.length()-length),following=PAIRS.get(prefix);
             if(following!=null && java.util.Arrays.asList(following.split(" ")).contains(word)) bonus=Math.max(bonus,4.5+length*.1);
-            bonus=Math.max(bonus,Math.min(10,Math.log1p(chineseLearning.getOrDefault(prefix+"\t"+word,0))*3));
+            bonus=Math.max(bonus,Math.min(10,pinyinBonus(chineseLearning.getOrDefault(prefix+"\t"+word,0))*3));
         }
         return bonus;
     }
+    private double personalContextBonus(String context,String word){String tail=chineseTail(context);double result=0;for(int n=1;n<=tail.length();n++)result=Math.max(result,pinyinBonus(chineseLearning.getOrDefault(tail.substring(tail.length()-n)+"\t"+word,0)));return Math.min(4,result);}
     private static String chineseTail(String context) {
         if(context==null) return "";
         int end=context.length();while(end>0 && Character.isWhitespace(context.charAt(end-1))) end--;
@@ -331,7 +357,7 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
         try{flush();}catch(Exception ignored){} // Learning persistence can never suppress input.
         if(database!=null) {database.close();database=null;}
         if(pinyinDatabase!=null){pinyinDatabase.close();pinyinDatabase=null;}
-        english=null;nineCache.clear();glossCache.clear();posCache.clear();chineseLearning.clear();pinyinCache.clear();pinyinLearning.clear();pinyinReferences.clear();learnedPinyin.clear();
+        contextModel=null;english=null;nineCache.clear();glossCache.clear();posCache.clear();chineseLearning.clear();pinyinCache.clear();pinyinLearning.clear();pinyinReferences.clear();learnedPinyin.clear();
     }
     private static final class PinyinRow{final String text,pinyin;final int weight;PinyinRow(String text,String pinyin,int weight){this.text=text;this.pinyin=pinyin;this.weight=weight;}}
     private static final class Row {

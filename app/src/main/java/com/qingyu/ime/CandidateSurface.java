@@ -12,6 +12,8 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.TextPaint;
 import android.text.TextUtils;
+import android.text.StaticLayout;
+import android.text.Layout;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
@@ -26,8 +28,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.HashMap;
 
-/** Candidate geometry depends on the word, never on a delayed annotation. */
+/** Compact candidates have stable slots; expanded sentences use readable rows. */
 final class CandidateSurface extends View {
     interface Listener {
         void choose(int index); void detail(int index); void translate(int index); void expand();
@@ -41,6 +45,7 @@ final class CandidateSurface extends View {
     private final ImePreferences prefs;
     private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
     private final TextPaint textPaint=new TextPaint(Paint.ANTI_ALIAS_FLAG);
+    private final TextPaint gridWordPaint=new TextPaint(Paint.ANTI_ALIAS_FLAG),gridGlossPaint=new TextPaint(Paint.ANTI_ALIAS_FLAG);
     private final Paint.FontMetrics wordMetrics=new Paint.FontMetrics(),glossMetrics=new Paint.FontMetrics();
     private final RectF rect=new RectF();
     private final Handler timer=new Handler(Looper.getMainLooper());
@@ -53,6 +58,9 @@ final class CandidateSurface extends View {
     private List<String> words=Collections.emptyList();
     private Map<String,String> glosses=Collections.emptyMap();
     private Map<String,String> partsOfSpeech=Collections.emptyMap();
+    private final List<GridCell> gridCells=new ArrayList<>();
+    private boolean gridDirty;
+    private float gridHeight;
     private final List<Float> offsets=new ArrayList<>();
     private String composing="";
     private boolean translations=true, interactiveComposition=true;
@@ -88,12 +96,15 @@ final class CandidateSurface extends View {
         boolean wordsChanged=!this.words.equals(words);
         boolean changed=wordsChanged||!this.composing.equals(composing);
         if(changed){cancelTouch();clearVirtualFocus();generation++;scroll=0;notifiedFirst=notifiedLast=-1;}
+        boolean translationChanged=translations!=translate;
         this.composing=composing;if(wordsChanged)this.words=new ArrayList<>(words);translations=translate;
         // Retain matching annotations while the next asynchronous batch is loading.
         boolean nextDark=prefs.dark(getContext());if(nextDark!=dark){dark=nextDark;colors=new Palette(dark);}
-        if(wordsChanged)calculate();invalidate();accessibilityChanged();
+        if(wordsChanged)calculate();if(wordsChanged||translationChanged)requestGrid();invalidate();accessibilityChanged();
     }
-    void glosses(Map<String,String> glosses){this.glosses=glosses;invalidate();accessibilityChanged();}
+    void glosses(Map<String,String> glosses){if(this.glosses.equals(glosses))return;this.glosses=new HashMap<>(glosses);requestGrid();invalidate();accessibilityChanged();}
+    /** Source attribution is confined to the separate long-press details. */
+    void modelWords(Set<String> words){}
     void partsOfSpeech(Map<String,String> values){partsOfSpeech=values;invalidate();}
     /** Header state only: expanding never changes the candidate row's height. */
     void setExpandIndicator(boolean value){
@@ -105,7 +116,7 @@ final class CandidateSurface extends View {
     /** A separate instance fills the already reserved keyboard body. */
     void setEmbeddedGrid(boolean value){
         if(embeddedGrid==value)return;cancelTouch();clearVirtualFocus();generation++;embeddedGrid=value;scroll=0;notifiedFirst=notifiedLast=-1;
-        setContentDescription(value?"候选词，上下滑动浏览，长按查看完整释义":"候选词，上方为释义；左右滑动浏览，长按查看详情，上滑输入翻译");requestLayout();invalidate();accessibilityChanged();
+        setContentDescription(value?"候选词，上下滑动浏览，长按查看完整释义":"候选词，上方为释义；左右滑动浏览，长按查看详情，上滑输入翻译");requestGrid();requestLayout();invalidate();accessibilityChanged();
     }
     void setPredicting(boolean value){
         if(predicting==value)return;cancelTouch();clearVirtualFocus();generation++;predicting=value;
@@ -138,10 +149,10 @@ final class CandidateSurface extends View {
         int desired=Math.round(dp(embeddedGrid?(landscape()?176:316):(landscape()?44:52)));
         setMeasuredDimension(MeasureSpec.getSize(w),resolveSize(desired,h));
     }
-    @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){cancelTouch();clearVirtualFocus();generation++;scroll=Math.min(scroll,maxScroll());if(embeddedGrid)notifyViewport();else listener.visibleWordsChanged();}
+    @Override protected void onSizeChanged(int w,int h,int oldw,int oldh){cancelTouch();clearVirtualFocus();generation++;requestGrid();scroll=Math.min(scroll,maxScroll());if(embeddedGrid)notifyViewport();else listener.visibleWordsChanged();}
     private float rowHeight(){return Math.max(dp(64),fontDensity*40+dp(12));}
-    private int firstVisible(){return Math.min(words.size(),Math.max(0,(int)(scroll/rowHeight())*3));}
-    private int lastVisible(){return Math.min(words.size(),Math.max(0,(int)Math.ceil((scroll+candidateBottom())/rowHeight())*3));}
+    private int firstVisible(){for(int i=0;i<gridCells.size();i++)if(gridCells.get(i).bounds.bottom>scroll)return i;return gridCells.size();}
+    private int lastVisible(){int i=firstVisible();while(i<gridCells.size()&&gridCells.get(i).bounds.top<scroll+candidateBottom())i++;return i;}
     private float candidateBottom(){return getHeight();}
     private boolean hasExpand(){return !embeddedGrid&&!predicting&&interactiveComposition&&!words.isEmpty();}
     private boolean hasClear(){return !embeddedGrid&&predicting&&!words.isEmpty();}
@@ -149,7 +160,45 @@ final class CandidateSurface extends View {
     // outward can otherwise make a word overlap the X by one physical pixel.
     private float listWidth(){return Math.max(0,getWidth()-(hasExpand()||hasClear()?Math.round(dp(48)):0));}
     private float expandLeft(){return Math.min(Math.max(0,totalWidth-scroll),getWidth()-dp(48));}
-    private float maxScroll(){return embeddedGrid?Math.max(0,((words.size()+2)/3)*rowHeight()-candidateBottom()):Math.max(0,totalWidth-listWidth());}
+    private float maxScroll(){return embeddedGrid?Math.max(0,gridHeight-candidateBottom()):Math.max(0,totalWidth-listWidth());}
+    private static final class GridCell {
+        final RectF bounds=new RectF();final StaticLayout word,gloss;final int row,column,span;
+        GridCell(StaticLayout word,StaticLayout gloss,int row,int column,int span){this.word=word;this.gloss=gloss;this.row=row;this.column=column;this.span=span;}
+    }
+    private StaticLayout wrapped(String value,TextPaint paint,int width,boolean wide){
+        return StaticLayout.Builder.obtain(value,0,value.length(),paint,Math.max(1,width)).setAlignment(wide?Layout.Alignment.ALIGN_NORMAL:Layout.Alignment.ALIGN_CENTER).setIncludePad(false).setBreakStrategy(Layout.BREAK_STRATEGY_HIGH_QUALITY).build();
+    }
+    private boolean wideCandidate(int index,float narrow){
+        String word=words.get(index),gloss=translations?glosses.getOrDefault(word,""):"";
+        return gridWordPaint.measureText(word)>narrow || gridGlossPaint.measureText(gloss)>narrow*2;
+    }
+    private void requestGrid(){
+        if(!embeddedGrid)return;gridDirty=true;
+        // An arriving annotation may need more rows, but must not move a live
+        // finger or stop a fling. Apply it at the next safe gesture boundary.
+        if(pressed==NO_ID&&scroller.isFinished())rebuildGrid();
+    }
+    private void rebuildGrid(){
+        if(!embeddedGrid||getWidth()<=0)return;
+        int anchor=firstVisible();float within=anchor<gridCells.size()?scroll-gridCells.get(anchor).bounds.top:0;
+        gridDirty=false;gridCells.clear();gridHeight=0;
+        gridWordPaint.setTextSize(fontDensity*(landscape()?17:19));gridGlossPaint.setTextSize(fontDensity*11);
+        float narrow=getWidth()/3f-dp(24);int row=0;
+        for(int index=0;index<words.size();) {
+            boolean wide=wideCandidate(index,narrow);int count=1;
+            if(!wide)while(count<3&&index+count<words.size()&&!wideCandidate(index+count,narrow))count++;
+            float cellWidth=wide?getWidth():getWidth()/3f,height=rowHeight();
+            for(int column=0;column<count;column++) {
+                String word=words.get(index+column),gloss=translations?glosses.getOrDefault(word,""):"";
+                GridCell cell=new GridCell(wrapped(word,gridWordPaint,(int)(cellWidth-dp(24)),wide),wrapped(gloss,gridGlossPaint,(int)(cellWidth-dp(24)),wide),row,wide?0:column,wide?3:1);
+                height=Math.max(height,cell.word.getHeight()+Math.max(cell.gloss.getHeight(),fontDensity*13)+dp(14));gridCells.add(cell);
+            }
+            for(int column=0;column<count;column++)gridCells.get(index+column).bounds.set(column*cellWidth,gridHeight,(column+1)*cellWidth,gridHeight+height);
+            gridHeight+=height;index+=count;row++;
+        }
+        scroll=Math.max(0,Math.min(maxScroll(),anchor<gridCells.size()?gridCells.get(anchor).bounds.top+within:scroll));
+        notifyViewport();invalidate();
+    }
     private void text(Canvas c,String value,float x,float y,float size,int color,Paint.Align align){
         paint.setTextSize(fontDensity*size);paint.setColor(color);paint.setTextAlign(align);c.drawText(value,x,y,paint);
     }
@@ -160,12 +209,9 @@ final class CandidateSurface extends View {
         c.drawColor(colors.background);float compH=0,bottom=candidateBottom();
         if(words.isEmpty())return;
         if(embeddedGrid) {
-            float height=rowHeight(),width=getWidth()/3f;
             c.save();c.clipRect(0,0,getWidth(),bottom);
             for(int index=firstVisible();index<lastVisible();index++){
-                float top=(index/3)*height-scroll;
-                rect.set((index%3)*width+dp(4),top+dp(3),(index%3+1)*width-dp(4),top+height-dp(3));
-                drawWord(c,index,rect);
+                GridCell cell=gridCells.get(index);rect.set(cell.bounds);rect.offset(0,-scroll);rect.inset(dp(4),dp(3));drawGridWord(c,index,cell,rect);
             }
             c.restore();
             if(maxScroll()>0){float thumb=Math.max(dp(20),bottom*bottom/(maxScroll()+bottom)),top=(bottom-thumb)*scroll/maxScroll();paint.setColor(colors.secondary);paint.setAlpha(100);c.drawRoundRect(getWidth()-dp(3),top,getWidth()-dp(1),top+thumb,dp(1),dp(1),paint);paint.setAlpha(255);}
@@ -217,11 +263,18 @@ final class CandidateSurface extends View {
         text(c,ellipsize(word,wordSize,width),center,wordBaseline,wordSize,colors.partOfSpeech(partsOfSpeech.get(word)),Paint.Align.CENTER);
         if(pressed==CANDIDATE+index&&swipeTranslation)text(c,"↑",bounds.right-dp(10),bounds.top+dp(12),12,colors.accent,Paint.Align.RIGHT);
     }
+    private void drawGridWord(Canvas canvas,int index,GridCell cell,RectF bounds){
+        if(pressed==CANDIDATE+index&&!swiped||index==0){paint.setColor(pressed==CANDIDATE+index&&!swiped?colors.pressed:colors.function);canvas.drawRoundRect(bounds,dp(9),dp(9),paint);}
+        float content=cell.word.getHeight()+Math.max(cell.gloss.getHeight(),fontDensity*13)+dp(2);
+        float top=bounds.centerY()-content/2,left=bounds.left+dp(8);
+        gridGlossPaint.setColor(colors.secondary);int saved=canvas.save();canvas.translate(left,top);cell.gloss.draw(canvas);canvas.restoreToCount(saved);
+        gridWordPaint.setColor(colors.partOfSpeech(partsOfSpeech.get(words.get(index))));saved=canvas.save();canvas.translate(left,top+Math.max(cell.gloss.getHeight(),fontDensity*13)+dp(2));cell.word.draw(canvas);canvas.restoreToCount(saved);
+    }
     private int hitNode(float x,float y) {
         if(x<0||x>=getWidth()||y<0||y>=candidateBottom())return NO_ID;
         if(embeddedGrid) {
-            int index=(int)((y+scroll)/rowHeight())*3+Math.min(2,(int)(x/(getWidth()/3f)));
-            return index<words.size()?CANDIDATE+index:NO_ID;
+            for(int index=firstVisible();index<lastVisible();index++)if(gridCells.get(index).bounds.contains(x,y+scroll))return CANDIDATE+index;
+            return NO_ID;
         }
         if(hasClear()&&x>=listWidth())return CLEAR;
         if(hasExpand()&&x>=expandLeft()&&x<expandLeft()+dp(48))return EXPAND;
@@ -261,12 +314,12 @@ final class CandidateSurface extends View {
         }
     }
     private void feedback(){if(prefs.haptic())performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);}
-    void cancelTouch(){timer.removeCallbacks(longPress);if(velocity!=null){velocity.recycle();velocity=null;}scroller.abortAnimation();touchGeneration=-1;pressed=NO_ID;swiped=false;swipeTranslation=false;longFired=false;moved=false;invalidate();}
+    void cancelTouch(){timer.removeCallbacks(longPress);if(velocity!=null){velocity.recycle();velocity=null;}scroller.abortAnimation();touchGeneration=-1;pressed=NO_ID;swiped=false;swipeTranslation=false;longFired=false;moved=false;if(gridDirty)rebuildGrid();invalidate();}
     @Override public void computeScroll(){
-        if(scroller.computeScrollOffset()){scroll=Math.max(0,Math.min(maxScroll(),scroller.getCurrY()));notifyViewport();postInvalidateOnAnimation();}
+        if(scroller.computeScrollOffset()){scroll=Math.max(0,Math.min(maxScroll(),scroller.getCurrY()));notifyViewport();postInvalidateOnAnimation();}else if(gridDirty&&pressed==NO_ID)rebuildGrid();
     }
     private void notifyViewport(){
-        if(!embeddedGrid)return;int first=firstVisible(),last=lastVisible();if(first==notifiedFirst&&last==notifiedLast)return;
+        if(!embeddedGrid||!isShown())return;int first=firstVisible(),last=lastVisible();if(first==notifiedFirst&&last==notifiedLast)return;
         notifiedFirst=first;notifiedLast=last;clearVirtualFocus();accessibilityChanged();sendVirtualEvent(NO_ID,AccessibilityEvent.TYPE_VIEW_SCROLLED,null);listener.visibleWordsChanged();
     }
     private RectF virtualBounds(int id) {
@@ -275,8 +328,9 @@ final class CandidateSurface extends View {
         if(id==CLEAR&&hasClear())return new RectF(listWidth(),top,width,height);
         int index=id-CANDIDATE;if(index<0||index>=words.size())return null;
         if(embeddedGrid) {
-            float rowTop=(index/3)*rowHeight()-scroll,rowBottom=rowTop+rowHeight();if(rowBottom<=0||rowTop>=height)return null;
-            return new RectF((index%3)*width/3,Math.max(0,rowTop),(index%3+1)*width/3,Math.min(height,rowBottom));
+            if(index>=gridCells.size())return null;RectF cell=gridCells.get(index).bounds;
+            float rowTop=cell.top-scroll,rowBottom=cell.bottom-scroll;if(rowBottom<=0||rowTop>=height)return null;
+            return new RectF(cell.left,Math.max(0,rowTop),cell.right,Math.min(height,rowBottom));
         }
         if(index>=offsets.size())return null;
         float left=offsets.get(index)-scroll,right=(index+1<offsets.size()?offsets.get(index+1):totalWidth)-scroll;
@@ -292,7 +346,13 @@ final class CandidateSurface extends View {
         if(id==EXPAND)return expandIndicator?"收起候选":"展开候选";
         if(id==CLEAR)return "清空预测候选";
         int index=id-CANDIDATE;
-        if(index>=0&&index<words.size()){String word=words.get(index),gloss=translations?glosses.get(word):null;return gloss==null||gloss.isEmpty()?word:word+"，释义 "+gloss;}return "";
+        if(index>=0&&index<words.size()){
+            String word=words.get(index),gloss=translations?glosses.get(word):null;
+            // Accessibility describes the same snapshot as the visible rows
+            // while a live gesture temporarily defers annotation reflow.
+            if(embeddedGrid&&index<gridCells.size()){GridCell cell=gridCells.get(index);gloss=cell.gloss.getText().toString();}
+            return gloss==null||gloss.isEmpty()?word:word+"，释义 "+gloss;
+        }return "";
     }
     private boolean virtualEnabled(int id) {
         return isEnabled();
@@ -340,7 +400,7 @@ final class CandidateSurface extends View {
             if(id==HOST_VIEW_ID) {
                 AccessibilityNodeInfo node=AccessibilityNodeInfo.obtain(CandidateSurface.this);onInitializeAccessibilityNodeInfo(node);
                 for(int child:visibleNodes())if(virtualBounds(child)!=null)node.addChild(CandidateSurface.this,child);node.setScrollable(maxScroll()>0);
-                if(embeddedGrid)node.setCollectionInfo(AccessibilityNodeInfo.CollectionInfo.obtain((words.size()+2)/3,3,false));
+                if(embeddedGrid)node.setCollectionInfo(AccessibilityNodeInfo.CollectionInfo.obtain(gridCells.isEmpty()?0:gridCells.get(gridCells.size()-1).row+1,3,false));
                 if(scroll<maxScroll())node.addAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);if(scroll>0)node.addAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);return node;
             }
             RectF box=virtualBounds(id);if(box==null)return null;
@@ -353,7 +413,7 @@ final class CandidateSurface extends View {
             Rect bounds=new Rect();box.roundOut(bounds);node.setBoundsInParent(bounds);int[] screen=new int[2];getLocationOnScreen(screen);bounds.offset(screen[0],screen[1]);node.setBoundsInScreen(bounds);
             node.setAccessibilityFocused(accessibilityFocus==id);node.addAction(accessibilityFocus==id?AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS:AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS);
             if(node.isClickable())node.addAction(AccessibilityNodeInfo.ACTION_CLICK);
-            if(candidate){node.setLongClickable(true);node.setHintText(embeddedGrid?"长按查看完整释义并输入译文":"长按查看完整释义，上滑输入本地译文或查看完整翻译");if(embeddedGrid)node.setCollectionItemInfo(AccessibilityNodeInfo.CollectionItemInfo.obtain((id-CANDIDATE)/3,1,(id-CANDIDATE)%3,1,false));node.addAction(AccessibilityNodeInfo.ACTION_LONG_CLICK);node.addAction(new AccessibilityNodeInfo.AccessibilityAction(ACTION_TRANSLATE,"输入本地译文或查看完整翻译"));}return node;
+            if(candidate){node.setLongClickable(true);node.setHintText(embeddedGrid?"长按查看完整释义并输入译文":"长按查看完整释义，上滑输入译文");if(embeddedGrid){GridCell cell=gridCells.get(id-CANDIDATE);node.setCollectionItemInfo(AccessibilityNodeInfo.CollectionItemInfo.obtain(cell.row,1,cell.column,cell.span,false));}node.addAction(AccessibilityNodeInfo.ACTION_LONG_CLICK);node.addAction(new AccessibilityNodeInfo.AccessibilityAction(ACTION_TRANSLATE,"输入译文或查看完整翻译"));}return node;
         }
         @Override public AccessibilityNodeInfo findFocus(int focus){return focus==AccessibilityNodeInfo.FOCUS_ACCESSIBILITY&&accessibilityFocus!=NO_ID?createAccessibilityNodeInfo(accessibilityFocus):null;}
         @Override public boolean performAction(int id,int action,Bundle arguments) {

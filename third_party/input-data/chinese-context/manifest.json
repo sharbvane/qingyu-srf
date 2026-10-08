@@ -1,0 +1,38 @@
+{
+  "format": "QYCM 2 (sorted delta keys/counts as unsigned varints; other fields big endian; gzip)",
+  "training_split": "train only",
+  "source_commit": "7b61ed473f963e911788efdf1f478154bc1053e4",
+  "source_license": "CC BY-SA 4.0",
+  "sources": {
+    "zh_gsdsimp-ud-train.conllu": {
+      "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Chinese-GSDSimp/7b61ed473f963e911788efdf1f478154bc1053e4/zh_gsdsimp-ud-train.conllu",
+      "sha256": "956636fe612a1166e8b19e7413fee2e73d68231aca2f0455be2c616b947d629d",
+      "bytes": 9321012
+    },
+    "LICENSE.txt": {
+      "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Chinese-GSDSimp/7b61ed473f963e911788efdf1f478154bc1053e4/LICENSE.txt",
+      "sha256": "899b1804a12ebc090b96339614eede1b64b686721b650a71430b55b5235f7f79",
+      "bytes": 202
+    },
+    "README.md": {
+      "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Chinese-GSDSimp/7b61ed473f963e911788efdf1f478154bc1053e4/README.md",
+      "sha256": "02287bdf80282151d8ca7ef3c3f7a3c3b98609f7266f145e3e3dd0a05693abd3",
+      "bytes": 3105
+    }
+  },
+  "training_sentences": 3997,
+  "training_tokens": 98614,
+  "unigrams": 16720,
+  "bigrams": 371748,
+  "trigrams": 636825,
+  "pos_words": 18904,
+  "prediction_contexts": 1185,
+  "example_sentences": 384,
+  "example_words": 1207,
+  "lexicon_v2_sha256": "ef4c9c9f22deea61e02a0cdf71ad6be2e906af3088f0d3abd2657385034ad4ff",
+  "jieba_sha256": "7197c3211ddd98962b036cdf40324d1ea2bfaa12bd028e68faa70111a88e12a8",
+  "model_bytes": 2736395,
+  "decoded_bytes": 3494939,
+  "model_sha256": "4c748464c3097bf84084b3f35d29af6d627d1be93873e8aa42472a7864bcd763",
+  "transformations": "Character counts: TRAIN 10x; one contribution per unique modern word weighted 1+floor(min(8,log1p(weight)/2)); Chinese runs reset at punctuation; corpus UPOS transitions; lexical jieba POS on corpus words/single characters. Count cutoff bigrams>=2/trigrams>=3. Next-word tables are complete observed tokens with count>=3 and conditional support>=0.08. Example sentences are exact short TRAIN texts, deterministic length/order cap384 and broad sensitive-domain filter; dev/test excluded. No phrase/benchmark-specific counts or boosts."
+}

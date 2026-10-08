@@ -1,0 +1,94 @@
+Dictionary SHA-256: AE80997B6E2B2DE23BC11276767A15CD00B1E8E6308823A2761769D811A3513A
+CASE	woyaokanduanshipin	我要看短视频	daily-sentence	1	5	我要看短视频|我要砍断视频|我要砍断饰品|我要砍断食品|我要看段视频
+CASE	qingsaomazhifu	请扫码支付	daily-sentence	3	5	清扫码支付|清扫马支付|请扫码支付|轻扫码支付|情扫码支付
+CASE	woxiangdawangyueche	我想打网约车	daily-sentence	1	5	我想打网约车|我想大网约车|我想打望月车|我想大王说车|我想大望月车
+CASE	woxiangkandianying	我想看电影	daily-sentence	1	5	我想看电影|我向看电影|我像看电影|我想看点映|我相看电影
+CASE	jintianwoyaoqushangban	今天我要去上班	daily-sentence	1	5	今天我要去上班|今天我要去上半|今天我要去上板|今天我咬去上班|今天我要去商办
+CASE	wanshangwomenyiqichifan	晚上我们一起吃饭	daily-sentence	1	5	晚上我们一起吃饭|玩上我们一起吃饭|腕上我们一起吃饭|挽上我们一起吃饭|腕伤我们一起吃饭
+CASE	mingtianyiqiqugongyuan	明天一起去公园	daily-sentence	1	5	明天一起去公园|明天一起去公元|明天一起去贡院|明天一崎岖公园|明天一崎岖公元
+CASE	nikeyibangwokankanma	你可以帮我看看吗	daily-sentence	1	5	你可以帮我看看吗|你可以帮我看看么|你可以帮我看看嘛|你可以帮我看看马|你可以帮我看看骂
+CASE	woxihuanxuexizhongwen	我喜欢学习中文	daily-sentence	1	5	我喜欢学习中文|我喜欢学系中文|我喜欢学习中问|我西环学习中文|我喜欢血洗中文
+CASE	nixianzaiyoushijianma	你现在有时间吗	daily-sentence	1	5	你现在有时间吗|你现在有时间么|你现在有时间码|你现在又是见吗|你现在又是剑麻
+CASE	woxiangmaiyibeikafei	我想买一杯咖啡	daily-sentence	1	5	我想买一杯咖啡|我想买一倍咖啡|我想买已被咖啡|我想买易被咖啡|我想买一被咖啡
+CASE	kuaidiyijingdaole	快递已经到了	daily-sentence	1	5	快递已经到了|会的已经到了|快的已经到了|块的已经到了|会地已经到了
+CASE	womenxuyaochongxinsheji	我们需要重新设计	daily-sentence	1	5	我们需要重新设计|我们须要重新设计|我们需要重新涉及|我们需要重新射击|我们需要重新社稷
+CASE	qingbangwodakaishezhi	请帮我打开设置	daily-sentence	1	5	请帮我打开设置|青帮我打开设置|情帮我打开设置|清帮我打开设置|亲帮我打开设置
+CASE	mingtiankenenghuixiayu	明天可能会下雨	daily-sentence	1	5	明天可能会下雨|明天可能会夏雨|明天可能会下狱|明天可能会夏禹|明天可能会下愚
+CASE	wozhengzaixuexibiancheng	我正在学习编程	daily-sentence	1	5	我正在学习编程|我正在学习变成|我正在学习编成|我正在学习便成|我正再学习编程
+CASE	qinggaosuwonidexiangfa	请告诉我你的想法	daily-sentence	1	5	请告诉我你的想法|情告诉我你的想法|亲告诉我你的想法|请告诉我呢的想法|清告诉我你的想法
+CASE	zhegewentiyijingjiejue	这个问题已经解决	daily-sentence	1	5	这个问题已经解决|这个文体已经解决|这个问题意境解决|这个问题一经解决|这个问题易经解决
+CASE	woxiangzuogaotiehuijia	我想坐高铁回家	daily-sentence	2	5	我想做高铁回家|我想坐高铁回家|我向坐高铁回家|我向左高铁回家|我像坐高铁回家
+CASE	jintiandetianqihenhao	今天的天气很好	daily-sentence	1	5	今天的天气很好|今天地天气很好|今天的天启很好|今天得天气很好|今天的田七很好
+CASE	zhegebanbenkeyigengxin	这个版本可以更新	daily-sentence	1	5	这个版本可以更新|这个版本刻意更新|这个版本可疑更新|这个版本科一更新|这个班本可以更新
+CASE	niyoumeiyoudaichongdianqi	你有没有带充电器	daily-sentence	1	5	你有没有带充电器|你有没有大充电器|你又没有带充电器|你有没有待充电器|你有没有戴充电器
+CASE	woxianzaizhunbeichumen	我现在准备出门	daily-sentence	1	5	我现在准备出门|我先在准备出门|我现在准备楚门|我现在准备出们|我现在准备出闷
+CASE	dengyixiawomashanghuilai	等一下我马上回来	daily-sentence	1	5	等一下我马上回来|等一吓我马上回来|灯一下我马上回来|等以下我马上回来|等一下我马上会来
+CASE	qingbawenjianfageiwo	请把文件发给我	daily-sentence	1	5	请把文件发给我|请吧文件发给我|请把稳健发给我|请吧稳健发给我|亲吧文件发给我
+CASE	womenmingtianzaitaolun	我们明天再讨论	daily-sentence	1	5	我们明天再讨论|我们明天在讨论|我们明天灾讨论|我们明天载讨论|我们明天崽讨论
+CASE	woxiangtingyishougequ	我想听一首歌曲	daily-sentence	1	5	我想听一首歌曲|我想听一手歌曲|我想听易受歌曲|我想听一熟歌曲|我想听已售歌曲
+CASE	wojuedezheyangbijiaohao	我觉得这样比较好	daily-sentence	1	5	我觉得这样比较好|我觉得遮阳比较好|我觉得这样比较号|我觉的这样比较好|我觉得这杨比较好
+CASE	jintiangongzuoyoudianmang	今天工作有点忙	daily-sentence	1	5	今天工作有点忙|今天工作优点忙|今天工作邮电忙|今天工作优点盲|今天工作优点芒
+CASE	woyijingshoudaoxiaoxi	我已经收到消息	daily-sentence	1	5	我已经收到消息|我已经受到消息|我一惊收到消息|我已经收到小溪|我一经收到消息
+CASE	qingwenfujinyoumeiyouditiezhan	请问附近有没有地铁站	daily-sentence	1	5	请问附近有没有地铁站|轻吻附近有没有地铁站|请问附近又没有地铁站|请问附近有没有地铁战|轻吻附近又没有地铁站
+CASE	zhegeerweimawufashibie	这个二维码无法识别	daily-sentence	1	5	这个二维码无法识别|这个二维码乌发识别|这个二维码五发识别|这个二位吗无法识别|这个二维吗无法识别
+CASE	woxiangxianshiyixia	我想先试一下	daily-sentence	11	5	我想显示一下|我向显示一下|我像显示一下|我想先是一下|我想现时一下
+CASE	xindeanzhuobanbenhenliuchang	新的安卓版本很流畅	daily-sentence	1	5	新的安卓版本很流畅|心得安卓版本很流畅|心得安着版本很流畅|新的案桌版本很流畅|新的安卓版本狠流畅
+CASE	woxuyaoyuyuemingtiandeshijian	我需要预约明天的时间	daily-sentence	2	5	我需要愉悦明天的时间|我需要预约明天的时间|我需要愉悦明天的事件|我需要预约明天的事件|我需要逾越明天的时间
+CASE	woxiangqubeijing	我想去北京	daily-sentence	1	5	我想去北京|我想去背景|我想娶北京|我想曲北京|我向去北京
+CASE	jintiantianqihenhao	今天天气很好	daily-sentence	1	5	今天天气很好|今天天启很好|今天天气很号|今天田七很好|今天天气很耗
+CASE	shilidedaxiaobutong	施力的大小不同	ud-dev-heldout	0	5	实力的大小不同|势力的大小不同|失利的大小不同|视力的大小不同|市里的大小不同
+CASE	yinqidejiasudubutong	引起的加速度不同	ud-dev-heldout	1	5	引起的加速度不同|引起的家速度不同|引起的加速度不通|因其的加速度不同|引起得加速度不同
+CASE	zuizhongdejieguoyebuyiyang	最终的结果也不一样	ud-dev-heldout	1	5	最终的结果也不一样|最重的结果也不一样|最终的接过也不一样|最终得结果也不一样|最终的借过也不一样
+CASE	yikeyicongxiangliangdejiachengxinglaikan	亦可以从向量的加成性来看	ud-dev-heldout	0	5	一颗已从响亮的加成|亦可以|一颗|亦可|一刻
+CASE	zhezhongcheliangruguoguisirenyongyou	这种车辆如果归私人拥有	ud-dev-heldout	6	5	这种车辆如果鬼斯人拥有|这种车辆如果贵私人拥有|这种车辆如果鬼私人拥有|这种车辆如果桂私人拥有|这种车辆如果鬼死人拥有
+CASE	duobanhuishezhiangguideyinpinshebei	多半会设置昂贵的音频设备	ud-dev-heldout	1	5	多半会设置昂贵的音频设备|多半会设置昂贵的饮品设备|多半会摄制昂贵的音频设备|多半会设置昂贵得音频设备|多半会设置昂贵地音频设备
+CASE	yijibataihebingxiang	以及吧台和冰箱	ud-dev-heldout	2	5	一级吧台和冰箱|以及吧台和冰箱|遗迹吧泰和冰箱|遗迹吧台和冰箱|遗迹吧太和冰箱
+CASE	dongzuomaoxianyouxi	动作冒险游戏	ud-dev-heldout	1	5	动作冒险游戏|动作冒险游隙|动作茂县游戏|动作毛线游戏|动作冒险右膝
+CASE	shimaoxianyouxidefenzhi	是冒险游戏的分支	ud-dev-heldout	1	5	是冒险游戏的分支|时冒险游戏的分支|是冒险游戏的分值|事冒险游戏的分支|市冒险游戏的分支
+CASE	jiceshibaohanlemeishuzhiliaofa	其测试包含了美术治疗法	ud-dev-heldout	4	5	计策是包含了美术治疗法|给测试包含了美术治疗法|及测试包含了美术治疗法|其测试包含了美术治疗法|机测试包含了美术治疗法
+CASE	renzhixingweizhiliaohedongchaliaofa	认知行为治疗和洞察疗法	ud-dev-heldout	1	5	认知行为治疗和洞察疗法|认知行为治疗河东差疗法|认知行为治疗河东茶疗法|认知行为治疗呵洞察疗法|任职行为治疗和洞察疗法
+CASE	zezhongduanleshengchan	则中断了生产	ud-dev-heldout	1	5	则中断了生产|则终端了生产|泽中断了生产|咋终端了生产|咋中断了生产
+CASE	dejingjiyiyuyeweizhu	的经济以渔业为主	ud-dev-heldout	0	5	的经济一渔业为主|的经济一渔业围住|的经济一渔业喂猪|地经济一渔业为主|的经济一浴液围住
+CASE	xueyuyexiangdangfada	鳕鱼业相当发达	ud-dev-heldout	0	5	雪域也相当发达|血雨也相当发达|学渔业相当发达|鳕鱼也相当发达|血玉也相当发达
+CASE	renxiangjidingjuyuci	人相继定居于此	ud-dev-heldout	2	5	人相机定居于此|人相继定居于此|人相机定居与此|人相继定居与此|人像其定居于此
+CASE	wuyueershiyiri	五月二十一日	ud-dev-heldout	1	5	五月二十一日|五月|五岳|吴越|无约
+CASE	chuchengyingjieqianlai	出城迎接前来	ud-dev-heldout	1	5	出城迎接前来|出城应届前来|出城迎接迁来|出城硬解前来|出城英杰前来
+CASE	tahuafeilexuduoshijianlaibijiao	他花费了许多时间来比较	ud-dev-heldout	1	5	他花费了许多时间来比较|他花费了许多事件来比较|她花费了许多时间来比较|他花费了许多事捡来比较|他花费了许多事件赖比较
+CASE	shouciyaoqingshuming	首次邀请数名	ud-dev-heldout	5	5	首次邀请书名|首次邀请署名|受此邀请书名|受此邀请署名|首次邀请数名
+CASE	qiandingmengyuezhihou	签订盟约之后	ud-dev-heldout	1	5	签订盟约之后|签订盟约滞后|签订梦月之后|签订盟约置后|签订梦乐之后
+CASE	diguofaqideshisannianzhanzheng	帝国发起的十三年战争	ud-dev-heldout	3	5	帝国发起的是三年战争|帝国发起的事三年战争|帝国发起的十三年战争|帝国法器的是三年战争|帝国法器的十三年战争
+CASE	haihuomigongzhongyidongshi	海或迷宫中移动时	ud-dev-heldout	0	5	还获迷宫中医董事|还获迷宫中移动式|还获迷宫中以董事|还获迷宫忠义董事|还获迷宫中意董事
+CASE	dezhimingdushishenzhishui	的知名度时甚至说	ud-dev-heldout	3	5	的知名度是甚至说|的知名都是甚至说|的知名度时甚至说|的知名度事甚至说|的知名度使甚至说
+CASE	bingchengweilexilieguanfangdejixiangwu	并成为了系列官方的吉祥物	ud-dev-heldout	0	5	秉承为了系列官方的|秉承|并成|并称|冰城
+CASE	wulunguafengxiayu	无论刮风下雨	ud-dev-heldout	1	5	无论刮风下雨|五轮刮风下雨|五伦刮风下雨|无论刮风下狱|无论刮风下愚
+CASE	bugujingchahebaotusaorao	不顾警察和暴徒骚扰	ud-dev-heldout	1	5	不顾警察和暴徒骚扰|不顾警察和胞吐骚扰|布谷警察和暴徒骚扰|不顾警察合暴徒骚扰|不顾警察荷包土骚扰
+CASE	desuoyouliangxinfan	的所有良心犯	ud-dev-heldout	1	5	的所有良心犯|的所有良心饭|的所有良心烦|地所有良心犯|的所有良心反
+CASE	yigejiatingshourudezhongjianshuwei	一个家庭收入的中间数为	ud-dev-heldout	8	5	一个家庭收入的中间数位|一个家庭收入的中间殊为|一个家庭收入的中间戍卫|一个家庭收入的忠奸殊为|一个家庭收入的中坚殊为
+CASE	jiatingshourudezhongjianshuwei	家庭收入的中间数为	ud-dev-heldout	8	5	家庭收入的中间数位|家庭收入的中间殊为|家庭收入的中间戍卫|家庭收入的忠奸殊为|家庭收入的中坚殊为
+CASE	guominpingjunshouruwei	国民平均收入为	ud-dev-heldout	1	5	国民平均收入为|国民平均收入位|国民平均收入围|国民平均收入微|国民平均收入味
+CASE	tebiexingzhengoufuzeguanxia	特别行政区负责管辖	ud-dev-heldout	1	5	特别行政区负责管辖|特别行政偶负责管辖|特别行政藕负责管辖|特别刑侦够负责管辖|特别行政欧负责管辖
+CASE	tieluquanxiangongsheyouchezhan	铁路全线共设有车站	ud-dev-heldout	9	5	铁路权限公社有车站|铁路权限共设有车站|铁路权限公设有车站|铁路全县共设有车站|铁路权限公社有车展
+CASE	suozaidedisanou	所在的第三区	ud-dev-heldout	1	5	所在的第三区|所在的第三偶|所在的第三欧|所在的第三藕|所在地第三区
+CASE	zaoyibudanshizhixuexiao	早已不单是指学校	ud-dev-heldout	7	5	早已不但是指学校|早已不但实质学校|早已不但失职学校|早已不但使之学校|早已不但时至学校
+CASE	shoucituixingdexuduogaigecuoshizai	首次推行的许多改革措施在	ud-dev-heldout	1	5	首次推行的许多改革措施在|首次推行的许多改革措施再|受此推行的许多改革措施在|首次腿型的许多改革措施在|首次推行地许多改革措施在
+CASE	dangzhengqijiansuiyiranbaoliu	当政期间虽依然保留	ud-dev-heldout	0	5	党政期间岁依然保留|党政期间遂依然保留|党政期间虽依然保留|党政期间随意然保留|党争期间岁依然保留
+CASE	wenmingdiquyiwaidedifang	文明地区以外的地方	ud-dev-heldout	1	5	文明地区以外的地方|文明地区意外的地方|文明的去以外的地方|文明的去意外的地方|文明的区以外的地方
+CASE	jimeiyoukaihuadedifang	即没有开化的地方	ud-dev-heldout	0	5	既没有开花的地方|及没有开花的地方|既没有开化的地方|及没有开化的地方|既没有开画的地方
+CASE	dixiaercengweiditie	地下二层为地铁	ud-dev-heldout	1	5	地下二层为地铁|地下二层位地铁|低下二层为地铁|地下二层为敌贴|底下二层为地铁
+CASE	dixiasancengweizhengzaijianshededitie	地下三层为正在建设的地铁	ud-dev-heldout	1	5	地下三层为正在建设的地铁|地下三层位正在建设的地铁|低下三层为正在建设的地铁|地下三层魏正在建设的地铁|地下三层未正在建设的地铁
+CASE	niankuojianweifuzhukeyunzhan	年扩建为辅助客运站	ud-dev-heldout	1	5	年扩建为辅助客运站|年扩建未辅助客运站|念扩建为辅助客运站|年扩建为附注客运站|年扩建为付诸客运站
+CASE	yizhiyuliansaikaishishi	以至于联赛开始时	ud-dev-heldout	1	5	以至于联赛开始时|一只鱼联赛开始时|以致于联赛开始时|以至于联赛开始是|一致于联赛开始时
+CASE	zaicitiqianyilunsuodingliansaijijun	再次提前一轮锁定联赛季军	ud-dev-heldout	0	5	再次提前议论锁定连|在此|再次|在|再
+CASE	liansaixiaozusaidezhijiecansaixiwei	联赛小组赛的直接参赛席位	ud-dev-heldout	0	5	联赛小组赛的直接惨|联赛|连|练|脸
+CASE	duihuodelexiasaiji	队获得了下赛季	ud-dev-heldout	2	5	对获得了下赛季|队获得了下赛季|对火的了下赛季|对火得了下赛季|堆获得了下赛季
+CASE	gaigongchengbingweiwangong	该工程并未完工	ud-dev-heldout	1	5	该工程并未完工|改工程并未完工|改工程并为完工|该工程并为完工|盖工程并未完工
+CASE	waichenggongyouqimen	外城共有七门	ud-dev-heldout	0	5	外城共有气门|外城共有祁门|外城共有奇门|外城共有气闷|外城公有祁门
+CASE	ciwaihaiyouliangzuobianmen	此外还有两座便门	ud-dev-heldout	2	5	此外还有两座边门|此外还有两座便门|此外还有两左边们|此外还有两左边闷|此外还有两左边门
+QUALITY total=85 top1=57 top5=68 top10=73 found=74 failures=17; 2029 incremental searches p50=3.084ms p95=84.698ms max=285.020ms
+DAILY_ACCEPTANCE total=37 failures=1; ASSESSMENT total=48 failures=16 (all CASE rows retained)
+java.lang.AssertionError: expected candidate must reach each corpus rank limit; failures=1
+	at com.qingyu.core.ChineseQualitySmoke.check(ChineseQualitySmoke.java:12)
+	at com.qingyu.core.ChineseQualitySmoke.run(ChineseQualitySmoke.java:73)
+	at com.qingyu.core.ChineseQualitySmoke.main(ChineseQualitySmoke.java:18)
+	at com.android.internal.os.RuntimeInit.nativeFinishInit(Native Method)
+	at com.android.internal.os.RuntimeInit.main(RuntimeInit.java:369)

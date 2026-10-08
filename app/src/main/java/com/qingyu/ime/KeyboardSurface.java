@@ -151,7 +151,7 @@ final class KeyboardSurface extends View {
         } else {
             row("q w e r t y u i o p".split(" "),"1 2 3 4 5 6 7 8 9 0".split(" "),pad,h,0,null);
             row("a s d f g h j k l".split(" "),null,pad+h,h,dp(16),null);
-            row(new String[]{"SHIFT","z","x","c","v","b","n","m","⌫"},null,pad+h*2,h,0,new float[]{1.35f,1,1,1,1,1,1,1,1.35f});
+            row(new String[]{english||secure?"SHIFT":"SPLIT","z","x","c","v","b","n","m","⌫"},null,pad+h*2,h,0,new float[]{1.35f,1,1,1,1,1,1,1,1.35f});
             row(new String[]{"?123","LANG",english?",":"，","SPACE",english?".":"。","ENTER"},null,pad+h*3,h,0,new float[]{1.35f,1,0.9f,3.6f,0.9f,1.65f});
         }
         accessibilityChanged();
@@ -159,6 +159,7 @@ final class KeyboardSurface extends View {
     private String label(Key k) {
         switch(k.value) {
             case "SHIFT":return symbols?(secondSymbols?"123":"#+="):(capsLock?"⇪":"⇧");
+            case "SPLIT":return "分词";
             case "SPACE":return cursorMode?"‹  移动光标  ›":(english?"English":isNineKey()?"轻语 · 九键":"轻语 · 拼音");
             case "LANG":return english?"EN":"中";
             case "ENTER":return enterLabel;
@@ -280,6 +281,7 @@ final class KeyboardSurface extends View {
     private String accessibilityName(Key key) {
         switch(key.value) {
             case "SHIFT":return symbols?(secondSymbols?"数字符号页":"更多符号"):(capsLock?"大写已锁定":"切换大小写");
+            case "SPLIT":return "拼音分词";
             case "SPACE":return "空格";
             case "LANG":return secure?"安全输入，英文键盘":(english?"切换中文":"切换英文");
             case "ENTER":return enterLabel.equals("拼音")?"提交原始拼音":enterLabel.equals("↵")?"换行":enterLabel;

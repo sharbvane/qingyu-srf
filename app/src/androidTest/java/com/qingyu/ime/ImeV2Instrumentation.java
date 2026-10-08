@@ -47,11 +47,11 @@ public class ImeV2Instrumentation extends ImeSmokeInstrumentation {
         pass("unlisted English spelling survives a normal space commit");
 
         clear();selectMode("中文 · 全键拼音");type("zhongguo");awaitCandidate("中国");clickCandidate("中国");awaitText("中国");
-        awaitCandidate("人");awaitGloss("人","person");check(find("candidate_expand")==null,"Chinese next-word prediction exposes expand");clickCandidate("人");awaitText("中国人");
-        pass("Chinese contextual prediction displays a gloss and continues 中国 to 中国人");
+        awaitCandidate("人民");awaitGloss("人民","the people");check(find("candidate_expand")==null,"Chinese next-word prediction exposes expand");clickCandidate("人民");awaitText("中国人民");
+        pass("Chinese contextual prediction displays a gloss and continues 中国 to 中国人民");
 
         clear();type("kaifa");awaitCandidate("开发");holdCandidate("开发");
-        awaitNodeText("translation_detail","develop");awaitNodeText("translation_detail","CC-CEDICT · 英文词典释义");check(text().equals("kaifa"),"Long press committed text");
+        awaitNodeText("translation_detail","develop");awaitNodeText("translation_explanation","CC-CEDICT · 英文词典释义");check(text().equals("kaifa"),"Long press committed text");
         screenshot("v2-detail.png");closePanel();keyboardReady();upCandidate("开发");awaitText("develop");
         pass("candidate hold opens full definition, upward swipe inputs translated word");
         clear();type("xiangmu");awaitCandidate("项目");horizontalCandidate("项目");SystemClock.sleep(180);awaitText("xiangmu");clear();
@@ -66,12 +66,13 @@ public class ImeV2Instrumentation extends ImeSmokeInstrumentation {
         pass("undownloaded or unavailable translation model leaves normal Chinese input usable");
         }else{
         clear();setLanguage("日语");type("wenhua");awaitCandidate("文化");holdCandidate("文化");
-        awaitNodeText("translation_detail","Google Translate · 端侧翻译");
+        awaitNode("translation_attribution");
         check(awaitNode("translation_attribution").isVisibleToUser(),"Downloaded model detail attribution is not visible");
         check(findButton("Translate with Google")!=null,"Downloaded model detail is missing the attributed commit action");
         check(text().equals("wenhua"),"Viewing downloaded model translation changed composing text");
-        closePanel();keyboardReady();upCandidate("文化");awaitNodeText("translation_detail","Google Translate · 端侧翻译");check(text().equals("wenhua"),"Model swipe committed without opening details");buttonClick("Translate with Google");awaitText("文化");
-        pass("downloaded Japanese translation remains in attributed details; upward gesture opens details before commit");
+        String translated=awaitNode("translation_detail").getText().toString().split("\n",2)[0].trim();check(!translated.isEmpty(),"Japanese translation is empty");
+        closePanel();keyboardReady();awaitGloss("文化",translated);upCandidate("文化");awaitText(translated);
+        pass("downloaded Japanese translation appears in candidates and attributed details; upward gesture directly commits the same concise translation");
         }
 
         clear();setLanguage("英语");nodeClick("toolbar_more");buttonClick("键盘高度");
@@ -132,7 +133,7 @@ public class ImeV2Instrumentation extends ImeSmokeInstrumentation {
     protected void upCandidate(String word){Rect bounds=new Rect();candidate(word).getBoundsInScreen(bounds);swipe(bounds.centerX(),bounds.centerY(),bounds.centerX(),bounds.centerY()-110,180);}
     private void horizontalCandidate(String word){Rect bounds=new Rect();candidate(word).getBoundsInScreen(bounds);swipe(bounds.centerX(),bounds.centerY(),bounds.centerX()+90,bounds.centerY(),180);}
     private void awaitSelection(int from,int to){long until=SystemClock.uptimeMillis()+3000;int[] selection={-1,-1};while(SystemClock.uptimeMillis()<until){runOnMainSync(()->{selection[0]=editor.getSelectionStart();selection[1]=editor.getSelectionEnd();});if(Math.min(selection[0],selection[1])==from&&Math.max(selection[0],selection[1])==to)return;SystemClock.sleep(30);}throw new AssertionError("Expected selection "+from+".."+to+", actual "+selection[0]+".."+selection[1]+"; editor="+text());}
-    private void awaitClip(String value){long until=SystemClock.uptimeMillis()+3000;ClipboardManager manager=(ClipboardManager)getTargetContext().getSystemService(Activity.CLIPBOARD_SERVICE);while(SystemClock.uptimeMillis()<until){String[] actual={""};runOnMainSync(()->{ClipData clip=manager.getPrimaryClip();if(clip!=null&&clip.getItemCount()>0)actual[0]=String.valueOf(clip.getItemAt(0).getText());});if(value.equals(actual[0]))return;SystemClock.sleep(30);}throw new AssertionError("Clipboard did not receive "+value);}
+    protected void awaitClip(String value){long until=SystemClock.uptimeMillis()+3000;ClipboardManager manager=(ClipboardManager)getTargetContext().getSystemService(Activity.CLIPBOARD_SERVICE);while(SystemClock.uptimeMillis()<until){String[] actual={""};runOnMainSync(()->{ClipData clip=manager.getPrimaryClip();if(clip!=null&&clip.getItemCount()>0)actual[0]=String.valueOf(clip.getItemAt(0).getText());});if(value.equals(actual[0]))return;SystemClock.sleep(30);}throw new AssertionError("Clipboard did not receive "+value);}
     private JSONArray readHistory()throws Exception{java.io.File file=new java.io.File(getTargetContext().getFilesDir(),"clipboard-history.json");return file.exists()?new JSONArray(new String(java.nio.file.Files.readAllBytes(file.toPath()),StandardCharsets.UTF_8)):new JSONArray();}
     private JSONArray awaitHistoryCount(int count)throws Exception{long until=SystemClock.uptimeMillis()+5000;while(SystemClock.uptimeMillis()<until){JSONArray history=readHistory();if(history.length()==count)return history;SystemClock.sleep(40);}throw new AssertionError("Expected clipboard history count "+count+", actual "+readHistory().length());}
 }

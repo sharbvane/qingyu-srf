@@ -5,6 +5,7 @@ import com.qingyu.core.NineKeyCandidate;
 import com.qingyu.core.PinyinEngine;
 import com.qingyu.core.EngineSnapshot;
 import com.qingyu.core.Candidate;
+import com.qingyu.core.ChineseContextModel;
 import java.lang.reflect.Field;
 import java.util.List;
 import java.io.File;
@@ -19,6 +20,8 @@ public final class InputDictionarySmoke {
         field.set(dictionary,SQLiteDatabase.openDatabase(args[0],null,SQLiteDatabase.OPEN_READONLY));
         check(args.length>=2,"Modern lexicon asset is required for this check");
         Field modern=LocalInputDictionary.class.getDeclaredField("pinyinDatabase");modern.setAccessible(true);modern.set(dictionary,SQLiteDatabase.openDatabase(args[1],null,SQLiteDatabase.OPEN_READONLY));
+        Field contextual=LocalInputDictionary.class.getDeclaredField("contextModel");contextual.setAccessible(true);
+        if(args.length>4)contextual.set(dictionary,ChineseContextModel.load(Files.newInputStream(new File(args[4]).toPath())));
         List<NineKeyCandidate> hello=dictionary.suggestNineKey("64426");
         check(hello.get(0).text.equals("你好") && hello.get(0).consumedDigits==5,"common nine-key exact reading");
         check(dictionary.suggestNineKey("52432").get(0).text.equals("开发"),"real full word dictionary");
@@ -38,12 +41,26 @@ public final class InputDictionarySmoke {
         check(!tags.containsKey("hello") && !tags.containsKey("未知词性词组"),"unknown and English words stay neutral");
         check(dictionary.partsOfSpeech(java.util.Arrays.asList("项目","未知词性词组")).get("项目").equals("n"),"cached POS batch");
         check(dictionary.predictChinese("中国").contains("人民"),"Chinese context continuation");
+        for(String boundary:new String[]{"中国。","中国！","中国?","中国，","中国\n。","甲乙丙丁戊己","hello","123"})check(dictionary.predictChinese(boundary).isEmpty(),"unreliable/boundary Chinese prediction: "+boundary);
+        check(dictionary.example("未知词性词组").isEmpty(),"unknown source example must be empty");
         dictionary.setLearningEnabled(false);dictionary.learnChinese("绝密内容","上下文");
         Field learning=LocalInputDictionary.class.getDeclaredField("chineseLearning");learning.setAccessible(true);
         check(((java.util.Map<?,?>)learning.get(dictionary)).isEmpty(),"private Chinese input disables learning");
         dictionary.setLearningEnabled(true);
+        dictionary.learnChinese("单次选择","本地验证");check(!dictionary.predictChinese("本地验证").contains("单次选择"),"single accidental next word was promoted");dictionary.learnChinese("单次选择","本地验证");check(!dictionary.predictChinese("本地验证").contains("单次选择"),"two accidental next words were promoted");dictionary.learnChinese("单次选择","本地验证");check(dictionary.predictChinese("本地验证").contains("单次选择"),"repeated contextual preference is missing");
         for(int i=0;i<10;i++) dictionary.learnChinese("轻语","测试");
         check(dictionary.predictChinese("测试").get(0).equals("轻语"),"personal context continuation");
+        ChineseContextModel contextModel=(ChineseContextModel)contextual.get(dictionary);
+        if(contextModel!=null){
+            Field continuations=ChineseContextModel.class.getDeclaredField("continuations");continuations.setAccessible(true);
+            boolean checked=false;
+            for(String history:new java.util.TreeSet<>(((java.util.Map<String,?>)continuations.get(contextModel)).keySet())){
+                List<String> observed=contextModel.predict(history);if(observed.size()<2)continue;
+                String preferred=observed.get(observed.size()-1);for(int i=0;i<3;i++)dictionary.learnChinese(preferred,history);
+                check(dictionary.predictChinese(history).get(0).equals(preferred),"corpus score overwrote repeated personal prediction");checked=true;break;
+            }
+            check(checked,"corpus resource lacks a multiword prediction regression fixture");
+        }
         for(String[] word:new String[][]{{"dangang","单杠"},{"anzhuo","安卓"},{"biancheng","编程"},{"shujuku","数据库"}})check(rank(dictionary.lookup(word[0],""),word[1])>=0&&rank(dictionary.lookup(word[0],""),word[1])<8,"modern indexed common word "+word[0]+" -> "+word[1]);
         check(rank(dictionary.lookup("dan'gang",""),"单杠")>=0,"explicit full-pinyin boundary");check(rank(dictionary.lookup("xi'an",""),"西安")>=0&&rank(dictionary.lookup("xi'an",""),"先")<0,"explicit apostrophe must not become another syllable");
         check(rank(dictionary.completePinyin("bianchen",""),"编程")>=0,"indexed modern incomplete-prefix completion");
@@ -79,7 +96,7 @@ public final class InputDictionarySmoke {
     }
     private static void segmentedLearning(String[] args,Field modern,Field coded,Field file,java.lang.reflect.Method load)throws Exception{
         File user=new File(args[3]),saved=new File(new File(args[1]).getParentFile(),"test-segmented-learning.tsv");Files.deleteIfExists(user.toPath());Files.deleteIfExists(saved.toPath());
-        LocalInputDictionary dictionary=new LocalInputDictionary();modern.set(dictionary,SQLiteDatabase.openDatabase(args[1],null,SQLiteDatabase.OPEN_READONLY));file.set(dictionary,saved);PinyinEngine engine=new PinyinEngine();engine.open(args[2],user.getPath());engine.setLexicon(dictionary);
+        LocalInputDictionary dictionary=new LocalInputDictionary();modern.set(dictionary,SQLiteDatabase.openDatabase(args[1],null,SQLiteDatabase.OPEN_READONLY));if(args.length>4){Field model=LocalInputDictionary.class.getDeclaredField("contextModel");model.setAccessible(true);model.set(dictionary,ChineseContextModel.load(Files.newInputStream(new File(args[4]).toPath())));}file.set(dictionary,saved);PinyinEngine engine=new PinyinEngine();engine.open(args[2],user.getPath());engine.setLexicon(dictionary);
         try{
             check(rank(dictionary.lookup("woyaokanduanshipin",""),"我要看短视频")<0,"fixture needs a new composed sentence");
             EngineSnapshot initial=engine.search("woyaokanduanshipin");Candidate prefix=candidate(initial,"我要看");java.util.Map<?,?> counters=(java.util.Map<?,?>)coded.get(dictionary);java.util.Map<?,?> before=new java.util.LinkedHashMap<>(counters);check(engine.previewCandidate(prefix.id).equals("我要看短视频")&&counters.equals(before),"preview learned composed phrase");

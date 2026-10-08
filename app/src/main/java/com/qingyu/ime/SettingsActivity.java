@@ -37,6 +37,7 @@ public final class SettingsActivity extends Activity {
     private TranslationRepository translations;
     private boolean modelManagerOpen;
     private TextView[] modelStates,modelSizes;
+    private ProgressBar[] modelProgress;
     private Button[] modelDownloads,modelDeletes;
     private long modelUiRevision;
     private static final String[] MODEL_LANGUAGES=TranslationRepository.glossLanguages();
@@ -47,17 +48,19 @@ public final class SettingsActivity extends Activity {
     private ProgressBar updateProgress;
     private final Handler updatePoll=new Handler(Looper.getMainLooper());
     private final Runnable pollDownload=new Runnable(){public void run(){if(resumed&&updateOpen){updates.refresh();updatePoll.postDelayed(this,800);}}};
+    private int modelPollCount;
+    private final Runnable pollModels=new Runnable(){public void run(){if(!resumed||!modelManagerOpen)return;boolean busy=false;for(int i=0;i<MODEL_LANGUAGES.length;i++)if(translations.status(MODEL_LANGUAGES[i])==TranslationRepository.State.DOWNLOADING){busy=true;updateModelProgress(i);}if(!busy||++modelPollCount%5==0)translations.refreshModels("en",state->updateModelRows());updatePoll.postDelayed(this,busy?800:4000);}};
     private boolean firstCreate=true;
     private int dp(int n){return (int)(getResources().getDisplayMetrics().density*n+0.5f);}
     @Override public void onCreate(Bundle state){super.onCreate(state);prefs=new ImePreferences(this);translations=new TranslationRepository(this);updates=new AppUpdate(this,this::updateUpdateRows);if(state!=null&&state.getBoolean("update_open")){buildUpdates(false);}else if(state!=null&&state.getBoolean("model_open")||getIntent().getBooleanExtra("model_manager",false))buildModelManager();else if(getIntent().getBooleanExtra("check_updates",false))buildUpdates(true);else build();}
     @Override protected void onNewIntent(Intent intent){super.onNewIntent(intent);setIntent(intent);if(intent.getBooleanExtra("check_updates",false))buildUpdates(true);else if(intent.getBooleanExtra("model_manager",false))buildModelManager();else build();}
     @Override protected void onSaveInstanceState(Bundle state){state.putBoolean("update_open",updateOpen);state.putBoolean("model_open",modelManagerOpen);super.onSaveInstanceState(state);}
     @Override protected void onResume(){super.onResume();resumed=true;updateActivation();if(modelManagerOpen)translations.refreshModels("en",state->updateModelRows());if(updateOpen){updatePoll.removeCallbacks(pollDownload);updatePoll.post(pollDownload);if(updates.installPending()&&getPackageManager().canRequestPackageInstalls())requestInstall();}}
-    @Override protected void onPause(){resumed=false;installStarting=false;updatePoll.removeCallbacks(pollDownload);super.onPause();}
+    @Override protected void onPause(){resumed=false;installStarting=false;updatePoll.removeCallbacks(pollDownload);updatePoll.removeCallbacks(pollModels);super.onPause();}
     @Override protected void onDestroy(){if(translations!=null)translations.close();if(updates!=null)updates.close();updatePoll.removeCallbacksAndMessages(null);super.onDestroy();}
     private void build(){
         modelManagerOpen=false;
-        updateOpen=false;updatePoll.removeCallbacks(pollDownload);
+        updateOpen=false;updatePoll.removeCallbacks(pollDownload);updatePoll.removeCallbacks(pollModels);
         palette=new Palette(prefs.dark(this));
         getWindow().setStatusBarColor(palette.background);getWindow().setNavigationBarColor(palette.background);
         getWindow().getDecorView().setSystemUiVisibility(prefs.dark(this)?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
@@ -84,7 +87,7 @@ public final class SettingsActivity extends Activity {
         label(setup,"首次启用时，Android 会显示输入法通用提示。输入与翻译在本机处理；模型下载不包含输入内容。",12,palette.secondary,Typeface.NORMAL,12);
         LinearLayout options=card(16);
         label(options,"输入偏好",18,palette.text,Typeface.BOLD,0);
-        toggle(options,"候选释义","键盘显示本地词义；英文默认显示中文", "translation",true);
+        toggle(options,"候选释义","本地词典优先，已下载模型补充；英文默认显示中文", "translation",true);
         button(options,"释义显示语言  ·  "+TranslationRepository.languageName(prefs.glossLanguage()),this::languageDialog,false);
         button(options,"翻译模型管理",this::buildModelManager,false);
         button(options,"中文键盘  ·  "+(prefs.keyboardMode().equals("t9")?"九键":"全键盘"),this::keyboardDialog,false);
@@ -97,13 +100,13 @@ public final class SettingsActivity extends Activity {
         button(options,"键盘高度  ·  "+heightName(),this::heightDialog,false);
         LinearLayout practice=card(16);
         label(practice,"试着输入",18,palette.text,Typeface.BOLD,0);
-        label(practice,"输入 kaifa、xiangmu、sheji，看看本地释义。单击输入原文，长按看详情；上滑输入已有本地译文，其他翻译在详情页确认。",13,palette.secondary,Typeface.NORMAL,10);
+        label(practice,"输入 kaifa、xiangmu、sheji，看看释义。单击输入原文，长按看详情；上滑输入当前语言的简洁译文。",13,palette.secondary,Typeface.NORMAL,10);
         EditText edit=new EditText(this);edit.setHint("在这里打几个字…");edit.setTextSize(17);edit.setTextColor(palette.text);edit.setHintTextColor(palette.secondary);edit.setSingleLine(false);edit.setMinLines(2);edit.setGravity(Gravity.TOP);
         editorForInsets=edit;
         edit.setInputType(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);edit.setBackground(tint(palette.background,12));edit.setPadding(dp(14),dp(12),dp(14),dp(12));
         LinearLayout.LayoutParams ep=new LinearLayout.LayoutParams(-1,dp(112));ep.topMargin=dp(14);practice.addView(edit,ep);
         label(content,"顺手的小动作",16,palette.text,Typeface.BOLD,24);
-        label(content,"空格左右滑动，移动光标\n长按退格，连续删除\n退格向左滑，删除一个片段\n长按字母，左右滑动选择大小写与数字\n中文 Shift 单击临时大写，双击锁定大写\n左右滑动候选栏，查看更多候选\n点候选列表末尾展开，上下滑动浏览\n再次点击当前导航图标，收起面板\n长按候选，查看完整释义\n上滑候选，输入对应译文\n拼音输入时按回车，输入原始字母\n长按「中 / EN」，切换系统输入法",13,palette.secondary,Typeface.NORMAL,12);
+        label(content,"空格左右滑动，移动光标\n长按退格，连续删除\n退格向左滑，删除一个片段\n长按字母，左右滑动选择大小写与数字\n中文全拼点分词键，手动加入拼音分隔\n英文 Shift 单击临时大写，双击锁定大写\n左右滑动候选栏，查看更多候选\n点候选列表末尾展开，上下滑动浏览\n再次点击当前导航图标，收起面板\n长按候选，查看完整释义\n上滑候选，输入对应译文\n拼音输入时按回车，输入原始字母\n长按「中 / EN」，切换系统输入法",13,palette.secondary,Typeface.NORMAL,12);
         label(content,"版本与项目",16,palette.text,Typeface.BOLD,28);
         button(content,"检查更新",()->buildUpdates(true),false);
         button(content,"项目主页",this::projectHome,false);
@@ -144,7 +147,7 @@ public final class SettingsActivity extends Activity {
         body.addView(slider,new LinearLayout.LayoutParams(-1,dp(56)));
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("键盘高度").setView(body).setPositiveButton("完成",null).setNeutralButton("恢复标准",(d,w)->prefs.store.edit().putFloat("height",1f).apply()).create();dialog.setOnDismissListener(d->build());dialog.show();
     }
-    private void languageDialog(){String[] values=TranslationRepository.glossLanguages(),names=new String[values.length];int index=0;for(int i=0;i<values.length;i++){names[i]=TranslationRepository.languageLabel(values[i])+(values[i].equals("en")?"":"（按需下载）");if(values[i].equals(prefs.glossLanguage()))index=i;}new AlertDialog.Builder(this).setTitle("释义显示语言").setSingleChoiceItems(names,index,(d,i)->{String selected=values[i];prefs.store.edit().putString("gloss_language",selected).apply();d.dismiss();build();if(!selected.equals("en")){buildModelManager();translations.ensureModels(selected,state->updateModelRows());}}).setNegativeButton("取消",null).show();}
+    private void languageDialog(){String[] values=TranslationRepository.glossLanguages(),names=new String[values.length];int index=0;for(int i=0;i<values.length;i++){names[i]=TranslationRepository.languageLabel(values[i])+(values[i].equals("en")?"":"（按需下载）");if(values[i].equals(prefs.glossLanguage()))index=i;}new AlertDialog.Builder(this).setTitle("释义显示语言").setSingleChoiceItems(names,index,(d,i)->{String selected=values[i];prefs.store.edit().putString("gloss_language",selected).apply();d.dismiss();build();if(!selected.equals("en")){buildModelManager();downloadModel(selected);}}).setNegativeButton("取消",null).show();}
     private void keyboardDialog(){String[] names={"中文全键盘","中文九键"},values={"full","t9"};new AlertDialog.Builder(this).setTitle("中文键盘模式").setSingleChoiceItems(names,prefs.keyboardMode().equals("t9")?1:0,(d,i)->{prefs.store.edit().putString("keyboard_mode",values[i]).apply();d.dismiss();build();}).setNegativeButton("取消",null).show();}
     private void styleDialog(){String[] names={"圆角","平整"},values={"classic","flat"};new AlertDialog.Builder(this).setTitle("键盘风格").setSingleChoiceItems(names,prefs.style().equals("flat")?1:0,(d,i)->{prefs.store.edit().putString("style",values[i]).apply();d.dismiss();build();}).setNegativeButton("取消",null).show();}
     private void buildModelManager(){
@@ -153,19 +156,30 @@ public final class SettingsActivity extends Activity {
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(palette.background);scroll.setOnApplyWindowInsetsListener((v,insets)->{if(android.os.Build.VERSION.SDK_INT>=30){android.graphics.Insets bars=insets.getInsets(android.view.WindowInsets.Type.systemBars()|android.view.WindowInsets.Type.ime());v.setPadding(bars.left,bars.top,bars.right,bars.bottom);}else v.setPadding(0,insets.getSystemWindowInsetTop(),0,insets.getSystemWindowInsetBottom());return insets;});
         content=new LinearLayout(this);content.setOrientation(LinearLayout.VERTICAL);content.setPadding(dp(24),dp(20),dp(24),dp(28));scroll.addView(content);setContentView(scroll);
         button(content,"返回设置",this::build,false);label(content,"翻译模型管理",26,palette.text,Typeface.BOLD,22);
-        label(content,"中文与英文词典开箱可用。键盘仅显示本地词义；额外语言和完整句子的模型译文在详情页展示。模型按需下载，需连接 Wi-Fi。",13,palette.secondary,Typeface.NORMAL,12);
-        modelStates=new TextView[MODEL_LANGUAGES.length];modelSizes=new TextView[MODEL_LANGUAGES.length];modelDownloads=new Button[MODEL_LANGUAGES.length];modelDeletes=new Button[MODEL_LANGUAGES.length];
+        label(content,"中文与英文词典开箱可用。模型按需下载，补充候选释义和整句翻译。建议连接 Wi-Fi；选择使用流量时可在当前网络下载。模型服务器需能正常访问 Google。",13,palette.secondary,Typeface.NORMAL,12);
+        toggle(content,"允许使用移动数据","仅在主动下载时使用；每个模型占用约 40–65 MiB", "model_metered",false);
+        modelStates=new TextView[MODEL_LANGUAGES.length];modelSizes=new TextView[MODEL_LANGUAGES.length];modelProgress=new ProgressBar[MODEL_LANGUAGES.length];modelDownloads=new Button[MODEL_LANGUAGES.length];modelDeletes=new Button[MODEL_LANGUAGES.length];
         for(int i=0;i<MODEL_LANGUAGES.length;i++){
             String language=MODEL_LANGUAGES[i];LinearLayout entry=new LinearLayout(this);entry.setOrientation(LinearLayout.VERTICAL);entry.setPadding(0,dp(20),0,dp(20));content.addView(entry,new LinearLayout.LayoutParams(-1,-2));View line=new View(this);line.setBackgroundColor(palette.border);content.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));label(entry,"中文 ↔ "+TranslationRepository.languageName(language),18,palette.text,Typeface.BOLD,0);
             modelStates[i]=label(entry,"正在检查本地模型",13,palette.secondary,Typeface.NORMAL,8);modelStates[i].setContentDescription(TranslationRepository.languageName(language)+"模型状态");modelSizes[i]=label(entry,"已安装语言文件：正在读取",12,palette.secondary,Typeface.NORMAL,6);modelSizes[i].setContentDescription(TranslationRepository.languageName(language)+"模型占用");
+            ProgressBar progress=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);progress.setMax(100);progress.setProgressTintList(ColorStateList.valueOf(palette.accent));progress.setIndeterminateTintList(ColorStateList.valueOf(palette.accent));progress.setContentDescription(TranslationRepository.languageName(language)+"模型下载进度");progress.setVisibility(View.GONE);modelProgress[i]=progress;LinearLayout.LayoutParams progressLayout=new LinearLayout.LayoutParams(-1,dp(6));progressLayout.topMargin=dp(12);entry.addView(progress,progressLayout);
             if(language.equals("en"))label(entry,"包含中文共享模型。删除后各语言整句翻译暂停，本地中英文词典仍可使用。",12,palette.secondary,Typeface.NORMAL,8);
             LinearLayout actions=new LinearLayout(this);LinearLayout.LayoutParams actionLayout=new LinearLayout.LayoutParams(-1,-2);actionLayout.topMargin=dp(12);entry.addView(actions,actionLayout);
-            Button download=modelButton("下载 · "+TranslationRepository.languageName(language),()->translations.ensureModels(language,state->updateModelRows()));modelDownloads[i]=download;actions.addView(download,new LinearLayout.LayoutParams(0,-2,1));
+            Button download=modelButton("下载 · "+TranslationRepository.languageName(language),()->downloadModel(language));modelDownloads[i]=download;actions.addView(download,new LinearLayout.LayoutParams(0,-2,1));
             Button delete=modelButton("删除 · "+TranslationRepository.languageName(language),()->translations.deleteModels(language,state->updateModelRows()));modelDeletes[i]=delete;LinearLayout.LayoutParams deleteLayout=new LinearLayout.LayoutParams(0,-2,1);deleteLayout.leftMargin=dp(8);actions.addView(delete,deleteLayout);
         }
         android.widget.ImageView badge=new android.widget.ImageView(this);badge.setImageResource(prefs.dark(this)?R.drawable.google_translate_badge_dark:R.drawable.google_translate_badge);badge.setContentDescription("powered by Google Translate");badge.setScaleType(android.widget.ImageView.ScaleType.FIT_CENTER);LinearLayout.LayoutParams badgeLayout=new LinearLayout.LayoutParams(dp(176),dp(16));badgeLayout.topMargin=dp(24);content.addView(badge,badgeLayout);
         label(content,"端侧翻译可能不准确，请结合语境阅读。Google SDK 会发送设备信息、安装标识及运行指标，不发送输入与译文。",12,palette.secondary,Typeface.NORMAL,12);
         updateModelRows();translations.refreshModels("en",state->updateModelRows());
+    }
+    private void downloadModel(String language){
+        if(translations.status(language)==TranslationRepository.State.UNSUPPORTED){updateModelRows();return;}
+        if(translations.hasWifi()||prefs.store.getBoolean("model_metered",false)){translations.ensureModels(language,state->updateModelRows());return;}
+        new AlertDialog.Builder(this).setTitle("下载"+TranslationRepository.languageName(language)+"模型").setMessage("每个模型在本机约占 40–65 MiB，首次还需中文共享模型。下载流量以实际进度为准。当前网络不是 Wi-Fi，是否允许使用移动数据？").setPositiveButton("使用流量下载",(d,w)->{prefs.store.edit().putBoolean("model_metered",true).apply();translations.ensureModels(language,true,state->updateModelRows());}).setNegativeButton("稍后连接 Wi-Fi",(d,w)->translations.ensureModels(language,false,state->updateModelRows())).show();
+    }
+    private void updateModelProgress(int index){
+        long revision=modelUiRevision;TextView statusView=modelStates[index];ProgressBar progressView=modelProgress[index];
+        translations.modelProgress(MODEL_LANGUAGES[index],progress->{if(!modelManagerOpen||revision!=modelUiRevision||statusView!=modelStates[index])return;int percent=progress.percent();progressView.setIndeterminate(percent<0);if(percent>=0)progressView.setProgress(percent);progressView.setVisibility(progress.state==TranslationRepository.State.DOWNLOADING?View.VISIBLE:View.GONE);String bytes=progress.downloadedBytes>0?String.format(java.util.Locale.ROOT," · 已下载 %.1f MiB",progress.downloadedBytes/1048576d):"";if(percent>=0)bytes=String.format(java.util.Locale.ROOT," · %.1f / %.1f MiB",progress.downloadedBytes/1048576d,progress.totalBytes/1048576d);statusView.setText(progress.message+bytes);if(progress.state!=translations.status(MODEL_LANGUAGES[index]))updateModelRows();});
     }
     private Button modelButton(String title,Runnable action){Button button=new Button(this);button.setText(title);button.setContentDescription(title);button.setAllCaps(false);button.setTextSize(13);button.setTextColor(palette.accent);button.setMinHeight(dp(48));button.setPadding(dp(10),dp(10),dp(10),dp(10));button.setBackground(new RippleDrawable(ColorStateList.valueOf(palette.pressed),tint(palette.function,10),tint(android.graphics.Color.WHITE,10)));button.setOnClickListener(v->action.run());return button;}
     private void updateModelRows(){
@@ -173,15 +187,17 @@ public final class SettingsActivity extends Activity {
         long revision=++modelUiRevision;
         boolean busy=false;for(String language:MODEL_LANGUAGES){TranslationRepository.State state=translations.status(language);busy|=state==TranslationRepository.State.DOWNLOADING||state==TranslationRepository.State.DELETING;}
         for(int i=0;i<MODEL_LANGUAGES.length;i++){
-            String language=MODEL_LANGUAGES[i];TranslationRepository.State state=translations.status(language);String status=TranslationRepository.stateText(state);
+            String language=MODEL_LANGUAGES[i];TranslationRepository.State state=translations.status(language);String status=translations.modelStatusText(language);
             if(!language.equals("en")&&state==TranslationRepository.State.MISSING)status="未下载或缺少中文共享模型 · 下载后可用";modelStates[i].setText(status);
+            modelProgress[i].setVisibility(state==TranslationRepository.State.DOWNLOADING?View.VISIBLE:View.GONE);if(state==TranslationRepository.State.DOWNLOADING)updateModelProgress(i);
             modelDownloads[i].setEnabled(!busy&&state!=TranslationRepository.State.READY&&state!=TranslationRepository.State.UNSUPPORTED&&state!=TranslationRepository.State.CHECKING);modelDownloads[i].setText(state==TranslationRepository.State.READY?"已就绪":state==TranslationRepository.State.FAILED?"重新下载":"下载模型");
             modelDeletes[i].setEnabled(false);int index=i;boolean deletingAllowed=!busy&&state!=TranslationRepository.State.UNSUPPORTED;
             TextView sizeView=modelSizes[i];Button deleteButton=modelDeletes[i];translations.modelSize(language,bytes->{if(!modelManagerOpen||revision!=modelUiRevision||sizeView!=modelSizes[index])return;sizeView.setText(bytes<0?"已安装语言文件：SDK 未提供可读取大小":String.format(java.util.Locale.ROOT,"已安装语言文件：%.1f MiB",bytes/1048576d));deleteButton.setEnabled(deletingAllowed&&(bytes>0||state==TranslationRepository.State.READY));});
         }
+        updatePoll.removeCallbacks(pollModels);if(resumed)updatePoll.postDelayed(pollModels,busy?800:4000);
     }
     private void buildUpdates(boolean check){
-        updateOpen=true;modelManagerOpen=false;editorForInsets=null;activation=null;palette=new Palette(prefs.dark(this));
+        updateOpen=true;modelManagerOpen=false;updatePoll.removeCallbacks(pollModels);editorForInsets=null;activation=null;palette=new Palette(prefs.dark(this));
         getWindow().setStatusBarColor(palette.background);getWindow().setNavigationBarColor(palette.background);getWindow().getDecorView().setSystemUiVisibility(prefs.dark(this)?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
         ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.setBackgroundColor(palette.background);
         scroll.setOnApplyWindowInsetsListener((v,insets)->{if(android.os.Build.VERSION.SDK_INT>=30){android.graphics.Insets bars=insets.getInsets(android.view.WindowInsets.Type.systemBars()|android.view.WindowInsets.Type.ime());v.setPadding(bars.left,bars.top,bars.right,bars.bottom);}else v.setPadding(0,insets.getSystemWindowInsetTop(),0,insets.getSystemWindowInsetBottom());return insets;});
@@ -239,7 +255,7 @@ public final class SettingsActivity extends Activity {
         activation.setText(selected?"已就绪 · 轻语是当前输入法":enabled?"已启用 · 还需切换到轻语":"两步开始使用");
     }
     private void about(){
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("轻语输入法 "+updates.currentVersion()).setMessage("Android 8.0 及以上\n\n轻语自有代码：GNU GPL-3.0-only。完整许可证随应用提供。\n\n中文引擎：AOSP PinyinIME\nApache License 2.0\n来源：android.googlesource.com/platform/packages/inputmethods/PinyinIME\n\n现代中文词库：雾凇拼音 Rime Ice\nGPL-3.0-only；经筛选和词频转换融合到现有引擎。\n来源：https://github.com/iDvel/rime-ice\n\n本地英文释义：CC-CEDICT\nMDBG 与社区贡献者维护\nCC BY-SA 4.0\n来源：https://www.mdbg.net/chinese/dictionary?page=cc-cedict\n简短释义补充了常用表达；详细词典保留原始义项与拼音。\n\n整句翻译：Google Translate · ML Kit 端侧模型\n键盘只展示本地释义，模型译文仅在详情页展示。\n输入与翻译内容在本机处理，不发送至 Google 服务器。模型仅用户主动下载；Google SDK 另会联网获取更新和兼容信息，并发送设备信息、安装标识、语言配置、输入输出长度和运行指标以诊断及改进 SDK。\n\n部分译文由 Google Translate 自动生成，可能不准确；非英语语言会经英语中转。Google 不对译文的准确性、可靠性、适销性、特定用途适用性及不侵权性提供担保。\n翻译服务说明：https://cloud.google.com/translate\nSDK 隐私说明：https://developers.google.com/ml-kit/terms\n\n词频与最近 100 条剪贴板记录仅保存在本机。密码字段不学习、不记录。输入内容不写入应用日志。\n\n完整来源、许可证及转换脚本随项目提供。").setPositiveButton("知道了",null).create();
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("轻语输入法 "+updates.currentVersion()).setMessage("Android 8.0 及以上\n\n轻语自有代码：GNU GPL-3.0-only。完整许可证随应用提供。\n\n中文引擎：AOSP PinyinIME\nApache License 2.0\n来源：android.googlesource.com/platform/packages/inputmethods/PinyinIME\n\n现代中文词库：雾凇拼音 Rime Ice\nGPL-3.0-only；经筛选和词频转换融合到现有引擎。\n来源：https://github.com/iDvel/rime-ice\n\n本地英文释义：CC-CEDICT\nMDBG 与社区贡献者维护\nCC BY-SA 4.0\n来源：https://www.mdbg.net/chinese/dictionary?page=cc-cedict\n简短释义补充了常用表达；详细词典保留原始义项与拼音。\n\n中文上下文与真实例句：UD Chinese GSDSimp\nUniversal Dependencies 社区贡献者，CC BY-SA 4.0\n来源：https://github.com/UniversalDependencies/UD_Chinese-GSDSimp\n使用训练集统计，保留真实短例句；百科语料只提供有限的搭配线索。\n\n整句翻译：Google Translate · ML Kit 端侧模型\n本地释义优先，已下载模型异步补充候选、详情及上滑译文。\n输入与翻译内容在本机处理，不发送至 Google 服务器。模型仅用户主动下载；Google SDK 另会联网获取更新和兼容信息，并发送设备信息、安装标识、语言配置、输入输出长度和运行指标以诊断及改进 SDK。\n\n部分译文由 Google Translate 自动生成，可能不准确；非英语语言会经英语中转。Google 不对译文的准确性、可靠性、适销性、特定用途适用性及不侵权性提供担保。\n翻译服务说明：https://cloud.google.com/translate\nSDK 隐私说明：https://developers.google.com/ml-kit/terms\n\n词频与最近 100 条剪贴板记录仅保存在本机。密码字段不学习、不记录。输入内容不写入应用日志。\n\n完整来源、许可证及转换脚本随项目提供。").setPositiveButton("知道了",null).create();
         dialog.show();TextView message=dialog.findViewById(android.R.id.message);if(message!=null)android.text.util.Linkify.addLinks(message,android.text.util.Linkify.WEB_URLS);
     }
 }

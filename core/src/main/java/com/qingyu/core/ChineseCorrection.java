@@ -139,6 +139,13 @@ public final class ChineseCorrection {
     }
 
     private static int syllables(String value) { return parse(value)[value.length()]; }
+    /** Sentence lookup can skip incomplete/illegal suffixes without any SQL. */
+    static boolean[] completePrefixes(String value) {
+        boolean[] result=new boolean[value.length()+1];
+        for(int i=0;i<value.length();i++)if(value.charAt(i)<'a'||value.charAt(i)>'z'){Arrays.fill(result,true);return result;}
+        int[] counts=parse(value);for(int i=0;i<counts.length;i++)result[i]=counts[i]>=0;
+        return result;
+    }
     private static int validPrefix(String value) {
         int[] parsed=parse(value);
         for (int i=value.length()-1;i>=0;i--) if (parsed[i]>=0) return i;

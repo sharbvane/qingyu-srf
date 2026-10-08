@@ -16,14 +16,16 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.UUID;
 
-/** Framework-only seed on v0.4, verify after a system APK upgrade; never changes IME settings. */
+/** Framework-only seed before a system APK upgrade; never changes IME settings. */
 public final class ReleaseMigrationInstrumentation extends Instrumentation {
     private static final String LEGACY = "12794d0f0be3a864281e828ad389f8e71bb725e196cb4bf65c4937069452d6d9";
     private static final String RELEASE = "1d6872a840fe42468cdc5af2d11eeee87455c4b635e2fd2b60168b082c4e0cf5";
     private String phase;
+    private int fromVersion;
     @Override public void onCreate(Bundle args) {
         super.onCreate(args);
         phase = args == null ? "" : args.getString("phase", "");
+        fromVersion=args==null?4:Integer.parseInt(args.getString("from_version","4"));
         start();
     }
     private static void check(boolean valid, String message) {
@@ -55,25 +57,28 @@ public final class ReleaseMigrationInstrumentation extends Instrumentation {
             Signature[] current = Build.VERSION.SDK_INT >= 28 ? installed.signingInfo.getApkContentsSigners() : installed.signatures;
             check(current != null && current.length == 1, "Expected one current signing certificate");
             check(installed.packageName.equals("com.qingyu.ime"), "Unexpected target package");
-            SharedPreferences saved = context.getSharedPreferences("test_release_migration", Context.MODE_PRIVATE);
-            File sentinel = new File(context.getFilesDir(), ".qingyu-release-migration-sentinel");
+            check(fromVersion==4||fromVersion==5,"Supported original versions are 4 and 5");
+            SharedPreferences saved = context.getSharedPreferences("test_release_migration"+(fromVersion==4?"":"_"+fromVersion), Context.MODE_PRIVATE);
+            File sentinel = new File(context.getFilesDir(), ".qingyu-release-migration-sentinel"+(fromVersion==4?"":"-"+fromVersion));
             File dictionary = new File(context.getFilesDir(), "user-pinyin.dat");
             if (phase.equals("seed")) {
-                check(installed.versionCode == 4 && installed.versionName.equals("0.4.0") && certificate(current[0]).equals(LEGACY), "Seed requires the original v0.4 Release");
+                check(installed.versionCode == fromVersion && installed.versionName.equals("0."+fromVersion+".0") && certificate(current[0]).equals(fromVersion==4?LEGACY:RELEASE), "Seed requires the original signed Release");
                 check(!sentinel.exists() && !saved.contains("marker"), "Migration seed already exists; refusing to replace it");
                 String marker = UUID.randomUUID().toString();
                 try (FileOutputStream output = new FileOutputStream(sentinel)) {
                     output.write(("Qingyu release migration " + marker).getBytes(StandardCharsets.UTF_8));
                     output.getFD().sync();
                 }
-                check(saved.edit().putString("marker", marker).putString("sentinel_sha256", digest(sentinel))
+                SharedPreferences.Editor seed=saved.edit();
+                for(String name:new String[]{"pinyin-learning-v1.tsv","chinese-learning-v2.tsv","english-learning-v2.tsv"}){File learning=new File(context.getFilesDir(),name);seed.putString(name,learning.isFile()?digest(learning):"");}
+                check(seed.putString("marker", marker).putString("sentinel_sha256", digest(sentinel))
                         .putString("dictionary_sha256", dictionary.isFile() ? digest(dictionary) : "")
                         .putInt("uid", context.getApplicationInfo().uid).commit(), "Migration marker commit failed");
-                report.append("PASS original v0.4 signing identity and version\n")
+                report.append("PASS original v0.").append(fromVersion).append(" signing identity and version\n")
                         .append("PASS app-private preference/file sentinel seeded; existing user dictionary only read\n")
                         .append("RELEASE_MIGRATION_SEED_PASS\n");
             } else {
-                check(installed.versionCode == 5 && installed.versionName.equals("0.5.0"), "Verify requires v0.5 Release");
+                check(installed.versionCode == fromVersion+1 && installed.versionName.equals("0."+(fromVersion+1)+".0"), "Verify requires the next Release");
                 if (Build.VERSION.SDK_INT >= 28) {
                     check(!installed.signingInfo.hasMultipleSigners() && certificate(current[0]).equals(RELEASE), "Independent Release signing identity missing");
                     Signature[] history = installed.signingInfo.getSigningCertificateHistory();
@@ -91,7 +96,9 @@ public final class ReleaseMigrationInstrumentation extends Instrumentation {
                 check(saved.getInt("uid", -1) == context.getApplicationInfo().uid, "Application UID changed during upgrade");
                 String dictionaryHash = saved.getString("dictionary_sha256", "");
                 if (!dictionaryHash.isEmpty()) check(dictionary.isFile() && digest(dictionary).equals(dictionaryHash), "Existing user dictionary changed during migration");
+                for(String name:new String[]{"pinyin-learning-v1.tsv","chinese-learning-v2.tsv","english-learning-v2.tsv"}){String expected=saved.getString(name,"");if(!expected.isEmpty()){File learning=new File(context.getFilesDir(),name);check(learning.isFile()&&digest(learning).equals(expected),"Existing learning records changed during migration: "+name);}}
                 report.append("PASS preserved app-private preferences, file sentinel and application UID\n")
+                        .append("PASS existing personalization files preserved when present (content and digest not logged)\n")
                         .append(dictionaryHash.isEmpty() ? "SKIP existing dictionary byte check: absent at seed\n" : "PASS existing user dictionary bytes preserved (content and digest not logged)\n")
                         .append("RELEASE_MIGRATION_VERIFY_PASS\n");
             }

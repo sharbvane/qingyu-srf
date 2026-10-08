@@ -29,6 +29,12 @@ final class AttributionCheck {
         check(height == surface.getMeasuredHeight() && before.equals(bounds(surface, 100)), "Local annotation moved a candidate");
         AccessibilityNodeInfo attribution = surface.getAccessibilityNodeProvider().createAccessibilityNodeInfo(4);
         check(attribution == null && before.bottom == height, "Keyboard still reserves a model branding strip");
+        check(!surface.getAccessibilityNodeProvider().createAccessibilityNodeInfo(100).getContentDescription().toString().contains("powered by Google"),"A local gloss has model attribution");
+        surface.modelWords(Collections.singleton("开发"));layout(surface);
+        check(height==surface.getMeasuredHeight()&&before.equals(bounds(surface,100)),"Model source changed the compact row geometry");
+        String modelDescription=surface.getAccessibilityNodeProvider().createAccessibilityNodeInfo(100).getContentDescription().toString();
+        check(modelDescription.contains("a deliberately long sentence supplied by the model")&&!modelDescription.contains("Google Translate"),"Model gloss was hidden or branded during normal input");
+        surface.modelWords(Collections.emptySet());
 
         ImePanels panels = new ImePanels(context, prefs, new View(context), action -> {});
         panels.body.setLayoutParams(new LinearLayout.LayoutParams(-1, -2));
@@ -39,6 +45,14 @@ final class AttributionCheck {
         check(image.getVisibility() == View.GONE && commit.getText().toString().equals("输入译文"), "Local details have Google branding");
         panels.detailResult("开发", "development", "Google Translate · 端侧翻译");
         check(image.getVisibility() == View.VISIBLE && commit.getText().toString().equals("Translate with Google"), "Model details missing badge/action attribution");
+        android.widget.TextView note=panels.body.findViewById(R.id.translation_note);
+        check(note.getText().toString().equals("Google Translate · 端侧翻译"),"Model source note was lost");
+        check(((android.widget.TextView)panels.body.findViewById(R.id.translation_detail)).getText().toString().equals("development"),"Source note was mixed into simple translation");
+        panels.detailResult("develop","开发","本地词典","create or improve something","v","zh","We develop new ideas.","我们开发新的想法。","Google Translate · 端侧翻译");
+        check(image.getVisibility()==View.GONE&&panels.body.findViewById(R.id.translation_example_attribution).getVisibility()==View.VISIBLE,"Mixed local gloss and model example share the wrong source");
+        check(((android.widget.TextView)panels.body.findViewById(R.id.translation_meta)).getText().toString().equals("动词 · 中文"),"English details do not use their actual Chinese target");
+        panels.detailResult("develop","开发","本地词典","","v","zh","","","");
+        check(panels.body.findViewById(R.id.translation_example).getVisibility()==View.GONE&&panels.body.findViewById(R.id.translation_example_attribution).getVisibility()==View.GONE,"Missing real example leaves fabricated content/source");
         panels.detailResult("谷歌翻译", "Google Translate", "CC-CEDICT · 英文词典释义\nGoogle Translate is a proper name");
         check(image.getVisibility() == View.GONE, "A dictionary mention falsely marked as a model result");
         panels.close();

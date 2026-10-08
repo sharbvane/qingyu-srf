@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([string]$Serial='emulator-5554',[string]$Dictionary='', [switch]$Baseline, [switch]$Acceptance, [switch]$SkipNativeBuild, [string]$JavaHome)
+param([string]$Serial='emulator-5554',[string]$Dictionary='', [string]$Corpus='', [string]$ReportName='', [switch]$Baseline, [switch]$Acceptance, [switch]$WithoutContext, [switch]$SkipNativeBuild, [string]$JavaHome)
 $ErrorActionPreference='Stop'
 $qualityRoot=Split-Path -Parent $PSScriptRoot
 . (Join-Path $qualityRoot 'scripts/resolve-java.ps1')
@@ -26,14 +26,17 @@ Invoke-QualityAdb @('shell','mkdir','-p',$qualityRemote) | Out-Null
 Invoke-QualityAdb @('push',$qualityJar,"$qualityRemote/checks.jar") | Out-Null
 Invoke-QualityAdb @('push',$Dictionary,"$qualityRemote/dict.dat") | Out-Null
 Invoke-QualityAdb @('push',(Join-Path $qualityRoot '.tools/engine-build/direct/x86_64/libqingyu_pinyin.so'),"$qualityRemote/libqingyu_pinyin.so") | Out-Null
-Invoke-QualityAdb @('push',(Join-Path $PSScriptRoot 'chinese-quality.tsv'),"$qualityRemote/corpus.tsv") | Out-Null
+if(!$Corpus){$Corpus=Join-Path $PSScriptRoot 'chinese-quality.tsv'}
+Invoke-QualityAdb @('push',$Corpus,"$qualityRemote/corpus.tsv") | Out-Null
 Invoke-QualityAdb @('push',(Join-Path $qualityRoot 'app/src/main/assets/pinyin/lexicon-v2.db'),"$qualityRemote/lexicon-v2.db") | Out-Null
 $qualityMode=if($Baseline){'baseline'}elseif($Acceptance){'acceptance'}else{'verify'}
 $qualityUser="$qualityRemote/$qualityMode-user.dat"
 $qualityCommand="CLASSPATH=$qualityRemote/checks.jar app_process -Djava.library.path=$qualityRemote /system/bin com.qingyu.core.ChineseQualitySmoke $qualityRemote/dict.dat $qualityUser $qualityRemote/corpus.tsv $qualityMode $qualityRemote/lexicon-v2.db"
+if(!$Baseline -and !$WithoutContext){Invoke-QualityAdb @('push',(Join-Path $qualityRoot 'app/src/main/assets/input/chinese-context-v1.bin.gz'),"$qualityRemote/context.bin.gz") | Out-Null;$qualityCommand+=" $qualityRemote/context.bin.gz"}
 $qualityResult=& $qualityAdb -s $Serial shell $qualityCommand
 $qualityExit=$LASTEXITCODE
-$qualityName=if($Baseline){'chinese-quality-baseline-v0.4.txt'}else{'chinese-quality-v0.5.txt'}
+$qualityName=if($Baseline){'chinese-quality-baseline-v0.4.txt'}elseif($WithoutContext){'chinese-quality-without-context-v0.6.txt'}else{'chinese-quality-v0.6.txt'}
+if($ReportName){if($ReportName -notmatch '^[a-zA-Z0-9._-]+\.txt$'){throw 'ReportName must be a filename in docs'};$qualityName=$ReportName}
 @("Dictionary SHA-256: $((Get-FileHash -LiteralPath $Dictionary -Algorithm SHA256).Hash)",$qualityResult) | Set-Content -LiteralPath (Join-Path $qualityRoot "docs/$qualityName") -Encoding utf8
 $qualityResult
 if($qualityExit -ne 0){throw "Chinese quality assertion failed ($qualityExit); full CASE results saved in docs/$qualityName; Android uncaught assertion is also in logcat."}
