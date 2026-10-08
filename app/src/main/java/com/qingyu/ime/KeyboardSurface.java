@@ -46,10 +46,12 @@ final class KeyboardSurface extends View {
     private float downX, downY, cursorX;
     private boolean dragged, longFired, cursorMode;
     private boolean english, shifted, capsLock, symbols, secondSymbols, numeric, secure;
-    private boolean nineKey, dark, nineComposing;
+    private boolean nineKey, dark, nineComposing, nineBacktrack;
     private final List<String> nineReadings = new ArrayList<>();
-    private final RectF nineRail = new RectF(), choiceBounds = new RectF();
+    private final RectF nineRail = new RectF(), nineViewport = new RectF(), choiceBounds = new RectF();
     private int nineRailStart = -1;
+    private float nineScroll, nineDownScroll;
+    private boolean nineRailTouch, nineScrollTouch, nineScrolling;
     private String[] holdChoices;
     private int holdChoice;
     private boolean holdNine;
@@ -101,18 +103,17 @@ final class KeyboardSurface extends View {
     }
     void toggleSymbols() { cancelTouch();symbols=!symbols; secondSymbols=false; layoutKeys(); invalidate();animateSwitch(); }
     void nineState(boolean composing, List<String> readings) {
-        List<String> next=readings.subList(0,Math.min(4,readings.size()));
-        if(nineComposing==composing && nineReadings.equals(next))return;
-        nineComposing=composing;nineReadings.clear();nineReadings.addAll(next);
+        nineState(composing,readings,false);
+    }
+    void nineState(boolean composing, List<String> readings, boolean canBacktrack) {
+        if(nineComposing==composing && nineBacktrack==canBacktrack && nineReadings.equals(readings))return;
+        if(nineComposing!=composing || !nineReadings.equals(readings))nineScroll=0;
+        nineComposing=composing;nineBacktrack=canBacktrack;nineReadings.clear();nineReadings.addAll(readings);
         if(isNineKey() && nineRailStart>=0) {
-            for(int i=0;i<4;i++) {
-                Key previous=keys.get(nineRailStart+i), replacement=new Key(railValue(i),"");
-                replacement.bounds.set(previous.bounds);
-                if(previous.value.equals(replacement.value))continue;
-                if(pressed==previous)cancelTouch();
-                if(released==previous)released=null;
-                keys.set(nineRailStart+i,replacement);
-            }
+            if((pressed!=null && railKey(pressed)) || nineRailTouch)cancelTouch();
+            if(released!=null && railKey(released))released=null;
+            if((accessibilityFocus>nineRailStart && accessibilityFocus<HOLD_NODE_BASE) || (hoveredNode>nineRailStart && hoveredNode<HOLD_NODE_BASE))clearVirtualFocus();
+            rebuildNineRail();
             accessibilityChanged();invalidate();
         }
     }
@@ -173,11 +174,7 @@ final class KeyboardSurface extends View {
             nineCell("SPACE",2,3,1,pad,h);nineCell("NUMERIC",3,3,1,pad,h);
             nineCell("",0,0,3,pad,h);nineRail.set(keys.remove(keys.size()-1).bounds);
             nineRailStart=keys.size();
-            for(int i=0;i<4;i++) {
-                Key key=new Key(railValue(i),"");
-                key.bounds.set(nineRail.left,nineRail.top+nineRail.height()*i/4,nineRail.right,nineRail.top+nineRail.height()*(i+1)/4);
-                keys.add(key);
-            }
+            rebuildNineRail();
         } else {
             row("q w e r t y u i o p".split(" "),"1 2 3 4 5 6 7 8 9 0".split(" "),pad,h,0,null);
             row("a s d f g h j k l".split(" "),null,pad+h,h,dp(16),null);
@@ -194,6 +191,36 @@ final class KeyboardSurface extends View {
     }
     private String railValue(int index) {return nineComposing?"READING_"+(index<nineReadings.size()?nineReadings.get(index):""):new String[]{"，","。","？","！"}[index];}
     private boolean railKey(Key key) {return nineRailStart>=0 && keys.indexOf(key)>=nineRailStart;}
+    private boolean readingKey(Key key) {return nineRailStart>=0 && key.value.startsWith("READING_") && !key.value.equals("READING_BACK");}
+    private int readingCount() {return nineComposing?Math.max(4,nineReadings.size()):4;}
+    private float nineScrollLimit() {return Math.max(0,(readingCount()-4)*nineViewport.height()/4);}
+    private void rebuildNineRail() {
+        keys.subList(nineRailStart,keys.size()).clear();
+        nineViewport.set(nineRail);
+        if(nineComposing && nineBacktrack) {
+            float height=Math.min(dp(28),nineRail.height()/5);
+            Key back=new Key("READING_BACK","");back.bounds.set(nineRail.left,nineRail.top,nineRail.right,nineRail.top+height);keys.add(back);
+            nineViewport.top+=height;
+        }
+        nineScroll=Math.max(0,Math.min(nineScrollLimit(),nineScroll));
+        for(int i=0;i<readingCount();i++)keys.add(new Key(railValue(i),""));
+        layoutNineReadings();
+    }
+    private void layoutNineReadings() {
+        int start=nineRailStart+(nineComposing && nineBacktrack?1:0);
+        for(int i=start;i<keys.size();i++) {
+            float top=nineViewport.top+(i-start)*nineViewport.height()/4-nineScroll;
+            keys.get(i).bounds.set(nineViewport.left,top,nineViewport.right,top+nineViewport.height()/4);
+        }
+    }
+    private boolean visibleKey(Key key) {return !readingKey(key) || RectF.intersects(key.bounds,nineViewport);}
+    private boolean scrollNine(float position) {
+        float next=Math.max(0,Math.min(nineScrollLimit(),position));
+        if(next==nineScroll)return false;
+        nineScroll=next;layoutNineReadings();released=null;
+        if(accessibilityFocus>0 && accessibilityFocus<=keys.size() && !visibleKey(keys.get(accessibilityFocus-1)))clearVirtualFocus();
+        invalidate();accessibilityChanged();return true;
+    }
     private boolean enabledKey(Key key) {return !key.value.equals("READING_");}
     private String label(Key k) {
         switch(k.value) {
@@ -202,6 +229,7 @@ final class KeyboardSurface extends View {
             case "CLEAR":return "清空";
             case "SYMBOLS":return "符号";
             case "NUMERIC":return "123";
+            case "READING_BACK":return "↶";
             case "SPACE":return cursorMode?(isNineKey()?"‹  ›":"‹  移动光标  ›"):(english?"English":isNineKey()?"空格":"轻语 · 拼音");
             case "LANG":return english?"EN":"中";
             case "ENTER":return enterLabel;
@@ -217,15 +245,18 @@ final class KeyboardSurface extends View {
         float radius=dp(style.equals("flat")?4:8);
         if(isNineKey()){paint.setColor(colors.key);c.drawRoundRect(nineRail,radius,radius,paint);}
         for(Key k:keys) {
+            if(!visibleKey(k))continue;
             boolean enter=k.value.equals("ENTER");
             boolean rail=railKey(k);
+            int clip=readingKey(k)?c.save():-1;
+            if(clip>=0)c.clipRect(nineViewport);
             boolean function=k.value.length()>1 || k.value.equals("⌫");
             int base=enter?colors.accent:(function?colors.function:colors.key);
             if(k.value.equals("SHIFT") && shifted && !symbols)base=blend(base,colors.accent,.14f);
             paint.setColor(k==pressed?colors.pressed:k==released&&release>0?blend(base,colors.pressed,release):base);
             if(!rail || k==pressed || k==released&&release>0)c.drawRoundRect(k.bounds,radius,radius,paint);
             paint.setTypeface(android.graphics.Typeface.create("sans-serif",android.graphics.Typeface.NORMAL));
-            paint.setColor(enter?colors.accentText:k.value.equals("SHIFT") && shifted && !symbols || rail && nineComposing && keys.indexOf(k)==nineRailStart?colors.accent:colors.text);
+            paint.setColor(enter?colors.accentText:k.value.equals("SHIFT") && shifted && !symbols || rail && nineComposing && keys.indexOf(k)==nineRailStart+(nineBacktrack?1:0)?colors.accent:colors.text);
             paint.setTextSize(dp(rail?(landscape()?15:18):k.value.equals("SPACE")?12:(k.value.length()>1?14:(isT9Digit(k)?(landscape()?19:23):(landscape()?17:22)))));
             if(rail){float width=k.bounds.width()-dp(8);if(paint.measureText(label(k))>width)paint.setTextSize(paint.getTextSize()*width/paint.measureText(label(k)));}
             paint.setTextAlign(Paint.Align.CENTER);
@@ -235,6 +266,12 @@ final class KeyboardSurface extends View {
                 paint.setTextSize(dp(9)); paint.setColor(colors.secondary); paint.setTextAlign(Paint.Align.RIGHT);
                 c.drawText(alternate,k.bounds.right-dp(5),k.bounds.top+dp(12),paint);
             }
+            if(clip>=0)c.restoreToCount(clip);
+        }
+        if(isNineKey() && nineScrollLimit()>0) {
+            float height=nineViewport.height()*4/readingCount(),top=nineViewport.top+(nineViewport.height()-height)*nineScroll/nineScrollLimit();
+            paint.setColor(colors.secondary);paint.setAlpha(75);
+            c.drawRoundRect(nineViewport.right-dp(3),top+dp(2),nineViewport.right-dp(1),top+height-dp(2),dp(1),dp(1),paint);paint.setAlpha(255);
         }
         if(release>0)postInvalidateOnAnimation();else released=null;
         if(holdChoices!=null) drawLetterChoices(c);
@@ -246,8 +283,11 @@ final class KeyboardSurface extends View {
             c.drawText(label(pressed),x,y+dp(33),paint);
         }
         if(accessibilityFocus>0 && accessibilityFocus<=keys.size()) {
+            Key focused=keys.get(accessibilityFocus-1);int clip=readingKey(focused)?c.save():-1;
+            if(clip>=0)c.clipRect(nineViewport);
             paint.setColor(colors.accent);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(2));
-            c.drawRoundRect(keys.get(accessibilityFocus-1).bounds,dp(8),dp(8),paint);paint.setStyle(Paint.Style.FILL);
+            c.drawRoundRect(focused.bounds,dp(8),dp(8),paint);paint.setStyle(Paint.Style.FILL);
+            if(clip>=0)c.restoreToCount(clip);
         } else if(holdChoices!=null && accessibilityFocus>=HOLD_NODE_BASE && accessibilityFocus<HOLD_NODE_BASE+holdChoices.length) {
             letterChoiceBounds(accessibilityFocus-HOLD_NODE_BASE,choiceBounds);paint.setColor(colors.accent);paint.setStyle(Paint.Style.STROKE);paint.setStrokeWidth(dp(2));
             c.drawRoundRect(choiceBounds,dp(7),dp(7),paint);paint.setStyle(Paint.Style.FILL);
@@ -256,10 +296,11 @@ final class KeyboardSurface extends View {
     private Key hit(float x,float y) {
         // Entire cell responds, including visual gutters; keys remain physically separated.
         Key closest=null; float best=Float.MAX_VALUE;
-        boolean insideRail=isNineKey() && x<=nineRail.right+dp(2) && y>=nineRail.top-dp(3) && y<=nineRail.bottom+dp(3);
+        boolean insideRail=insideNineRail(x,y);
         for(Key k:keys) {
-            if(!enabledKey(k))continue;
+            if(!enabledKey(k) || !visibleKey(k))continue;
             if(insideRail && !railKey(k))continue;
+            if(readingKey(k) && (y<nineViewport.top || y>=nineViewport.bottom))continue;
             if(y>=k.bounds.top-dp(3) && y<=k.bounds.bottom+dp(3)) {
                 float distance=Math.abs(k.bounds.centerX()-x);
                 if(railKey(k) && (x<k.bounds.left-dp(2) || x>k.bounds.right+dp(2)))continue;
@@ -268,6 +309,7 @@ final class KeyboardSurface extends View {
         }
         return closest;
     }
+    private boolean insideNineRail(float x,float y) {return isNineKey() && x>=nineRail.left-dp(2) && x<=nineRail.right+dp(2) && y>=nineRail.top-dp(3) && y<=nineRail.bottom+dp(3);}
     private void feedback() { if(prefs.haptic()) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP); }
     private void releaseKey(Key key) {
         int id=keys.indexOf(key)+1;
@@ -365,6 +407,7 @@ final class KeyboardSurface extends View {
             case "CLEAR":return "清空当前拼音";
             case "SYMBOLS":return "符号键盘";
             case "NUMERIC":return "数字键盘";
+            case "READING_BACK":return "回退上一个拼音选择";
             case "SPACE":return "空格";
             case "LANG":return secure?"安全输入，英文键盘":(english?"切换中文":"切换英文");
             case "ENTER":return enterLabel.equals("拼音")?"提交原始拼音":enterLabel.equals("↵")?"换行":enterLabel;
@@ -431,7 +474,12 @@ final class KeyboardSurface extends View {
             if(id==HOST_VIEW_ID) {
                 AccessibilityNodeInfo node=AccessibilityNodeInfo.obtain(KeyboardSurface.this);
                 onInitializeAccessibilityNodeInfo(node);node.setClassName("android.inputmethodservice.KeyboardView");
-                for(int i=0;i<keys.size();i++)node.addChild(KeyboardSurface.this,i+1);
+                for(int i=0;i<keys.size();i++)if(visibleKey(keys.get(i)))node.addChild(KeyboardSurface.this,i+1);
+                if(isNineKey() && nineScrollLimit()>0) {
+                    node.setScrollable(true);
+                    if(nineScroll>0)node.addAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);
+                    if(nineScroll<nineScrollLimit())node.addAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
+                }
                 if(holdChoices!=null)for(int i=0;i<holdChoices.length;i++)node.addChild(KeyboardSurface.this,HOLD_NODE_BASE+i);
                 return node;
             }
@@ -452,8 +500,10 @@ final class KeyboardSurface extends View {
             node.setViewIdResourceName(getContext().getPackageName()+":id/key_"+key.value);
             node.setText(label(key));node.setContentDescription(accessibilityName(key));node.setHintText(longHint(key));
             node.setEnabled(isEnabled()&&enabledKey(key)&&(!secure||!key.value.equals("LANG")));node.setFocusable(node.isEnabled());node.setClickable(node.isEnabled());
-            node.setPassword(secure&&characterKey(key));node.setVisibleToUser(isShown());
-            Rect bounds=new Rect();key.bounds.roundOut(bounds);node.setBoundsInParent(bounds);
+            node.setPassword(secure&&characterKey(key));node.setVisibleToUser(isShown()&&visibleKey(key));
+            Rect bounds=new Rect();key.bounds.roundOut(bounds);
+            if(readingKey(key)){Rect viewport=new Rect();nineViewport.roundOut(viewport);if(!bounds.intersect(viewport))bounds.setEmpty();}
+            node.setBoundsInParent(bounds);
             int[] screen=new int[2];getLocationOnScreen(screen);bounds.offset(screen[0],screen[1]);node.setBoundsInScreen(bounds);
             node.setAccessibilityFocused(id==accessibilityFocus);
             node.addAction(id==accessibilityFocus?AccessibilityNodeInfo.ACTION_CLEAR_ACCESSIBILITY_FOCUS:AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS);
@@ -463,6 +513,10 @@ final class KeyboardSurface extends View {
             if(key.value.equals("SPACE")) {
                 node.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD,"光标向左"));
                 node.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD,"光标向右"));
+            }
+            if(readingKey(key) && nineScrollLimit()>0) {
+                if(nineScroll>0)node.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD,"查看前面的拼音"));
+                if(nineScroll<nineScrollLimit())node.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD,"查看后面的拼音"));
             }
             if(isT9Digit(key)) {
                 String lower=t9Letters(key.value),choices=lower.toUpperCase(java.util.Locale.ROOT)+lower+key.value;
@@ -474,9 +528,13 @@ final class KeyboardSurface extends View {
             return focus==AccessibilityNodeInfo.FOCUS_ACCESSIBILITY&&accessibilityFocus!=NO_ID?createAccessibilityNodeInfo(accessibilityFocus):null;
         }
         @Override public boolean performAction(int id,int action,Bundle arguments) {
-            if(id==HOST_VIEW_ID)return KeyboardSurface.this.performAccessibilityAction(action,arguments);
+            if(id==HOST_VIEW_ID) {
+                if(isShown() && isEnabled() && isNineKey() && (action==AccessibilityNodeInfo.ACTION_SCROLL_FORWARD || action==AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD))
+                    return scrollNine(nineScroll+(action==AccessibilityNodeInfo.ACTION_SCROLL_FORWARD?1:-1)*nineViewport.height()*.8f);
+                return KeyboardSurface.this.performAccessibilityAction(action,arguments);
+            }
             boolean choice=holdChoices!=null && id>=HOLD_NODE_BASE && id<HOLD_NODE_BASE+holdChoices.length;
-            if((!choice && (id<1||id>keys.size()))||!isShown()||!isEnabled())return false;
+            if((!choice && (id<1||id>keys.size()||!visibleKey(keys.get(id-1))))||!isShown()||!isEnabled())return false;
             if(action==AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS) {
                 if(accessibilityFocus==id)return false;
                 if(accessibilityFocus!=NO_ID)sendVirtualEvent(accessibilityFocus,AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED,null);
@@ -492,6 +550,8 @@ final class KeyboardSurface extends View {
                 sendVirtualEvent(id,AccessibilityEvent.TYPE_VIEW_CLICKED,directName(value));return true;
             }
             Key key=keys.get(id-1);if(!enabledKey(key))return false;
+            if(readingKey(key) && (action==AccessibilityNodeInfo.ACTION_SCROLL_FORWARD || action==AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD))
+                return scrollNine(nineScroll+(action==AccessibilityNodeInfo.ACTION_SCROLL_FORWARD?1:-1)*nineViewport.height()*.8f);
             if(isT9Digit(key) && action>=T9_DIRECT_ACTION_BASE && action<T9_DIRECT_ACTION_BASE+128) {
                 String value=String.valueOf((char)(action-T9_DIRECT_ACTION_BASE)),letters=t9Letters(key.value);
                 if(!(letters+letters.toUpperCase(java.util.Locale.ROOT)+key.value).contains(value))return false;
@@ -515,7 +575,7 @@ final class KeyboardSurface extends View {
             List<AccessibilityNodeInfo> result=new ArrayList<>();
             if(query==null)return result;
             String needle=query.toLowerCase(java.util.Locale.ROOT);
-            for(int i=0;i<keys.size();i++)if((id==HOST_VIEW_ID||id==i+1)&&accessibilityName(keys.get(i)).toLowerCase(java.util.Locale.ROOT).contains(needle))result.add(createAccessibilityNodeInfo(i+1));
+            for(int i=0;i<keys.size();i++)if(visibleKey(keys.get(i))&&(id==HOST_VIEW_ID||id==i+1)&&accessibilityName(keys.get(i)).toLowerCase(java.util.Locale.ROOT).contains(needle))result.add(createAccessibilityNodeInfo(i+1));
             if(holdChoices!=null)for(int i=0;i<holdChoices.length;i++)if((id==HOST_VIEW_ID||id==HOLD_NODE_BASE+i)&&directName(holdChoices[i]).toLowerCase(java.util.Locale.ROOT).contains(needle))result.add(createAccessibilityNodeInfo(HOLD_NODE_BASE+i));
             return result;
         }
@@ -524,11 +584,23 @@ final class KeyboardSurface extends View {
         int action=event.getActionMasked(); float x=event.getX(),y=event.getY();
         if(action==MotionEvent.ACTION_DOWN) {
             cancelTouch(); pressed=hit(x,y); downX=x;downY=y;cursorX=x; dragged=false;longFired=false;cursorMode=false;
+            nineRailTouch=nineComposing && insideNineRail(x,y);
+            nineScrollTouch=nineRailTouch && y>=nineViewport.top && y<nineViewport.bottom;nineDownScroll=nineScroll;
+            if(nineRailTouch){if(pressed!=null)feedback();invalidate();return true;}
             if(pressed==null) return false;
             feedback();
             if(pressed.value.equals("⌫")) { releaseKey(pressed); longFired=true; timer.postDelayed(repeat,380); }
             else timer.postDelayed(longPress,ViewConfiguration.getLongPressTimeout());
             invalidate(); return true;
+        }
+        if(action==MotionEvent.ACTION_MOVE && nineRailTouch) {
+            if(x<0 || x>=getWidth() || y<0 || y>=getHeight()){cancelTouch();return true;}
+            float dx=x-downX,dy=y-downY,slop=ViewConfiguration.get(getContext()).getScaledTouchSlop();
+            if(nineScrollTouch && (nineScrolling || Math.abs(dy)>slop && Math.abs(dy)>Math.abs(dx))) {
+                nineScrolling=true;dragged=true;pressed=null;
+                scrollNine(nineDownScroll-dy);
+            } else if(Math.abs(dx)>slop || Math.abs(dy)>slop){dragged=true;pressed=null;invalidate();}
+            return true;
         }
         if(action==MotionEvent.ACTION_MOVE && pressed!=null) {
             if(x<0 || x>=getWidth() || y<0 || y>=getHeight()){cancelTouch();return true;}
@@ -548,7 +620,9 @@ final class KeyboardSurface extends View {
             return true;
         }
         if(action==MotionEvent.ACTION_UP) {
-            if(holdChoices!=null && x>=0 && x<getWidth() && y>=0 && y<getHeight()) {
+            if(nineRailTouch) {
+                if(!dragged && pressed!=null && insideNineRail(x,y) && hit(x,y)==pressed){releaseKey(pressed);performClick();}
+            } else if(holdChoices!=null && x>=0 && x<getWidth() && y>=0 && y<getHeight()) {
                 selectLetterChoice(x,y);String chosen=holdChoices[holdChoice];Key key=pressed;
                 cancelTouch();released=key;releaseTime=android.os.SystemClock.uptimeMillis();
                 listener.longKey("DIRECT_"+chosen);if(chosen.length()==1 && Character.isLetter(chosen.charAt(0)))consumedLetter();
@@ -558,7 +632,7 @@ final class KeyboardSurface extends View {
         }
         if(action==MotionEvent.ACTION_CANCEL) { cancelTouch(); return true; }
         if(action==MotionEvent.ACTION_POINTER_DOWN) {
-            if(holdChoices!=null){cancelTouch();return true;}
+            if(holdChoices!=null || nineRailTouch){cancelTouch();return true;}
             // Commit the first finger before switching so rapid two-thumb typing doesn't drop it.
             if(pressed!=null && !longFired && !dragged) releaseKey(pressed);
             cancelTouch(); int index=event.getActionIndex();
@@ -569,7 +643,7 @@ final class KeyboardSurface extends View {
         return true;
     }
     @Override public boolean performClick(){super.performClick();return true;}
-    void cancelTouch(){timer.removeCallbacks(repeat);timer.removeCallbacks(longPress);pressed=null;boolean hadChoices=holdChoices!=null;holdChoices=null;holdNine=false;cursorMode=false;if(hadChoices){if(accessibilityFocus>=HOLD_NODE_BASE)clearVirtualFocus();accessibilityChanged();}invalidate();}
+    void cancelTouch(){timer.removeCallbacks(repeat);timer.removeCallbacks(longPress);pressed=null;nineRailTouch=false;nineScrollTouch=false;nineScrolling=false;boolean hadChoices=holdChoices!=null;holdChoices=null;holdNine=false;cursorMode=false;if(hadChoices){if(accessibilityFocus>=HOLD_NODE_BASE)clearVirtualFocus();accessibilityChanged();}invalidate();}
     @Override protected void onDetachedFromWindow(){animate().cancel();setAlpha(1f);cancelTouch();released=null;clearVirtualFocus();super.onDetachedFromWindow();}
 }
 

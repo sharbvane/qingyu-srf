@@ -11,7 +11,7 @@ import android.view.accessibility.AccessibilityWindowInfo;
 import android.view.inputmethod.BaseInputConnection;
 
 /** Nine-key acceptance exercises the installed IME with real editor and pointer events. */
-public final class ImeV65Instrumentation extends ImeV2Instrumentation {
+public class ImeV65Instrumentation extends ImeV2Instrumentation {
     @Override protected String successMarker(){return "ALL_V65_IME_CHECKS_PASS";}
     @Override protected void runChecks() throws Exception {
         selectMode("中文 · 九键拼音");
@@ -77,7 +77,7 @@ public final class ImeV65Instrumentation extends ImeV2Instrumentation {
         newEditor(InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_FLAG_MULTI_LINE);keyboardReady();assertNineLayout();clear();
         pass("dark and landscape nine-key preserve geometry and composition; private password input remains direct English without candidates");
     }
-    private Rect bounds(String id){Rect r=new Rect();awaitNode(id).getBoundsInScreen(r);return r;}
+    protected Rect bounds(String id){Rect r=new Rect();awaitNode(id).getBoundsInScreen(r);return r;}
     private void assertNineLayout(){
         Rect split=bounds("key_SPLIT"),two=bounds("key_2"),three=bounds("key_3"),four=bounds("key_4"),five=bounds("key_5"),six=bounds("key_6"),seven=bounds("key_7"),eight=bounds("key_8"),nine=bounds("key_9"),delete=bounds("key_⌫"),clear=bounds("key_CLEAR"),enter=bounds("key_ENTER"),body=bounds("panel_host");
         check(split.centerX()<two.centerX()&&two.centerX()<three.centerX()&&three.centerX()<delete.centerX(),"Nine-key top row is not segmentation/ABC/DEF/delete");
@@ -88,8 +88,8 @@ public final class ImeV65Instrumentation extends ImeV2Instrumentation {
         if(composing().isEmpty())for(String symbol:new String[]{"，","。","？","！"})check(bounds("key_"+symbol).right<=split.left,"Idle punctuation is not in the left auxiliary column");
         for(String key:new String[]{"SPLIT","2","3","4","5","6","7","8","9","⌫","CLEAR","ENTER","SYMBOLS","LANG","SPACE","NUMERIC"})check(body.contains(bounds("key_"+key)),"Nine-key escaped keyboard bounds: "+key);
     }
-    private String composing(){String[] value={""};runOnMainSync(()->{int start=BaseInputConnection.getComposingSpanStart(editor.getText()),end=BaseInputConnection.getComposingSpanEnd(editor.getText());if(start>=0&&end>=start)value[0]=editor.getText().subSequence(start,end).toString();});return value[0];}
-    private String awaitPinyin(String prefix){
+    protected String composing(){String[] value={""};runOnMainSync(()->{int start=BaseInputConnection.getComposingSpanStart(editor.getText()),end=BaseInputConnection.getComposingSpanEnd(editor.getText());if(start>=0&&end>=start)value[0]=editor.getText().subSequence(start,end).toString();});return value[0];}
+    protected String awaitPinyin(String prefix){
         long until=SystemClock.uptimeMillis()+5000;String actual="";
         while(SystemClock.uptimeMillis()<until){actual=accessiblePinyin();if(actual.matches("[a-z' ]+")&&composing().equals(prefix+actual))return actual;SystemClock.sleep(35);}
         throw new AssertionError("Pinyin preedit/composition mismatch: bubble="+actual+" editor="+text()+" composing="+composing()+" expected prefix="+prefix);
@@ -97,8 +97,8 @@ public final class ImeV65Instrumentation extends ImeV2Instrumentation {
     // Android omits non-touchable popup windows; the candidate host exposes the same spelling.
     private String accessiblePinyin(){for(AccessibilityWindowInfo window:automation.getWindows()){String reading=pinyinDescription(window.getRoot());if(reading!=null)return reading;}return "";}
     private String pinyinDescription(AccessibilityNodeInfo node){if(node==null)return null;String description=String.valueOf(node.getContentDescription()),marker="原始拼音 · ";int at=description.indexOf(marker);if(at>=0)return description.substring(at+marker.length());for(int i=0;i<node.getChildCount();i++){String reading=pinyinDescription(node.getChild(i));if(reading!=null)return reading;}return null;}
-    private void awaitNoComposition(){long until=SystemClock.uptimeMillis()+4000;while(SystemClock.uptimeMillis()<until){if(accessiblePinyin().isEmpty()&&composing().isEmpty())return;SystemClock.sleep(35);}throw new AssertionError("Composition survived commit: "+composing());}
-    private void findExpandedCandidate(String word){
+    protected void awaitNoComposition(){long until=SystemClock.uptimeMillis()+4000;while(SystemClock.uptimeMillis()<until){if(accessiblePinyin().isEmpty()&&composing().isEmpty())return;SystemClock.sleep(35);}throw new AssertionError("Composition survived commit: "+composing());}
+    protected void findExpandedCandidate(String word){
         if(candidate(word)!=null)return;nodeClick("candidate_expand");SystemClock.sleep(180);
         for(int attempt=0;attempt<12&&candidate(word)==null;attempt++){AccessibilityNodeInfo host=awaitNode("panel_host"),visible=null;for(int i=0;i<128&&visible==null;i++)visible=walk(host,"candidate_"+i);check(visible!=null,"Expanded nine-key candidates unavailable");if(!visible.getParent().performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD))break;SystemClock.sleep(160);}
         check(candidate(word)!=null,"Missing expanded nine-key candidate "+word+"; editor="+text());

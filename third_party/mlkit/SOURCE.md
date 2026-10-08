@@ -134,18 +134,50 @@ dimensions; both remain identical to the official source graphics. It
 records source and packaged hashes separately in the version's
 `releases/qa/<version>/release-package.json`.
 
-## 16 KiB ARM64 device limitation
+## v0.6.6: ARM64 / 16 KiB compatibility gate
 
-The official 17.0.3 AAR's ARM64 `libtranslate_jni.so` has a GNU_RELRO end
-at `0xe75000`, which is not aligned to 16 KiB. Google Maven metadata still
-lists 17.0.3 as the newest release on 2026-10-05. Although older SDK release
-notes claim 16 KiB support, the current Android compatibility guide also
-requires a 16 KiB-aligned RELRO end:
+Google Maven metadata, checked 2026-10-08, still lists 17.0.3 as latest;
+the official August 7, 2024 release notes explicitly include translation
+17.0.3 in the Android SDK update for 16 KiB page sizes:
+https://dl.google.com/dl/android/maven2/com/google/mlkit/translate/maven-metadata.xml
+https://developers.google.com/ml-kit/release-notes#august_7_2024
+
+The Android guide warns that an unaligned RELRO end can protect writable
+data and crash. Merely meeting LOAD and APK ZIP alignment does not rule
+that out:
 https://developer.android.com/guide/practices/page-sizes#relro
 
-Qingyu does not modify the proprietary binary. On a 64-bit ARM process
-using pages larger than 4 KiB, it reports the model as unsupported and
-does not instantiate a Translator or download its models. Chinese/English
-input, local Chinese/English dictionary glosses, Chinese/English phrases and
-complete dictionary definitions remain available. Revisit this guard when
-an official fixed SDK is available; no affected physical device was tested.
+The former Qingyu guard rejected every 16 KiB ARM64 process solely because
+the official library's RELRO end is `0xe75000`. Inspection of this exact
+binary shows the RELRO covers an entire writable LOAD
+`[0xdc8000, 0xe75000)`. The next writable LOAD starts at `0xe789f0`, after
+the rounded protection end `0xe78000`. The rounded tail therefore contains
+padding, not writable data. AOSP's `phdr_table_protect_gnu_relro` rounds the
+range to pages; `_extend_gnu_relro_prot_end` distinguishes a whole LOAD
+from a partial writable LOAD. This explains why the generic end-modulo
+check was too broad for this layout. It is a structural inference from the
+official loader and inspected library, not an ARM64 runtime measurement:
+https://android.googlesource.com/platform/bionic/+/361ba86734fb2821a6adcfdf775db8abd04e0de0/linker/linker_phdr.cpp
+
+Inspected official AAR SHA-256:
+`b6194f7b42034309cf8299784b2d5d70a82a2e9287fbe1650dea4d1f3ad1fe55`.
+Its untouched ARM64 library SHA-256:
+`35b3d0366291347e3f25e80e809ee398d716aea49cd03278007fedd526a1496f`.
+
+Qingyu now checks the packaged library's bounded ELF program headers on
+the translation worker before any model operation on non-4 KiB devices.
+It accepts only 4 / 16 KiB page sizes, validates LOAD alignment and
+file/address congruence, and rejects any rounded RELRO range that covers
+writable bytes outside that RELRO or executable content. Unknown,
+truncated or incompatible binaries keep local input/glosses usable without
+loading model JNI. The check reads at most 16 KiB from the app's own
+base/split APK; it does not change ELF bytes, reduce RELRO protection,
+request page-compat mode, or send typed text to a server. APK auditing
+independently checks the same segment safety and records exact library
+hashes. Fixtures cover safe padding, unsafe writable overlap, partial
+RELRO, 4 KiB LOAD alignment, executable overlap and malformed headers.
+
+Downloads, model hash validation, progress, retry, optional language storage
+and asynchronous inference keep their existing SDK paths. Real translation
+checks and environment details belong in this version's validation report;
+an ARM64 physical device has not been tested here.

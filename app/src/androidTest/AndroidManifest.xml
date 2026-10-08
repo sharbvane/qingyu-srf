@@ -7,6 +7,7 @@
     <instrumentation android:name="com.qingyu.ime.ImeV5Instrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu v0.5 input and release checks" />
     <instrumentation android:name="com.qingyu.ime.ImeV6Instrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu v0.6 input and translation checks" />
     <instrumentation android:name="com.qingyu.ime.ImeV65Instrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu v0.6.5 nine-key checks" />
+    <instrumentation android:name="com.qingyu.ime.ImeV66Instrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu v0.6.6 sequential nine-key checks" />
     <instrumentation android:name="com.qingyu.ime.TranslationModelInstrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu on-device translation checks" />
     <instrumentation android:name="com.qingyu.ime.ReleaseMigrationInstrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu signed release migration checks" />
 </manifest>

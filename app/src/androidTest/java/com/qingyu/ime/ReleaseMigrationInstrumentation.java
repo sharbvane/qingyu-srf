@@ -57,12 +57,12 @@ public final class ReleaseMigrationInstrumentation extends Instrumentation {
             Signature[] current = Build.VERSION.SDK_INT >= 28 ? installed.signingInfo.getApkContentsSigners() : installed.signatures;
             check(current != null && current.length == 1, "Expected one current signing certificate");
             check(installed.packageName.equals("com.qingyu.ime"), "Unexpected target package");
-            check(fromVersion==4||fromVersion==5||fromVersion==6,"Supported original version codes are 4, 5 and 6");
+            check(fromVersion>=4&&fromVersion<=7,"Supported original version codes are 4 through 7");
             SharedPreferences saved = context.getSharedPreferences("test_release_migration"+(fromVersion==4?"":"_"+fromVersion), Context.MODE_PRIVATE);
             File sentinel = new File(context.getFilesDir(), ".qingyu-release-migration-sentinel"+(fromVersion==4?"":"-"+fromVersion));
             File dictionary = new File(context.getFilesDir(), "user-pinyin.dat");
             if (phase.equals("seed")) {
-                check(installed.versionCode == fromVersion && installed.versionName.equals("0."+fromVersion+".0") && certificate(current[0]).equals(fromVersion==4?LEGACY:RELEASE), "Seed requires the original signed Release");
+                check(installed.versionCode == fromVersion && installed.versionName.equals(fromVersion==7?"0.6.5":"0."+fromVersion+".0") && certificate(current[0]).equals(fromVersion==4?LEGACY:RELEASE), "Seed requires the original signed Release");
                 check(!sentinel.exists() && !saved.contains("marker"), "Migration seed already exists; refusing to replace it");
                 String marker = UUID.randomUUID().toString();
                 try (FileOutputStream output = new FileOutputStream(sentinel)) {
@@ -74,11 +74,11 @@ public final class ReleaseMigrationInstrumentation extends Instrumentation {
                 check(seed.putString("marker", marker).putString("sentinel_sha256", digest(sentinel))
                         .putString("dictionary_sha256", dictionary.isFile() ? digest(dictionary) : "")
                         .putInt("uid", context.getApplicationInfo().uid).commit(), "Migration marker commit failed");
-                report.append("PASS original v0.").append(fromVersion).append(" signing identity and version\n")
+                report.append("PASS original v").append(installed.versionName).append(" signing identity and version\n")
                         .append("PASS app-private preference/file sentinel seeded; existing user dictionary only read\n")
                         .append("RELEASE_MIGRATION_SEED_PASS\n");
             } else {
-                check(installed.versionCode == fromVersion+1 && installed.versionName.equals(fromVersion==6?"0.6.5":"0."+(fromVersion+1)+".0"), "Verify requires the next Release");
+                check(installed.versionCode == fromVersion+1 && installed.versionName.equals(fromVersion==7?"0.6.6":fromVersion==6?"0.6.5":"0."+(fromVersion+1)+".0"), "Verify requires the next Release");
                 if (Build.VERSION.SDK_INT >= 28) {
                     check(!installed.signingInfo.hasMultipleSigners() && certificate(current[0]).equals(RELEASE), "Independent Release signing identity missing");
                     Signature[] history = installed.signingInfo.getSigningCertificateHistory();

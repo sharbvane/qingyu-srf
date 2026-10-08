@@ -106,12 +106,12 @@ with zipfile.ZipFile(apk) as archive:
             phoff = struct.unpack_from("<Q", blob, 32)[0]
             size, count = struct.unpack_from("<HH", blob, 54)
             header = [struct.unpack_from("<IIQQQQQQ", blob, phoff + i * size) for i in range(count)]
-            segments = [(p[0], p[2], p[3], p[6], p[7]) for p in header]
+            segments = [(p[0], p[2], p[3], p[6], p[7], p[1]) for p in header]
         else:
             phoff = struct.unpack_from("<I", blob, 28)[0]
             size, count = struct.unpack_from("<HH", blob, 42)
             header = [struct.unpack_from("<IIIIIIII", blob, phoff + i * size) for i in range(count)]
-            segments = [(p[0], p[1], p[2], p[5], p[7]) for p in header]
+            segments = [(p[0], p[1], p[2], p[5], p[7], p[6]) for p in header]
         loads = [p for p in segments if p[0] == 1]
         relro_ends = [p[2] + p[3] for p in segments if p[0] == 0x6474e552]
         lengths = struct.unpack_from("<HH", raw, entry.header_offset + 26)
@@ -121,11 +121,19 @@ with zipfile.ZipFile(apk) as archive:
             assert all(p[4] >= 16384 and (p[1] - p[2]) % 16384 == 0 for p in loads), name
         if name.endswith("libqingyu_pinyin.so"):
             assert relro_ends and all(end % 16384 == 0 for end in relro_ends), name
-        elif any(end % 16384 for end in relro_ends) and bits == 2:
-            assert "/arm64-v8a/" in name, name
-            metadata["upstream_limitations"].append(name + ": RELRO end not 16KiB aligned; ARM64 processes with pages >4KiB disable SDK model path.")
+        # The linker protects whole pages. Padding is safe only if those pages
+        # contain no executable or writable LOAD bytes outside the RELRO.
+        if bits == 2:
+            for relro in (p for p in segments if p[0] == 0x6474e552):
+                start, end = relro[2], relro[2] + relro[3]
+                protected_start, protected_end = start // 16384 * 16384, (end + 16383) // 16384 * 16384
+                assert any(load[2] <= start and load[2] + load[3] >= end for load in loads), name
+                for load in loads:
+                    low, high = max(protected_start, load[2]), min(protected_end, load[2] + load[3])
+                    assert low >= high or not (load[5] & 1 or load[5] & 2 and (low < start or high > end)), name
         detail = {"bytes": len(blob), "sha256": digest(blob), "zip_data_offset": data_offset,
-                  "load_alignment": [p[4] for p in loads], "relro_ends": relro_ends}
+                  "load_alignment": [p[4] for p in loads], "relro_ends": relro_ends,
+                  "relro_page_protection_safe": bits == 2 or name.endswith("libqingyu_pinyin.so")}
         metadata["native"][name] = detail
         lines.append(name + " " + json.dumps(detail))
     source_assets = set()
@@ -277,7 +285,7 @@ with zipfile.ZipFile(apk) as archive:
 
 assert digest(baseline.read_bytes()) == baseline_sha, "Previous release changed during audit."
 lines += ["STATIC_PACKAGE_CHECKS_PASS", f"Independent Release signer with authenticated rotation from the v0.4 signer on API 28+; API 26-27 retain the compatibility signer; previous release preserved; all self-built native libraries align LOAD and RELRO to 16KiB.",
-          "The proprietary ARM64 SDK RELRO limitation remains; no 16KiB physical-device runtime is claimed.",
+          "64-bit model libraries pass LOAD and rounded-RELRO safety checks; no ARM64 16KiB physical-device runtime is claimed.",
           "This report does not assert UI/model/real-device test success."]
 (out / "final-package-audit.txt").write_text("\n".join(lines), encoding="utf-8")
 (out / "release-package.json").write_text(json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")

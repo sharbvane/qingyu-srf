@@ -45,7 +45,7 @@ public final class InputDictionarySmoke {
         check(nineKey.stream().anyMatch(candidate->candidate.text.equals("九键")&&candidate.pinyin.equals("jiu'jian")&&candidate.consumedDigits==7),"modern nine-key word is absent from bounded generic readings");
         check(nineKey.stream().allMatch(candidate->candidate.pinyin.split("'",2)[0].equals("jiu")),"selected side syllable leaked other first readings");
         List<String> readings=dictionary.nineKeyReadings("548");
-        check(readings.contains("jiu")&&readings.contains("liu")&&readings.contains("ji")&&readings.contains("li")&&readings.size()<=6,"side syllables must preserve long and short alternatives");
+        check(readings.contains("jiu")&&readings.contains("liu")&&readings.contains("ji")&&readings.contains("li"),"side syllables must preserve long and short alternatives");
         List<NineKeyCandidate> splitHello=dictionary.suggestNineKey("64'426");
         check(splitHello.get(0).text.equals("你好")&&splitHello.get(0).consumedDigits==6&&LocalInputDictionary.nineKeyPreedit("64'426",splitHello).equals("ni'hao"),"explicit split changed text/raw consumed length");
         List<NineKeyCandidate> splitNine=dictionary.suggestNineKey("548'5426","jiu");
@@ -56,6 +56,36 @@ public final class InputDictionarySmoke {
         for(String bad:new String[]{"'64","64''426","64 426","64126","64\n426","2".repeat(65)})check(dictionary.suggestNineKey(bad).isEmpty()&&LocalInputDictionary.nineKeyFallback(bad).isEmpty(),"T9 input trust boundary "+bad);
         check(dictionary.suggestNineKey("5485426","JIU").isEmpty(),"side reading trust boundary");
         System.out.println("NINE_KEY_V065_CHECKS_PASS: dynamic pinyin, raw separators, bounded modern readings, explicit first syllable, cold fallback and retained suffix");
+        List<String> completeRail=dictionary.nineKeyReadings("7426");
+        check(completeRail.size()>6&&completeRail.contains("qiao")&&completeRail.contains("piao")&&completeRail.contains("qia"),"scrollable rail lost lower-ranked legal syllables");
+        check(dictionary.suggestNineKey("7426","piao").stream().anyMatch(candidate->candidate.pinyin.equals("piao")),"a scrollable low-frequency syllable has no selectable Chinese word");
+        check(dictionary.suggestNineKey("74264","piao").stream().anyMatch(candidate->candidate.pinyin.equals("piao")&&candidate.consumedDigits==4),"a chosen low-frequency syllable vanished when another key was appended");
+        String selected=LocalInputDictionary.nineKeySelect("746498","","qing");
+        check(selected.equals("qing")&&LocalInputDictionary.nineKeySelectionOffset("746498",selected)==4,"first selected syllable did not consume its own raw keys");
+        check(dictionary.nineKeyReadings("746498",selected).containsAll(java.util.Arrays.asList("xu","yu","wu","zu")),"rail did not advance to next syllable options");
+        selected=LocalInputDictionary.nineKeySelect("746498",selected,"xu");
+        List<NineKeyCandidate> feeling=dictionary.suggestNineKey("746498",selected);
+        check(feeling.stream().anyMatch(candidate->candidate.text.equals("情绪")&&candidate.pinyin.equals("qing'xu")),"chosen second syllable failed to constrain whole phrase");
+        check(feeling.stream().allMatch(candidate->candidate.pinyin.equals("qing")||candidate.pinyin.equals("qing'xu")||candidate.pinyin.startsWith("qing'xu'")),"second syllable constraint leaked qing'yu/qing'wu");
+        check(LocalInputDictionary.nineKeyPreedit("746498",feeling,selected).equals("qing'xu")&&dictionary.nineKeyReadings("746498",selected).isEmpty(),"complete syllable selection changed preedit or left first-syllable choices");
+        check(LocalInputDictionary.nineKeyUndoSelection(selected).equals("qing")&&dictionary.nineKeyReadings("746498",LocalInputDictionary.nineKeyUndoSelection(selected)).contains("yu"),"backtracking did not restore alternate second readings");
+        String sentenceRaw="64426744543",sentenceSelected="";
+        for(String syllable:new String[]{"ni","hao","shi","jie"}) {
+            check(dictionary.nineKeyReadings(sentenceRaw,sentenceSelected).contains(syllable),"missing sequential choice "+syllable);
+            sentenceSelected=LocalInputDictionary.nineKeySelect(sentenceRaw,sentenceSelected,syllable);
+            check(LocalInputDictionary.nineKeyPreedit(sentenceRaw,dictionary.suggestNineKey(sentenceRaw,sentenceSelected),sentenceSelected).startsWith(sentenceSelected),"preedit forgot a previously selected syllable");
+        }
+        check(dictionary.suggestNineKey(sentenceRaw,sentenceSelected).stream().anyMatch(candidate->candidate.text.equals("你好世界")&&candidate.consumedDigits==sentenceRaw.length()),"all selected syllables did not compose the complete sentence");
+        check(LocalInputDictionary.nineKeyPreedit(sentenceRaw,dictionary.suggestNineKey(sentenceRaw,sentenceSelected),sentenceSelected).equals("ni'hao'shi'jie"),"complete selected sentence lost a syllable");
+        check(LocalInputDictionary.nineKeyRemainingSelection(sentenceRaw,sentenceSelected,5).equals("shi'jie"),"partial Chinese choice discarded remaining selected syllables");
+        check(LocalInputDictionary.nineKeyTrimSelection("6442674454",sentenceSelected).equals("ni'hao'shi"),"raw deletion removed intact earlier choices");
+        check(LocalInputDictionary.nineKeyPreedit(sentenceRaw+"2",java.util.Collections.emptyList(),sentenceSelected).equals("ni'hao'shi'jie'a"),"new keys did not retain confirmed reading prefix");
+        String separated="64'426'744'543";
+        check(LocalInputDictionary.nineKeySelectionOffset(separated,sentenceSelected)==separated.length()&&LocalInputDictionary.nineKeyRemainingSelection(separated,sentenceSelected,7).equals("shi'jie"),"explicit split consumed the wrong selected syllable offset");
+        check(dictionary.nineKeyReadings("6'4426","").stream().noneMatch(reading->reading.equals("ni")),"side rail ignored a manual split inside its syllable");
+        for(String bad:new String[]{"NI","ni''hao","ni hao","niu'hao","ni'hao'xi"})check(dictionary.suggestNineKey("64426",bad).isEmpty(),"invalid/mismatched selected syllable prefix accepted: "+bad);
+        check(LocalInputDictionary.nineKeySelect("64426","ni","shi").equals("ni"),"incompatible side choice silently changed raw input");
+        System.out.println("NINE_KEY_V066_CHECKS_PASS: all legal side readings, sequential constrained syllables, full sentence, backtrack, explicit separators and retained partial-choice suffix");
         String longDigits="64426".repeat(8);
         List<NineKeyCandidate> longSentence=dictionary.suggestNineKey(longDigits);
         check(!longSentence.isEmpty() && longSentence.get(0).consumedDigits==40,"long digit sentence retains every input key");

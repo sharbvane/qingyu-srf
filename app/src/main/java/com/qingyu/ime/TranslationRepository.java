@@ -19,7 +19,10 @@ import com.google.mlkit.nl.translate.TranslatorOptions;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.File;
+import java.io.InputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
@@ -31,6 +34,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /** Local lookups and model work stay off the IME thread. Downloads require an explicit action. */
 final class TranslationRepository implements AutoCloseable {
@@ -68,15 +73,12 @@ final class TranslationRepository implements AutoCloseable {
     private final Map<String,Boolean> downloadMetered = new HashMap<>();
     private volatile Function<String, String> englishLookup;
     private volatile boolean closed;
-    private final boolean modelPlatformSupported;
+    private volatile boolean modelPlatformSupported = true;
     private long modelGeneration;
 
     TranslationRepository(Context context) { this(context, null); }
     TranslationRepository(Context context, Handler existingWorker) {
         this.context = context.getApplicationContext();
-        modelPlatformSupported = modelPlatformSupported(android.os.Process.is64Bit(),
-            android.os.Build.SUPPORTED_ABIS.length==0 ? "" : android.os.Build.SUPPORTED_ABIS[0],
-            android.system.Os.sysconf(android.system.OsConstants._SC_PAGESIZE));
         english = new LocalEnglishProvider(context);
         if (existingWorker == null) {
             ownedThread = new HandlerThread("qingyu-translation", android.os.Process.THREAD_PRIORITY_BACKGROUND);
@@ -84,6 +86,12 @@ final class TranslationRepository implements AutoCloseable {
             worker = new Handler(ownedThread.getLooper());
         } else { ownedThread = null; worker = existingWorker; }
         executor = runnable -> worker.post(runnable);
+        worker.post(() -> {
+            if (closed) return;
+            long pageSize=android.system.Os.sysconf(android.system.OsConstants._SC_PAGESIZE);
+            if(pageSize!=4096){String[] abis=android.os.Process.is64Bit()?android.os.Build.SUPPORTED_64_BIT_ABIS:android.os.Build.SUPPORTED_32_BIT_ABIS;
+                modelPlatformSupported=abis.length>0&&packagedModelSupportsPageSize(this.context,abis[0],pageSize);}
+        });
         for(String language:GLOSS_LANGUAGES){String error=this.context.getSharedPreferences("qingyu",Context.MODE_PRIVATE).getString("model_error_"+language,"");if(!error.isEmpty()){modelErrors.put(language,error);states.put(language,State.FAILED);}}
         refreshModels("en", null);
     }
@@ -197,10 +205,56 @@ final class TranslationRepository implements AutoCloseable {
         String error=modelErrors.get(modelKey(language));
         return status(language)==State.FAILED && error!=null ? error : stateText(status(language));
     }
-    static boolean modelPlatformSupported(boolean process64,String abi,long pageSize) {
-        // The current official ML Kit ARM64 binary has a non-16K-aligned RELRO end.
-        // Keep dictionary/input paths usable rather than loading that JNI on affected devices.
-        return !(process64 && "arm64-v8a".equals(abi) && pageSize > 4096);
+    static boolean packagedModelSupportsPageSize(Context context,String abi,long pageSize) {
+        if(!"arm64-v8a".equals(abi)&&!"x86_64".equals(abi)&&!"armeabi-v7a".equals(abi))return false;
+        android.content.pm.ApplicationInfo app=context.getApplicationInfo();
+        try {
+            ArrayList<String> apks=new ArrayList<>();apks.add(app.sourceDir);if(app.splitSourceDirs!=null)java.util.Collections.addAll(apks,app.splitSourceDirs);
+            for(String apk:apks)try(ZipFile archive=new ZipFile(apk)){
+                ZipEntry entry=archive.getEntry("lib/"+abi+"/libtranslate_jni.so");
+                if(entry!=null)try(InputStream input=archive.getInputStream(entry)){return modelLibrarySupportsPageSize(libraryHeader(input),pageSize);}
+            }
+        }catch(IOException|RuntimeException ignored){}
+        return false;
+    }
+    private static byte[] libraryHeader(InputStream input)throws IOException {
+        byte[] header=new byte[16384];int count=0,read;
+        while(count<header.length&&(read=input.read(header,count,header.length-count))>0)count+=read;
+        return java.util.Arrays.copyOf(header,count);
+    }
+    static boolean modelLibrarySupportsPageSize(byte[] header,long pageSize) {
+        if(header==null||header.length<64||(pageSize!=4096&&pageSize!=16384))return false;
+        ByteBuffer bytes=ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN);
+        if(bytes.getInt(0)!=0x464c457f||header[5]!=1||(header[4]!=1&&header[4]!=2))return false;
+        boolean bits64=header[4]==2;int recordSize=bits64?56:32;
+        long offset=bits64?bytes.getLong(32):Integer.toUnsignedLong(bytes.getInt(28));
+        int size=Short.toUnsignedInt(bytes.getShort(bits64?54:42)),count=Short.toUnsignedInt(bytes.getShort(bits64?56:44));
+        if(size!=recordSize||count==0||count>128||offset<(bits64?64:52)||offset>header.length-(long)size*count)return false;
+        long[][] segments=new long[count][6];boolean load=false;
+        for(int i=0;i<count;i++){
+            int at=(int)offset+i*size;long[] segment=segments[i];segment[0]=Integer.toUnsignedLong(bytes.getInt(at));
+            segment[1]=bits64?Integer.toUnsignedLong(bytes.getInt(at+4)):Integer.toUnsignedLong(bytes.getInt(at+24));
+            long fileOffset=bits64?bytes.getLong(at+8):Integer.toUnsignedLong(bytes.getInt(at+4));
+            segment[2]=bits64?bytes.getLong(at+16):Integer.toUnsignedLong(bytes.getInt(at+8));
+            long fileSize=bits64?bytes.getLong(at+32):Integer.toUnsignedLong(bytes.getInt(at+16));
+            segment[3]=bits64?bytes.getLong(at+40):Integer.toUnsignedLong(bytes.getInt(at+20));
+            segment[4]=bits64?bytes.getLong(at+48):Integer.toUnsignedLong(bytes.getInt(at+28));
+            if(fileOffset<0||fileSize<0||segment[2]<0||segment[3]<fileSize||segment[2]>Long.MAX_VALUE-segment[3]-pageSize)return false;
+            segment[5]=segment[2]+segment[3];
+            if(segment[0]==1){load=true;if(segment[4]<pageSize||(segment[4]&(segment[4]-1))!=0||(fileOffset-segment[2])%pageSize!=0)return false;}
+        }
+        // AOSP rounds RELRO to pages: a padded whole LOAD is safe only when no writable or executable data shares those pages.
+        for(long[] relro:segments)if(relro[0]==0x6474e552L){
+            long start=relro[2]/pageSize*pageSize,end=(relro[5]+pageSize-1)/pageSize*pageSize;
+            boolean contained=false;
+            for(long[] segment:segments)if(segment[0]==1){
+                if(segment[2]<=relro[2]&&segment[5]>=relro[5])contained=true;
+                long low=Math.max(start,segment[2]),high=Math.min(end,segment[5]);
+                if(low<high&&((segment[1]&1)!=0||(segment[1]&2)!=0&&(low<relro[2]||high>relro[5])))return false;
+            }
+            if(!contained)return false;
+        }
+        return load;
     }
 
     /** Checking existing files never downloads a model. */
@@ -418,7 +472,7 @@ final class TranslationRepository implements AutoCloseable {
             case DELETING: return "正在删除模型";
             case FAILED: return "模型不可用 · 请检查网络后重试下载";
             case MISSING: return "模型未下载 · 中文输入照常可用";
-            case UNSUPPORTED: return "此 16KB ARM64 设备暂不支持模型翻译 · 本地释义仍可使用";
+            case UNSUPPORTED: return "模型组件与当前设备不兼容 · 本地释义仍可使用";
             default: return "正在检查本地模型";
         }
     }

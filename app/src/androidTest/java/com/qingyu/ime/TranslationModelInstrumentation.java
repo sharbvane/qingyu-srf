@@ -31,11 +31,13 @@ public final class TranslationModelInstrumentation extends Instrumentation {
             check(!TranslationRepository.isGlossLanguage(null)&&!TranslationRepository.isGlossLanguage("zh")&&repository.status("invalid")==TranslationRepository.State.UNSUPPORTED,"invalid model selection does not use English");
             CountDownLatch rejected=new CountDownLatch(1);TranslationRepository.State[] rejectedState={TranslationRepository.State.CHECKING};repository.ensureModels("invalid",state->{rejectedState[0]=state;rejected.countDown();});check(rejected.await(5,TimeUnit.SECONDS)&&rejectedState[0]==TranslationRepository.State.UNSUPPORTED,"invalid model download rejected");
             report.append("PASS six-language catalog, preferences and invalid download guard\n");
-            check(TranslationRepository.modelPlatformSupported(true,"arm64-v8a",4096),"4K ARM64 model guard");
-            check(!TranslationRepository.modelPlatformSupported(true,"arm64-v8a",16384),"16K ARM64 model guard");
-            check(TranslationRepository.modelPlatformSupported(true,"x86_64",16384),"16K x86 model guard");
-            check(TranslationRepository.modelPlatformSupported(false,"arm64-v8a",16384),"32-bit process model guard");
-            report.append("PASS model ABI/page-size guard\n");
+            checkPageSizeGate();
+            check(TranslationRepository.packagedModelSupportsPageSize(getTargetContext(),"arm64-v8a",16384),"packaged official ARM64 library has safe 16K segment boundaries");
+            check(TranslationRepository.packagedModelSupportsPageSize(getTargetContext(),"x86_64",16384),"packaged official x86 library has safe 16K segment boundaries");
+            check(TranslationRepository.packagedModelSupportsPageSize(getTargetContext(),"armeabi-v7a",4096),"packaged official 32-bit library keeps 4K support");
+            check(!TranslationRepository.packagedModelSupportsPageSize(getTargetContext(),"armeabi-v7a",16384),"4K-only 32-bit library is not accepted for 16K pages");
+            check(!TranslationRepository.packagedModelSupportsPageSize(getTargetContext(),"invalid",16384),"unknown packaged ABI rejected");
+            report.append("PASS actual packaged ARM64/x86 ELF page-size gate and malformed/unsafe fixtures\n");
             check(TranslationRepository.conciseTranslation("row; line").equals("row"),"one English sense for commit");
             check(TranslationRepository.conciseTranslation("n. 工作；作品").equals("工作"),"one Chinese sense without POS for commit");
             check(TranslationRepository.conciseTranslation("a natural sentence.").equals("a natural sentence."),"translation punctuation retained");
@@ -93,4 +95,35 @@ public final class TranslationModelInstrumentation extends Instrumentation {
         }finally{CountDownLatch cleaned=new CountDownLatch(1);worker.post(()->{for(int i=0;i<8;i++)pending.remove("v6-retry-fixture-"+i);cleaned.countDown();});cleaned.await(5,TimeUnit.SECONDS);}
     }
     private static void check(boolean condition,String message){if(!condition)throw new AssertionError(message);}
+    static void checkPageSizeGate(){
+        byte[] safe=pageFixture(32768);check(TranslationRepository.modelLibrarySupportsPageSize(safe,16384),"padded whole RELRO LOAD remains safe");
+        check(TranslationRepository.modelLibrarySupportsPageSize(safe,4096),"same binary supports 4K pages");
+        check(!TranslationRepository.modelLibrarySupportsPageSize(pageFixture(24576),16384),"rounded RELRO must not protect next writable LOAD");
+        byte[] partial=safe.clone();java.nio.ByteBuffer.wrap(partial).order(java.nio.ByteOrder.LITTLE_ENDIAN).putLong(64+56+40,8192);
+        check(!TranslationRepository.modelLibrarySupportsPageSize(partial,16384),"writable tail inside RELRO LOAD is rejected");
+        byte[] alignment=safe.clone();java.nio.ByteBuffer.wrap(alignment).order(java.nio.ByteOrder.LITTLE_ENDIAN).putLong(64+48,4096);
+        check(!TranslationRepository.modelLibrarySupportsPageSize(alignment,16384),"4K LOAD rejected on 16K pages");
+        byte[] congruence=safe.clone();java.nio.ByteBuffer.wrap(congruence).order(java.nio.ByteOrder.LITTLE_ENDIAN).putLong(64+8,1);
+        check(!TranslationRepository.modelLibrarySupportsPageSize(congruence,16384),"incongruent file/address offset rejected");
+        byte[] executable=safe.clone();java.nio.ByteBuffer.wrap(executable).order(java.nio.ByteOrder.LITTLE_ENDIAN).putInt(64+56+4,5);
+        check(!TranslationRepository.modelLibrarySupportsPageSize(executable,16384),"RELRO cannot remove executable permission");
+        check(!TranslationRepository.modelLibrarySupportsPageSize(java.util.Arrays.copyOf(safe,65),16384),"truncated headers rejected");
+        byte[] overflow=safe.clone();java.nio.ByteBuffer.wrap(overflow).order(java.nio.ByteOrder.LITTLE_ENDIAN).putLong(32,Long.MAX_VALUE);
+        check(!TranslationRepository.modelLibrarySupportsPageSize(overflow,16384),"program header range overflow rejected");
+        byte[] endian=safe.clone();endian[5]=2;
+        check(!TranslationRepository.modelLibrarySupportsPageSize(endian,16384),"unsupported ELF byte order rejected");
+        check(!TranslationRepository.modelLibrarySupportsPageSize(safe,65536),"untested larger page size rejected");
+    }
+    private static byte[] pageFixture(long writableStart){
+        java.nio.ByteBuffer header=java.nio.ByteBuffer.allocate(64+4*56).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+        header.putInt(0,0x464c457f).put(4,(byte)2).put(5,(byte)1).putLong(32,64).putShort(54,(short)56).putShort(56,(short)4);
+        fixtureSegment(header,64,1,5,0,0,64,16384);
+        fixtureSegment(header,120,1,6,16384,16384,4096,16384);
+        fixtureSegment(header,176,1,6,writableStart,writableStart,64,16384);
+        fixtureSegment(header,232,0x6474e552,4,16384,16384,4096,1);
+        return header.array();
+    }
+    private static void fixtureSegment(java.nio.ByteBuffer header,int at,int type,int flags,long offset,long address,long size,long alignment){
+        header.putInt(at,type).putInt(at+4,flags).putLong(at+8,offset).putLong(at+16,address).putLong(at+32,size).putLong(at+40,size).putLong(at+48,alignment);
+    }
 }

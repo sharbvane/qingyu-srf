@@ -1,0 +1,433 @@
+{
+  "apk": "releases/Qingyu-0.6.6.apk",
+  "variant": "release",
+  "version_code": 8,
+  "version_name": "0.6.6",
+  "bytes": 96441001,
+  "sha256": "88af583f5d2c6b0134d245eca6128c1b3dcc5ad5d506515ad88f63d016a5d9dc",
+  "min_sdk": 26,
+  "target_sdk": 35,
+  "debuggable": false,
+  "certificate_sha256": "1d6872a840fe42468cdc5af2d11eeee87455c4b635e2fd2b60168b082c4e0cf5",
+  "platform_signers": {
+    "26-27": "12794d0f0be3a864281e828ad389f8e71bb725e196cb4bf65c4937069452d6d9",
+    "28-35": "1d6872a840fe42468cdc5af2d11eeee87455c4b635e2fd2b60168b082c4e0cf5"
+  },
+  "signing_rotation": {
+    "application_id": "com.qingyu.ime",
+    "release_certificate_sha256": "1d6872a840fe42468cdc5af2d11eeee87455c4b635e2fd2b60168b082c4e0cf5",
+    "legacy_certificate_sha256": "12794d0f0be3a864281e828ad389f8e71bb725e196cb4bf65c4937069452d6d9",
+    "rotation_min_sdk": 28,
+    "legacy_max_sdk": 27,
+    "lineage_sha256": "97d0b304ea0a1f4c3b3ddabc6c68936a56fa71cc00a9bc1a27c731ca249d5589"
+  },
+  "baseline": "releases/Qingyu-0.6.5.apk",
+  "zipalign_16k": true,
+  "baseline_bytes": 96441001,
+  "baseline_sha256": "4ca091fae2ad3a180a40fe98e1e14ed0dbc81338a72962e53c251c7e82079ace",
+  "size_reduction_bytes": 0,
+  "size_reduction_percent": 0.0,
+  "native": {
+    "lib/arm64-v8a/libqingyu_pinyin.so": {
+      "bytes": 311560,
+      "sha256": "43c64481758ab851073ec8c8a24eca1d91dfdedbe5817eec24b6d46a21abadda",
+      "zip_data_offset": 589824,
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "relro_ends": [
+        327680
+      ],
+      "relro_page_protection_safe": true
+    },
+    "lib/arm64-v8a/libtranslate_jni.so": {
+      "bytes": 16361032,
+      "sha256": "45040ff0cdd194d6e601589d759e6f1ba733de5f95790f76cc3e2046919046be",
+      "zip_data_offset": 917504,
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "relro_ends": [
+        15159296
+      ],
+      "relro_page_protection_safe": true
+    },
+    "lib/armeabi-v7a/libqingyu_pinyin.so": {
+      "bytes": 186752,
+      "sha256": "e14cc4b851b85d40b454f4fd8a5b16bd8cfe7be71623020870ca87f36410ffcd",
+      "zip_data_offset": 17285120,
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "relro_ends": [
+        212992
+      ],
+      "relro_page_protection_safe": true
+    },
+    "lib/armeabi-v7a/libtranslate_jni.so": {
+      "bytes": 11608796,
+      "sha256": "9a7ebc4b29b51a54cc695ae57c736bc6676c6ddbcd4f75a3aed4547ab1c9e551",
+      "zip_data_offset": 17481728,
+      "load_alignment": [
+        4096,
+        4096,
+        4096
+      ],
+      "relro_ends": [
+        10436608
+      ],
+      "relro_page_protection_safe": false
+    },
+    "lib/x86_64/libqingyu_pinyin.so": {
+      "bytes": 312184,
+      "sha256": "e49ffcfc1539ffe053a79a2a62a6db7db9a0fc6d73a48a03a3edcb5ca32453c0",
+      "zip_data_offset": 29097984,
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "relro_ends": [
+        327680
+      ],
+      "relro_page_protection_safe": true
+    },
+    "lib/x86_64/libtranslate_jni.so": {
+      "bytes": 17371616,
+      "sha256": "a757f9544d2731838e5e775f4fa06782aea7944d9039d24d9f2c57d81efa4265",
+      "zip_data_offset": 29425664,
+      "load_alignment": [
+        16384,
+        16384,
+        16384
+      ],
+      "relro_ends": [
+        16171008
+      ],
+      "relro_page_protection_safe": true
+    }
+  },
+  "assets": {
+    "assets/input/chinese-context-v1.bin": {
+      "bytes": 3494939,
+      "sha256": "138a697004598d3ba54a553f1b60bf49aee2860372bfde19265363d2d43ca390"
+    },
+    "assets/input/english-bigrams.tsv": {
+      "bytes": 248893,
+      "sha256": "85bff15f7df75511347d3f9d2a012daeb5599e908e3efb4a13fa8e5fb8f75f15"
+    },
+    "assets/input/english-words.tsv": {
+      "bytes": 1539334,
+      "sha256": "7775da89eb739008ce943b592468248eb25e7faec437ad1c83f990fd68b6a9a1"
+    },
+    "assets/input/input-v3.db": {
+      "bytes": 10874880,
+      "sha256": "c23b15436c6750115e483962797ab8b52ec150fbe21ec843e188215871109554"
+    },
+    "assets/licenses/AOSP-PinyinIME-NOTICE.txt": {
+      "bytes": 10690,
+      "sha256": "b5830d96fb5a7e7e7ebcc295f352846b4b998e78fdc8f9aa68e134d2e4b39986"
+    },
+    "assets/licenses/Apache-2.0.txt": {
+      "bytes": 11358,
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    "assets/licenses/CC-CEDICT-source.txt": {
+      "bytes": 807,
+      "sha256": "a88853413f02d2c0cf005678271e04ac1d59e531606fa20bd39f3c614d0be49c"
+    },
+    "assets/licenses/chinese-context-sources.txt": {
+      "bytes": 1644,
+      "sha256": "1521b27f1d48876e8f2b5c9cc6a462922ef35fc5661616880dd0b872b9098636"
+    },
+    "assets/licenses/GPL-3.0.txt": {
+      "bytes": 34674,
+      "sha256": "fb981668c18a279e285fc4d83fba1e836cc84dd4daa73c9697d3cfd2d8aca6e0"
+    },
+    "assets/licenses/input-v3-sources.txt": {
+      "bytes": 1563,
+      "sha256": "91979cc5683c8ba9965718069ce4e5df67b15f443d71974e2e2f114ed038bb0b"
+    },
+    "assets/licenses/jieba-LICENSE.txt": {
+      "bytes": 1094,
+      "sha256": "901d4ea24b62b5d6ab28e0e359ea7d8407a72eb876605ec5f20591267fb0d136"
+    },
+    "assets/licenses/Rime-ice-LICENSE": {
+      "bytes": 35149,
+      "sha256": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986"
+    },
+    "assets/licenses/SCOWL-README.txt": {
+      "bytes": 16078,
+      "sha256": "abff200f25e487f61a96fb26ec1a8bb50c4612fe108e0382c389e656af79ba22"
+    },
+    "assets/licenses/UD-GSDSimp-LICENSE.txt": {
+      "bytes": 206,
+      "sha256": "c219395bf819ad073b54261c8774df0ff61e16ae0eacc59474aaeed021fa15ca"
+    },
+    "assets/pinyin/dict_pinyin.dat": {
+      "bytes": 4539440,
+      "sha256": "ae80997b6e2b2de23bc11276767a15cd00b1e8e6308823a2761769d811a3513a"
+    },
+    "assets/pinyin/lexicon-v2.db": {
+      "bytes": 67260416,
+      "sha256": "ef4c9c9f22deea61e02a0cdf71ad6be2e906af3088f0d3abd2657385034ad4ff"
+    },
+    "assets/translation/phrase-gloss.tsv": {
+      "bytes": 1069,
+      "sha256": "7ea55fc33a8c7b3d437e4ff35706d0fc37735b8b45814878073bba66c9b05e68"
+    },
+    "assets/translation/zh-en-details.db": {
+      "bytes": 8773632,
+      "sha256": "b8018ec67372cd8c39bb27fecf21761b4c14f5e405af7130ad35353aba736529"
+    },
+    "assets/translation/zh-en.db": {
+      "bytes": 3678208,
+      "sha256": "bda47e361201400d79eb8fb0f26c6c26c4b203c5f387ffc3ef3efa2cbca281ac"
+    },
+    "assets/dexopt/baseline.prof": {
+      "bytes": 771,
+      "sha256": "71a95082107682a97a9ac251c577de32303490081e53d8f4ea1abc1cf094426b"
+    },
+    "assets/dexopt/baseline.profm": {
+      "bytes": 140,
+      "sha256": "ea0a1fac0946209cd2143958123d057031e38ad199be333de16ab0567c5cc1ce"
+    }
+  },
+  "badges": {
+    "google_translate_badge.png": {
+      "packed_path": "res/vc.png",
+      "source_sha256": "44aab849963bc32493c1b2ff4ed9d47aea8d16cdfa12d3aaebef22feb2ba2ca9",
+      "packed_sha256": "b2a879e6bdd4337ad9a5755ded9ac57f0bf2749e3edc3ec627154ca6e6decb48",
+      "source_byte_match": false,
+      "rgba_pixel_match": true,
+      "dimensions": [
+        528,
+        48
+      ]
+    },
+    "google_translate_badge_dark.png": {
+      "packed_path": "res/Ow.png",
+      "source_sha256": "f5a888a335c107b6cc106e59804d08b5feb35b3755188b17ffc5e577298e6f1e",
+      "packed_sha256": "56b7838cbf8d222d757f7572d6b151100fc54bb56811b178642c68287022d22e",
+      "source_byte_match": false,
+      "rgba_pixel_match": true,
+      "dimensions": [
+        528,
+        48
+      ]
+    }
+  },
+  "upstream_limitations": [],
+  "build_generated_assets": {
+    "assets/dexopt/baseline.prof": "app/build/intermediates/binary_art_profile/release/compileReleaseArtProfile/baseline.prof",
+    "assets/dexopt/baseline.profm": "app/build/intermediates/binary_art_profile_metadata/release/compileReleaseArtProfile/baseline.profm"
+  },
+  "default_language_resources": {
+    "languages": [
+      "zh",
+      "en"
+    ],
+    "chinese_english_phrases": 45,
+    "optional_model_files_bundled": false,
+    "note": "Japanese/French/German/Russian/Spanish files download on demand; the shared SDK library supports multiple languages."
+  },
+  "input_data": {
+    "schema": 3,
+    "chinese_words": 120355,
+    "chinese_words_with_pos": 87160,
+    "part_of_speech_counts": {
+      "a": 2365,
+      "ad": 76,
+      "ag": 46,
+      "an": 29,
+      "b": 426,
+      "c": 223,
+      "d": 1145,
+      "df": 1,
+      "dg": 2,
+      "e": 28,
+      "f": 181,
+      "g": 961,
+      "h": 1,
+      "i": 5458,
+      "j": 360,
+      "k": 4,
+      "l": 2948,
+      "m": 622,
+      "mg": 2,
+      "mq": 17,
+      "n": 33683,
+      "ng": 279,
+      "nr": 7313,
+      "nrfg": 64,
+      "nrt": 1043,
+      "ns": 6485,
+      "nt": 654,
+      "nz": 2252,
+      "o": 130,
+      "p": 78,
+      "q": 162,
+      "r": 222,
+      "rg": 1,
+      "rz": 1,
+      "s": 187,
+      "t": 770,
+      "tg": 7,
+      "u": 9,
+      "ud": 1,
+      "ug": 1,
+      "uj": 1,
+      "ul": 1,
+      "uv": 1,
+      "uz": 1,
+      "v": 14318,
+      "vd": 3,
+      "vg": 160,
+      "vn": 1077,
+      "x": 364,
+      "y": 23,
+      "z": 626,
+      "zg": 2348
+    }
+  },
+  "chinese_pinyin": {
+    "format": "AOSP PinyinIME binary model v2",
+    "sources": {
+      "rime_ice_base": {
+        "url": "https://raw.githubusercontent.com/iDvel/rime-ice/da1fbe602e38f26db846fa10120ee64c2b0324c0/cn_dicts/base.dict.yaml",
+        "revision": "da1fbe602e38f26db846fa10120ee64c2b0324c0",
+        "sha256": "0418d5103d8e40c8fff4b686a873ad03e9836cd0419ecae0b7e1e2526312dba0",
+        "license": "GPL-3.0-only",
+        "readings": 554892
+      },
+      "aosp_raw": {
+        "revision": "05cc8f8f2465553bc6d19b2ede24073d079eeed7",
+        "sha256": "408700f28a56091fa07f3b849a0f134fbfc71e6b2ae9b3f52973a5b076f599ff",
+        "license": "Apache-2.0",
+        "readings": 65105
+      },
+      "rime_ice_ext": {
+        "url": "https://raw.githubusercontent.com/iDvel/rime-ice/da1fbe602e38f26db846fa10120ee64c2b0324c0/cn_dicts/ext.dict.yaml",
+        "revision": "da1fbe602e38f26db846fa10120ee64c2b0324c0",
+        "sha256": "8e49a0294c0139e63c815cc33a2d438cc144eb7889297d30cec899a368697c06",
+        "license": "GPL-3.0-only"
+      },
+      "cedict_companion": {
+        "sha256_gzip": "fd16b26f991724564037d7eb19105397c5f1b17938ebda95bbbe67d642cf5fda",
+        "license": "CC BY-SA 4.0",
+        "provenance": "third_party/cedict/manifest.json"
+      }
+    },
+    "readings": 235000,
+    "unique_words": 233642,
+    "modern_readings_added": 169895,
+    "lengths": {
+      "1": 17037,
+      "2": 104999,
+      "3": 52489,
+      "4": 53556,
+      "5": 4058,
+      "6": 1998,
+      "7": 580,
+      "8": 283
+    },
+    "legacy_spelling_count": 416,
+    "legacy_spelling_ids_retained": true,
+    "hanzi_reading_index_items": 17106,
+    "trie_prefix_nodes": 224998,
+    "max_deep_children": 142,
+    "max_multi_syllable_homophones": 31,
+    "transformations": "Retain all old legal readings; select up to 235000 total readings by upstream frequency with 3x admission priority for two-character words; modern weights replace old counts, 0.15 legacy-only fallback prior; shared maximum word weight across polyphonic readings; lve/nve map to legacy lue/nue; reject non-BMP/non-Chinese, length >8, unsupported syllables and mismatched character/syllable counts; no benchmark-specific weights or words; builder removes obsolete >4-character and <60-frequency filters.",
+    "raw_source": {
+      "bytes": 15026056,
+      "sha256": "016165afec6c78f6dfcf44350a1d0797af8ca0d8ed7b2e05a214e61a90d54466"
+    },
+    "lexicon": {
+      "path": "app/src/main/assets/pinyin/lexicon-v2.db",
+      "readings": 599320,
+      "bytes": 67260416,
+      "sha256": "ef4c9c9f22deea61e02a0cdf71ad6be2e906af3088f0d3abd2657385034ad4ff",
+      "license": "GPL-3.0-only; CEDICT-derived companion entries additionally retain CC BY-SA 4.0 attribution",
+      "indexes": "raw_rank, initials_rank, text_rank"
+    },
+    "output": {
+      "path": "app/src/main/assets/pinyin/dict_pinyin.dat",
+      "bytes": 4539440,
+      "sha256": "ae80997b6e2b2de23bc11276767a15cd00b1e8e6308823a2761769d811a3513a",
+      "serialized_bounds": {
+        "full_spelling_count": 413,
+        "character_reading_index_items": 17102,
+        "lemma_readings": 234996,
+        "system_end_id_exclusive": 234996,
+        "max_word_characters": 8
+      },
+      "actual_spelling_id_order_matches_v0_4": true
+    }
+  },
+  "chinese_context": {
+    "format": "QYCM 2 (sorted delta keys/counts as unsigned varints; other fields big endian; gzip)",
+    "training_split": "train only",
+    "source_commit": "7b61ed473f963e911788efdf1f478154bc1053e4",
+    "source_license": "CC BY-SA 4.0",
+    "sources": {
+      "zh_gsdsimp-ud-train.conllu": {
+        "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Chinese-GSDSimp/7b61ed473f963e911788efdf1f478154bc1053e4/zh_gsdsimp-ud-train.conllu",
+        "sha256": "956636fe612a1166e8b19e7413fee2e73d68231aca2f0455be2c616b947d629d",
+        "bytes": 9321012
+      },
+      "LICENSE.txt": {
+        "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Chinese-GSDSimp/7b61ed473f963e911788efdf1f478154bc1053e4/LICENSE.txt",
+        "sha256": "899b1804a12ebc090b96339614eede1b64b686721b650a71430b55b5235f7f79",
+        "bytes": 202
+      },
+      "README.md": {
+        "url": "https://raw.githubusercontent.com/UniversalDependencies/UD_Chinese-GSDSimp/7b61ed473f963e911788efdf1f478154bc1053e4/README.md",
+        "sha256": "02287bdf80282151d8ca7ef3c3f7a3c3b98609f7266f145e3e3dd0a05693abd3",
+        "bytes": 3105
+      }
+    },
+    "training_sentences": 3997,
+    "training_tokens": 98614,
+    "unigrams": 16720,
+    "bigrams": 371748,
+    "trigrams": 636825,
+    "pos_words": 18904,
+    "prediction_contexts": 1185,
+    "example_sentences": 384,
+    "example_words": 1207,
+    "lexicon_v2_sha256": "ef4c9c9f22deea61e02a0cdf71ad6be2e906af3088f0d3abd2657385034ad4ff",
+    "jieba_sha256": "7197c3211ddd98962b036cdf40324d1ea2bfaa12bd028e68faa70111a88e12a8",
+    "model_bytes": 2736395,
+    "decoded_bytes": 3494939,
+    "model_sha256": "4c748464c3097bf84084b3f35d29af6d627d1be93873e8aa42472a7864bcd763",
+    "transformations": "Character counts: TRAIN 10x; one contribution per unique modern word weighted 1+floor(min(8,log1p(weight)/2)); Chinese runs reset at punctuation; corpus UPOS transitions; lexical jieba POS on corpus words/single characters. Count cutoff bigrams>=2/trigrams>=3. Next-word tables are complete observed tokens with count>=3 and conditional support>=0.08. Example sentences are exact short TRAIN texts, deterministic length/order cap384 and broad sensitive-domain filter; dev/test excluded. No phrase/benchmark-specific counts or boosts."
+  },
+  "r8_jni": {
+    "mapping_sha256": "69973fe72f5072d8e39c38853474d40212d891a3c33fbbe53a9fb4c8e0cdac79",
+    "class_name": "com.qingyu.core.NativeDecoder",
+    "native_methods": [
+      "cancelLastChoice",
+      "choice",
+      "choose",
+      "close",
+      "delete",
+      "fixedLength",
+      "flush",
+      "open",
+      "pinyin",
+      "predict",
+      "reset",
+      "search",
+      "setLearningEnabled",
+      "syllableStarts"
+    ],
+    "actual_dex_native_flags_verified": true,
+    "three_abi_jni_symbols_verified": true
+  }
+}

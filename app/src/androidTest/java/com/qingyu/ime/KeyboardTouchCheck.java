@@ -106,6 +106,49 @@ final class KeyboardTouchCheck {
                     hold(instrumentation,view,group);expect(output);popupInside(instrumentation,view);pickChoice(instrumentation,view,choice);expect(output,"DIRECT_"+choice);
                 }
             }
+            List<String> readings=java.util.Arrays.asList("shi","si","ri","shou","sou","rou","shan","ran");
+            int width=view.getWidth(),height=view.getHeight();
+            instrumentation.runOnMainSync(()->view.nineState(true,readings));
+            Rect railTop=bounds(view,17),railBottom=bounds(view,20);
+            check(bounds(view,24).isEmpty(),"Offscreen pinyin had actionable bounds");
+            check(view.getAccessibilityNodeProvider().createAccessibilityNodeInfo(-1).isScrollable(),"Pinyin rail lacked accessibility scrolling");
+            for(int swipe=0;swipe<2;swipe++) {
+                event(instrumentation,view,MotionEvent.ACTION_DOWN,railBottom.centerX(),railBottom.bottom-2*dp);
+                move(instrumentation,view,railTop.centerX(),railTop.top+2*dp);
+                up(instrumentation,view,railTop.centerX(),railTop.top+2*dp);expect(output);
+            }
+            Rect last=bounds(view,24);
+            check(!last.isEmpty() && last.top>=railTop.top && last.bottom<=railBottom.bottom,"Last pinyin did not scroll fully inside rail");
+            check(bounds(view,17).isEmpty(),"Scrolled-away pinyin remained actionable");
+            tap(instrumentation,view,last);expect(output,"KEY_READING_ran");
+            check(view.getWidth()==width && view.getHeight()==height,"Rail scrolling resized the keyboard");
+            for(int swipe=0;swipe<2;swipe++) {
+                event(instrumentation,view,MotionEvent.ACTION_DOWN,railTop.centerX(),railTop.top+2*dp);
+                move(instrumentation,view,railBottom.centerX(),railBottom.bottom-2*dp);
+                up(instrumentation,view,railBottom.centerX(),railBottom.bottom-2*dp);expect(output);
+            }
+            tap(instrumentation,view,bounds(view,17));expect(output,"KEY_READING_shi");
+            event(instrumentation,view,MotionEvent.ACTION_DOWN,railTop.right+dp,railTop.centerY());
+            up(instrumentation,view,railTop.right+dp,railTop.centerY());expect(output,"KEY_READING_shi");
+            event(instrumentation,view,MotionEvent.ACTION_DOWN,railBottom.centerX(),railBottom.centerY());
+            move(instrumentation,view,railTop.centerX(),railTop.centerY());
+            event(instrumentation,view,MotionEvent.ACTION_CANCEL,railTop.centerX(),railTop.centerY());
+            up(instrumentation,view,railTop.centerX(),railTop.centerY());expect(output);
+            event(instrumentation,view,MotionEvent.ACTION_DOWN,railBottom.centerX(),railBottom.centerY());
+            move(instrumentation,view,two.centerX(),two.centerY());up(instrumentation,view,two.centerX(),two.centerY());expect(output);
+            tap(instrumentation,view,two);expect(output,"KEY_2");
+            hold(instrumentation,view,two);
+            instrumentation.runOnMainSync(()->view.nineState(true,readings));
+            expectChoices(instrumentation,view,"A","B","C","a","b","c","2");
+            instrumentation.runOnMainSync(()->view.nineState(true,java.util.Arrays.asList("wu","xu","yu","zu"),true));
+            expectChoices(instrumentation,view,"A","B","C","a","b","c","2");
+            pickChoice(instrumentation,view,"b");expect(output,"DIRECT_b");
+            tap(instrumentation,view,bounds(view,17));expect(output,"KEY_READING_BACK");
+            instrumentation.runOnMainSync(()->view.nineState(true,java.util.Collections.emptyList(),true));
+            tap(instrumentation,view,bounds(view,17));expect(output,"KEY_READING_BACK");
+            tap(instrumentation,view,bounds(view,18));expect(output);
+            instrumentation.runOnMainSync(()->view.nineState(false,java.util.Collections.emptyList()));
+            Rect comma=bounds(view,17);hold(instrumentation,view,comma);up(instrumentation,view,comma.centerX(),comma.centerY());expect(output,"APOSTROPHE");
             hold(instrumentation,view,two);event(instrumentation,view,MotionEvent.ACTION_CANCEL,two.centerX(),two.centerY());up(instrumentation,view,two.centerX(),two.centerY());expect(output);
             hold(instrumentation,view,two);instrumentation.runOnMainSync(view::resetModes);up(instrumentation,view,two.centerX(),two.centerY());expect(output);
             hold(instrumentation,view,two);instrumentation.runOnMainSync(()->view.configure(true,false,"↵",false));up(instrumentation,view,two.centerX(),two.centerY());expect(output);

@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sharbvane/qingyu-srf/releases/download/v0.6.5/Qingyu-0.6.5.apk"><img alt="公开下载 APK v0.6.5" src="https://img.shields.io/badge/Published_APK-v0.6.5-476B57"></a>
+  <a href="https://github.com/sharbvane/qingyu-srf/releases/download/v0.6.6/Qingyu-0.6.6.apk"><img alt="公开下载 APK v0.6.6" src="https://img.shields.io/badge/Published_APK-v0.6.6-476B57"></a>
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPL--3.0-blue.svg"></a>
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
 </p>
@@ -21,14 +21,14 @@
 
 | 浅色模式 | 深色模式 |
 | --- | --- |
-| ![轻语浅色键盘：候选区与贴边凸出的拼音](docs/images/keyboard-v0.4.0-light.png) | ![轻语深色键盘：候选区与贴边凸出的拼音](docs/images/keyboard-v0.4.0-dark.png) |
+| ![轻语浅色键盘：候选区与贴边凸出的拼音](docs/images/nine-v0.6.6-scroll.png) | ![轻语深色键盘：候选区与贴边凸出的拼音](docs/images/nine-v0.6.6-dark.png) |
 
-**v0.6.5 九键优化版现已发布**：[GitHub Release 与 APK 下载](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.6.5)，附 [SHA-256 校验文件](https://github.com/sharbvane/qingyu-srf/releases/download/v0.6.5/Qingyu-0.6.5.apk.sha256)、[安装说明](releases/README-v0.6.5.md)和[验证记录](docs/validation-v0.6.5.md)。预览图保留为主题示意，不代表 v0.6.5 的最新细节。
+**v0.6.6 九键连续选音节版现已发布**：[GitHub Release 与 APK 下载](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.6.6)，附 [SHA-256 校验文件](https://github.com/sharbvane/qingyu-srf/releases/download/v0.6.6/Qingyu-0.6.6.apk.sha256)、[安装说明](releases/README-v0.6.6.md)和[验证记录](docs/validation-v0.6.6.md)。上方截图为 v0.6.6 实际九键界面。
 
 ## 功能
 
 - **中文全拼与九键**：AOSP 原生解码器结合固定版本的 Rime-ice 现代词库及本地索引，支持多种拼音切分、整句组词与分段选词。v0.6 加入真实中文语料的上下文统计，改善长句组词与预测；全拼「分词」键可手动加入拼音分隔。长期选词习惯在本机逐步提高词语、简拼和短语排序，保留已有学习记录；轻微误触纠错仅作为可选候选，原始拼音始终保留。全拼原始拼音在键盘左上方紧贴边缘凸出显示；全拼回车提交原始拼音。九键显示按键组合对应的候选拼音，确认提交中文候选。
-- **九键布局与滑选**：三列字母键配合左侧标点或拼音选择、右侧删除和清空、双行高确认键；独立分词、符号与数字入口。长按字母组展开大小写字母和数字浮层，滑动高亮，松手输入选中的单个字符，取消不输入。拼音随候选与分段选词同步更新，数字仅在明确选择或数字模式中上屏。
+- **九键布局与滑选**：三列字母键配合左侧标点或拼音选择、右侧删除和清空、双行高确认键；独立分词、符号与数字入口。长按字母组展开大小写字母和数字浮层，滑动高亮，松手输入选中的单个字符，取消不输入。左侧拼音栏可上下滚动查看全部读音；选中一个音节后自动显示下一音节，保留整段待选输入。回退按钮可重选上一音节；整段音节已选完时退格也先回退选择。拼音随候选与分段选词同步更新，数字仅在明确选择或数字模式中上屏。
 - **英文候选与预测**：12 万余词形的补全、拼写建议、上下文下一词预测；英文候选默认显示中文释义，空格保留实际输入的拼写。
 - **紧凑键盘顶部**：空闲时显示较矮的空候选栏与图标导航；正在输入时，候选区覆盖导航区域，结束后恢复导航。顶部整体保留固定空间，按键位置不跳动。展开列表替换按键区域，可上下连续滑动浏览；长句及对应翻译完整换行。连续选择预测最多 3 轮，右侧「X」立即清空当前预测；没有可靠上下文时可不显示预测。
 - **自然接触外语**：本地释义优先，已下载的端侧模型异步补充可见候选的单字、词语、短语和长句翻译，不等待翻译才显示中文候选。轻点输入原词，长按查看分层详情，上滑直接输入所选语言的简洁译文；完整多义解释保留在详情中。语言切换同步更新候选、详情与上滑译文。普通候选栏与展开列表不显示 Google 品牌栏或标识；长按详情保留模型译文来源，具体来源要求见 [SDK 说明](third_party/mlkit/SOURCE.md)。
@@ -45,11 +45,11 @@
 
 ## 安装与使用
 
-1. 下载并安装 [Qingyu v0.6.5 APK](https://github.com/sharbvane/qingyu-srf/releases/download/v0.6.5/Qingyu-0.6.5.apk)，从 [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.6.5) 获取 SHA-256 校验文件。历史版本见[全部 Releases](https://github.com/sharbvane/qingyu-srf/releases)。适用于 Android 8.0 及以上。
+1. 下载并安装 [Qingyu v0.6.6 APK](https://github.com/sharbvane/qingyu-srf/releases/download/v0.6.6/Qingyu-0.6.6.apk)，从 [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.6.6) 获取 SHA-256 校验文件。历史版本见[全部 Releases](https://github.com/sharbvane/qingyu-srf/releases)。适用于 Android 8.0 及以上。
 2. 安装并打开「轻语输入法」，依次选择「启用轻语输入法」和「切换到轻语」。这是 Android 的系统设置步骤。
 3. 在任意输入框试试 `anzhuo`、`dangang` 或 `nohao`。点中文候选，上屏的只有中文。
 
-当前公开版本：**v0.6.5**。APK、SHA-256 和[验证记录](docs/validation-v0.6.5.md)见 [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.6.5)。可从 v0.6.0 覆盖安装并保留学习记录；签名与备份方式见[说明](docs/release-signing.md)。真机长期使用尚未验证。
+当前公开版本：**v0.6.6**。APK、SHA-256 和[验证记录](docs/validation-v0.6.6.md)见 [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.6.6)。可从 v0.6.5 覆盖安装并保留学习记录；签名与备份方式见[说明](docs/release-signing.md)。真机长期使用尚未验证。
 
 在「更多 → 释义显示语言」选择英语、日语、法语、德语、俄语或西班牙语。首次明确选择所需的非英语语言会发起按需模型下载；普通打字不触发下载。默认使用 Wi-Fi，也可在「翻译模型管理」明确允许移动数据。管理页显示真实已下载字节、可读取的总量、等待状态及失败原因，可重试、查看实际已安装大小或删除模型；总量未知时显示不定进度。日、法、德、俄、西五种额外模型已在 Android 15 / API 35 模拟器上实际重新下载并完成端侧翻译检查，网络仍需能访问官方模型服务。未下载的额外语言不预占模型存储，中文和英文键盘始终保留。
 
@@ -81,7 +81,7 @@
 
 应用有网络权限。Google ML Kit 会联网下载模型，也可能为配置、兼容性及诊断发送设备/安装标识、语言配置、输入输出长度和性能元数据；SDK 不发送输入或译文原文。详情见[端侧 SDK 来源与隐私说明](third_party/mlkit/SOURCE.md)。用户主动检查更新时读取 GitHub Releases 元数据，下载请求不附带输入或剪贴板内容。剪贴板历史可在面板清空、在设置关闭；不上传。应用未接入广告。
 
-当前官方模型 SDK 的 ARM64 原生库存在 16KB 页对齐限制。此类设备暂时禁用模型翻译以避免影响输入，本地中英词典及中英常用短语仍可使用，设置会显示明确状态。
+v0.6.6 修正了 16KB ARM64 设备被一刀切禁用模型的问题：后台检查安装包内官方模型库的实际布局，通过安全检查后正常下载与翻译，不修改官方库。无法确认兼容的设备仍保留本地输入与释义。已验证 16KB x86_64 模拟器；ARM64 真机仍需验证，依据及边界见 [SDK 说明](third_party/mlkit/SOURCE.md)。
 
 ## 从源码构建
 
@@ -92,7 +92,7 @@ pwsh -File scripts/setup-toolchain.ps1
 pwsh -File scripts/build.ps1 -Variant Release -Test
 ```
 
-构建产物位于 `releases/`；项目内工具和签名密钥会被 `.gitignore` 排除。新环境应先恢复已有签名材料，禁止生成替代密钥；见[签名说明](docs/release-signing.md)。v0.6.5 测试方法与实际验证范围见[验证记录](docs/validation-v0.6.5.md)，安装与已知限制见[发布说明](releases/README-v0.6.5.md)。
+构建产物位于 `releases/`；项目内工具和签名密钥会被 `.gitignore` 排除。新环境应先恢复已有签名材料，禁止生成替代密钥；见[签名说明](docs/release-signing.md)。v0.6.6 测试方法与实际验证范围见[验证记录](docs/validation-v0.6.6.md)，安装与已知限制见[发布说明](releases/README-v0.6.6.md)。
 
 ## 路线图
 
