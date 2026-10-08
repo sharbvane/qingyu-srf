@@ -57,7 +57,7 @@ public final class ReleaseMigrationInstrumentation extends Instrumentation {
             Signature[] current = Build.VERSION.SDK_INT >= 28 ? installed.signingInfo.getApkContentsSigners() : installed.signatures;
             check(current != null && current.length == 1, "Expected one current signing certificate");
             check(installed.packageName.equals("com.qingyu.ime"), "Unexpected target package");
-            check(fromVersion==4||fromVersion==5,"Supported original versions are 4 and 5");
+            check(fromVersion==4||fromVersion==5||fromVersion==6,"Supported original version codes are 4, 5 and 6");
             SharedPreferences saved = context.getSharedPreferences("test_release_migration"+(fromVersion==4?"":"_"+fromVersion), Context.MODE_PRIVATE);
             File sentinel = new File(context.getFilesDir(), ".qingyu-release-migration-sentinel"+(fromVersion==4?"":"-"+fromVersion));
             File dictionary = new File(context.getFilesDir(), "user-pinyin.dat");
@@ -78,7 +78,7 @@ public final class ReleaseMigrationInstrumentation extends Instrumentation {
                         .append("PASS app-private preference/file sentinel seeded; existing user dictionary only read\n")
                         .append("RELEASE_MIGRATION_SEED_PASS\n");
             } else {
-                check(installed.versionCode == fromVersion+1 && installed.versionName.equals("0."+(fromVersion+1)+".0"), "Verify requires the next Release");
+                check(installed.versionCode == fromVersion+1 && installed.versionName.equals(fromVersion==6?"0.6.5":"0."+(fromVersion+1)+".0"), "Verify requires the next Release");
                 if (Build.VERSION.SDK_INT >= 28) {
                     check(!installed.signingInfo.hasMultipleSigners() && certificate(current[0]).equals(RELEASE), "Independent Release signing identity missing");
                     Signature[] history = installed.signingInfo.getSigningCertificateHistory();

@@ -50,7 +50,10 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     private boolean navigationVisible=true;
     private PopupWindow pinyinBubble;
     private TextView pinyinText;
-    private String rawPreview="",editorEnterLabel="↵";
+    private String rawPreview="",nineRawPreview="",nineVisiblePrefix="",editorEnterLabel="↵";
+    private List<String> nineReadings=Collections.emptyList();
+    private String nineReading="";
+    private boolean temporaryNumeric;
     private boolean inputViewActive;
     private EngineSnapshot visible=EngineSnapshot.empty();
     private String preview="",workerRaw="",workerMode="pinyin",workerContext="",ninePrefix="",candidateMode="pinyin";
@@ -132,7 +135,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
         super.onStartInput(info,restarting);
         String identity=info.packageName+":"+info.fieldId+":"+info.inputType+":"+info.imeOptions;InputConnection ic=getCurrentInputConnection();CharSequence before=ic==null||preview.isEmpty()?null:ic.getTextBeforeCursor(preview.length(),0);
         if(restarting&&identity.equals(editorIdentity)&&!preview.isEmpty()&&before!=null&&before.toString().equals(preview)){restoreComposingSpan();applyLearningPreference(info);configureKeyboard();render();return;}
-        if(!restarting||!identity.equals(editorIdentity))resetPredictionChain();editorIdentity=identity;long token=session.incrementAndGet();revision++;visibleRevision=revision;preview="";rawPreview="";visible=EngineSnapshot.empty();selecting=false;composingActive=false;
+        if(!restarting||!identity.equals(editorIdentity))resetPredictionChain();editorIdentity=identity;long token=session.incrementAndGet();revision++;visibleRevision=revision;clearPreview();temporaryNumeric=false;visible=EngineSnapshot.empty();selecting=false;composingActive=false;
         int type=info.inputType,cls=type&InputType.TYPE_MASK_CLASS,variation=type&InputType.TYPE_MASK_VARIATION;
         numeric=cls==InputType.TYPE_CLASS_NUMBER||cls==InputType.TYPE_CLASS_PHONE||cls==InputType.TYPE_CLASS_DATETIME;
         sensitive=cls==InputType.TYPE_CLASS_TEXT&&(variation==InputType.TYPE_TEXT_VARIATION_PASSWORD||variation==InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD||variation==InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD)||cls==InputType.TYPE_CLASS_NUMBER&&variation==InputType.TYPE_NUMBER_VARIATION_PASSWORD;
@@ -152,8 +155,10 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     private void render(){
         if(candidates==null)return;List<String> words=new ArrayList<>();for(Candidate c:visible.candidates)words.add(c.text);String status=sensitive?"安全输入":engineError;
         synchronizeGlossLanguage();
-        keyboard.enterLabel(!english&&!numeric&&!sensitive&&!preview.isEmpty()&&currentMode().equals("pinyin")?"拼音":editorEnterLabel);renderPinyinBubble();
-        candidates.setContentDescription("候选词，上方为释义；左右滑动浏览，长按查看详情，上滑输入翻译"+(!english&&!numeric&&!sensitive&&currentMode().equals("pinyin")&&!preview.isEmpty()?"；原始拼音 · "+rawPreview:""));
+        boolean chineseComposition=!english&&!numeric&&!sensitive&&!preview.isEmpty();
+        keyboard.enterLabel(chineseComposition?currentMode().equals("nine")?"确认":"拼音":editorEnterLabel);
+        keyboard.nineState(chineseComposition&&currentMode().equals("nine"),nineReadings);renderPinyinBubble();
+        candidates.setContentDescription("候选词，上方为释义；左右滑动浏览，长按查看详情，上滑输入翻译"+(chineseComposition?"；原始拼音 · "+rawPreview:""));
         if(words.isEmpty()&&isCandidateExpanded())collapse();
         boolean predicting=!words.isEmpty()&&candidateMode.startsWith("predict");
         candidates.setVisibility(View.VISIBLE);candidates.setInteractiveComposition(!preview.isEmpty());candidates.setPredicting(predicting);candidates.setExpandIndicator(isCandidateExpanded());candidates.update(preview,words,prefs.translation()&&!sensitive,status);
@@ -177,7 +182,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     }
     private void dismissPinyinBubble(){if(pinyinBubble!=null)pinyinBubble.dismiss();}
     private void renderPinyinBubble(){
-        if(root==null||!inputViewActive||!root.isShown()||root.getWindowToken()==null||sensitive||numeric||english||!currentMode().equals("pinyin")||preview.isEmpty()||rawPreview.isEmpty()){dismissPinyinBubble();return;}
+        if(root==null||!inputViewActive||!root.isShown()||root.getWindowToken()==null||sensitive||numeric||english||preview.isEmpty()||rawPreview.isEmpty()){dismissPinyinBubble();return;}
         if(root.getWidth()==0)return;
         Palette colors=new Palette(prefs.dark(this));
         if(pinyinText==null){
@@ -232,15 +237,15 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     private EngineSnapshot snapshot(String raw,List<String> words,String commit){List<Candidate> items=new ArrayList<>();for(int i=0;i<words.size()&&i<128;i++)items.add(new Candidate(i,words.get(i)));return new EngineSnapshot(raw,workerRaw,items,commit);}
     private EngineSnapshot searchWorker(){
         if(workerMode.equals("english")){List<String> words=inputDictionary==null||inputDictionary.english()==null?Collections.emptyList():inputDictionary.english().suggest(workerRaw,workerContext);return snapshot(workerRaw,words,"");}
-        if(workerMode.equals("nine")){nineCandidates=inputDictionary==null?Collections.emptyList():inputDictionary.suggestNineKey(workerRaw);List<String> words=new ArrayList<>();for(NineKeyCandidate c:nineCandidates)words.add(c.text);return snapshot(ninePrefix+workerRaw,words,"");}
+        if(workerMode.equals("nine")){nineCandidates=inputDictionary==null?Collections.emptyList():inputDictionary.suggestNineKey(workerRaw,nineReading);List<String> words=new ArrayList<>();for(NineKeyCandidate c:nineCandidates)words.add(c.text);return snapshot(ninePrefix+LocalInputDictionary.nineKeyPreedit(workerRaw,nineCandidates),words,"");}
         if(engineOpen){engine.setContext(workerContext);return engine.search(workerRaw);}return new EngineSnapshot(workerRaw,workerRaw,Collections.emptyList(),"");
     }
-    private void resetWorker(){if(engineOpen)engine.reset();workerRaw="";ninePrefix="";nineSegments.clear();nineCandidates=Collections.emptyList();}
+    private void resetWorker(){if(engineOpen)engine.reset();workerRaw="";ninePrefix="";nineReading="";nineSegments.clear();nineCandidates=Collections.emptyList();}
     private EngineSnapshot finishWorker(){
         String commit="";
         if(workerMode.equals("english")){commit=workerRaw;if(inputDictionary!=null&&inputDictionary.english()!=null&&!workerRaw.isEmpty())inputDictionary.english().learn(workerRaw,workerContext);}
         else if(workerMode.equals("nine")){
-            commit=ninePrefix;String remaining=workerRaw;for(int step=0;step<64&&!remaining.isEmpty();step++){List<NineKeyCandidate> found=inputDictionary==null?Collections.emptyList():inputDictionary.suggestNineKey(remaining);if(found.isEmpty()){commit+=remaining;break;}NineKeyCandidate first=found.get(0);if(first.consumedDigits<=0||first.consumedDigits>remaining.length()){commit+=remaining;break;}commit+=first.text;remaining=remaining.substring(first.consumedDigits);}
+            commit=ninePrefix;String remaining=workerRaw;for(int step=0;step<64&&!remaining.isEmpty();step++){List<NineKeyCandidate> found=inputDictionary==null?Collections.emptyList():inputDictionary.suggestNineKey(remaining,step==0?nineReading:"");if(found.isEmpty()){commit+=LocalInputDictionary.nineKeyPreedit(remaining,found);break;}NineKeyCandidate first=found.get(0);if(first.consumedDigits<=0||first.consumedDigits>remaining.length()){commit+=LocalInputDictionary.nineKeyPreedit(remaining,found);break;}commit+=first.text;remaining=remaining.substring(first.consumedDigits);}
         }else if(!workerRaw.isEmpty()){
             if(engineOpen){EngineSnapshot state=engine.search(workerRaw);for(int i=0;i<64&&state.committedText.isEmpty()&&!state.candidates.isEmpty();i++)state=engine.select(state.candidates.get(0).id);commit=state.committedText.isEmpty()?state.composing:state.committedText;}else commit=workerRaw;
         }
@@ -251,12 +256,14 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
         long token=session.get(),generation=++revision;String context=contextBeforeComposition();
         decoder.post(()->{
             if(token!=session.get())return;EngineSnapshot result;String committed=suffix;
-            try{result=action.run();committed=result.committedText+suffix;workerRaw=result.rawPinyin;}catch(Exception|LinkageError error){result=new EngineSnapshot(workerRaw,workerRaw,Collections.emptyList(),"");}
-            EngineSnapshot output=result;String commit=committed;String original=output.composing.isEmpty()?"":mode.equals("pinyin")&&engineOpen?engine.rawInput():output.rawPinyin;
+            try{result=action.run();committed=result.committedText+suffix;workerRaw=result.rawPinyin;}catch(Exception|LinkageError error){result=new EngineSnapshot(mode.equals("nine")?ninePrefix+LocalInputDictionary.nineKeyPreedit(workerRaw,Collections.emptyList()):workerRaw,workerRaw,Collections.emptyList(),"");}
+            EngineSnapshot output=result;String commit=committed;String original=output.composing.isEmpty()?"":mode.equals("pinyin")&&engineOpen?engine.rawInput():mode.equals("nine")?LocalInputDictionary.nineKeyPreedit(output.rawPinyin,nineCandidates):output.rawPinyin;
+            String selectedPrefix=ninePrefix;List<String> readings=new ArrayList<>(mode.equals("nine")&&inputDictionary!=null?inputDictionary.nineKeyReadings(output.rawPinyin):Collections.emptyList());
+            if(mode.equals("nine")&&!nineCandidates.isEmpty()){String leading=nineCandidates.get(0).pinyin.split("'",2)[0];readings.remove(leading);readings.add(0,leading);}
             main.post(()->{
                 if(destroyed||token!=session.get())return;InputConnection ic=getCurrentInputConnection();if(ic==null)return;if(!commit.isEmpty()){ic.commitText(commit,1);composingActive=false;}
                 if(!commit.isEmpty()&&!mode.equals("english")&&!privateInput&&prefs.learning()&&inputDictionary!=null)decoder.post(()->{if(token==session.get())inputDictionary.learnChinese(commit,context);});
-                if(generation==revision){visible=output;visibleRevision=generation;candidateMode=mode;preview=output.composing;rawPreview=original;updateComposing(ic);render();if(preview.isEmpty())requestPrediction();}
+                if(generation==revision){visible=output;visibleRevision=generation;candidateMode=mode;preview=output.composing;rawPreview=original;nineRawPreview=mode.equals("nine")?output.rawPinyin:"";nineVisiblePrefix=mode.equals("nine")?selectedPrefix:"";nineReadings=readings;updateComposing(ic);render();if(preview.isEmpty())requestPrediction();}
             });
         });
     }
@@ -275,36 +282,46 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     private void resetPredictionChain(){predictionPicks=0;predictionSuppressed=false;predictionRequest++;}
     @Override public void clearCandidates(){predictionSuppressed=true;predictionRequest++;glossRequest++;detailRequest++;if(pendingTranslation!=null)translation.removeCallbacks(pendingTranslation);visible=EngineSnapshot.empty();activeGlosses.clear();activeModelWords.clear();applyGlosses();collapse();render();}
     private void updateComposing(InputConnection ic){if(!preview.isEmpty()){ic.setComposingText(preview,1);composingActive=true;}else{if(composingActive)ic.setComposingText("",1);ic.finishComposingText();composingActive=false;}}
+    private void clearPreview(){preview="";rawPreview="";nineRawPreview="";nineVisiblePrefix="";nineReadings=Collections.emptyList();}
     private void showImmediate(){InputConnection ic=getCurrentInputConnection();if(ic!=null)updateComposing(ic);visible=EngineSnapshot.empty();render();}
-    private void directCommit(String text){resetPredictionChain();String mode=currentMode();submit(this::finishWorker,text,mode);preview="";rawPreview="";visible=EngineSnapshot.empty();render();collapse();}
+    private void directCommit(String text){resetPredictionChain();String mode=currentMode();submit(this::finishWorker,text,mode);clearPreview();visible=EngineSnapshot.empty();render();collapse();}
+    private void clearComposition(){resetPredictionChain();predictionSuppressed=true;clearPreview();showImmediate();collapse();submit(()->{resetWorker();return EngineSnapshot.empty();},"",currentMode());}
     @Override public void key(String value){
         if(getCurrentInputConnection()==null)return;
         detailRequest++;
+        if(value.startsWith("READING_")){if(!english&&!numeric&&!sensitive&&currentMode().equals("nine")&&!nineRawPreview.isEmpty()){String reading=value.substring(8);resetPredictionChain();submit(()->{nineReading=reading;return searchWorker();},"","nine");}return;}
         switch(value){
             case "SHIFT":keyboard.shift();return;
-            case "SPLIT":if(!english&&!numeric&&!sensitive&&currentMode().equals("pinyin")&&!rawPreview.isEmpty()&&!rawPreview.endsWith("'"))key("'");return;
-            case "?123":case "ABC":keyboard.toggleSymbols();if(numeric){numeric=false;english=true;configureKeyboard();}return;
+            case "SPLIT":{String raw=currentMode().equals("nine")?nineRawPreview:rawPreview;if(!english&&!numeric&&!sensitive&&!raw.isEmpty()&&!raw.endsWith("'"))key("'");return;}
+            case "CLEAR":clearComposition();return;
+            case "NUMERIC":{String mode=currentMode();resetPredictionChain();submit(this::finishWorker,"",mode);clearPreview();visible=EngineSnapshot.empty();numeric=true;temporaryNumeric=true;keyboard.resetModes();collapse();configureKeyboard();render();return;}
+            case "SYMBOLS":keyboard.toggleSymbols();return;
+            case "?123":case "ABC":if(numeric){numeric=false;if(!temporaryNumeric)english=true;temporaryNumeric=false;keyboard.resetModes();configureKeyboard();render();}else keyboard.toggleSymbols();return;
             case "LANG":if(!sensitive)changeMode(!english,prefs.keyboardMode());return;
-            case "SPACE":{resetPredictionChain();String mode=currentMode();preview="";rawPreview="";visible=EngineSnapshot.empty();render();collapse();submit(()->{boolean empty=workerRaw.isEmpty()&&ninePrefix.isEmpty();EngineSnapshot finished=finishWorker();return new EngineSnapshot("","",Collections.emptyList(),finished.committedText+(mode.equals("english")||empty?" ":""));},"",mode);return;}
+            case "SPACE":{resetPredictionChain();String mode=currentMode();clearPreview();visible=EngineSnapshot.empty();render();collapse();submit(()->{boolean empty=workerRaw.isEmpty()&&ninePrefix.isEmpty();EngineSnapshot finished=finishWorker();return new EngineSnapshot("","",Collections.emptyList(),finished.committedText+(mode.equals("english")||empty?" ":""));},"",mode);return;}
             case "ENTER":resetPredictionChain();enter();return;case "⌫":resetPredictionChain();backspace();return;
             default:
                 resetPredictionChain();
                 boolean letter=value.length()==1&&value.charAt(0)>='a'&&value.charAt(0)<='z';String mode=currentMode();
-                boolean compose=!sensitive&&!numeric&&!keyboard.isSymbols()&&(english?letter:mode.equals("nine")?value.length()==1&&value.charAt(0)>='2'&&value.charAt(0)<='9':letter&&!keyboard.uppercase()||value.equals("'")&&!preview.isEmpty());
+                boolean compose=!sensitive&&!numeric&&!keyboard.isSymbols()&&(english?letter:mode.equals("nine")?value.length()==1&&value.charAt(0)>='2'&&value.charAt(0)<='9'||value.equals("'")&&!nineRawPreview.isEmpty():letter&&!keyboard.uppercase()||value.equals("'")&&!preview.isEmpty());
                 if(compose){
-                    String text=english&&keyboard.uppercase()?value.toUpperCase(java.util.Locale.ROOT):value;String context=contextBeforeComposition();rawPreview=preview.length()>=64?text:rawPreview+text;preview=preview.length()>=64?text:preview+text;showImmediate();
+                    String text=english&&keyboard.uppercase()?value.toUpperCase(java.util.Locale.ROOT):value;String context=contextBeforeComposition();
+                    if(mode.equals("nine")){String prior=nineRawPreview;if(prior.length()>=64){nineRawPreview=text;nineVisiblePrefix="";prior="";}else nineRawPreview+=text;rawPreview=LocalInputDictionary.nineKeyPending(nineRawPreview,prior,rawPreview);preview=nineVisiblePrefix+rawPreview;}
+                    else{rawPreview=preview.length()>=64?text:rawPreview+text;preview=preview.length()>=64?text:preview+text;}showImmediate();
                     submit(()->{String committed="";if(!workerMode.equals(mode)){resetWorker();workerMode=mode;}if(workerRaw.length()>=64)committed=finishWorker().committedText;workerContext=context;workerRaw+=text;EngineSnapshot state=searchWorker();return committed.isEmpty()?state:new EngineSnapshot(state.composing,state.rawPinyin,state.candidates,committed);},"",mode);if(english)keyboard.consumedLetter();
                 }else{String text=letter&&keyboard.uppercase()?value.toUpperCase(java.util.Locale.ROOT):value;directCommit(text);if(letter)keyboard.consumedLetter();}
         }
     }
-    private void changeMode(boolean en,String mode){if(sensitive)return;resetPredictionChain();preview="";rawPreview="";visible=EngineSnapshot.empty();submit(this::finishWorker,"",en?"english":mode.equals("t9")?"nine":"pinyin");english=en;numeric=false;prefs.store.edit().putBoolean("english",en).putString("keyboard_mode",mode).apply();keyboard.resetModes();collapse();configureKeyboard();render();}
+    private void changeMode(boolean en,String mode){if(sensitive)return;resetPredictionChain();clearPreview();visible=EngineSnapshot.empty();submit(this::finishWorker,"",en?"english":mode.equals("t9")?"nine":"pinyin");english=en;numeric=false;temporaryNumeric=false;prefs.store.edit().putBoolean("english",en).putString("keyboard_mode",mode).apply();keyboard.resetModes();collapse();configureKeyboard();render();}
     private void enter(){
-        EditorInfo info=getCurrentInputEditorInfo();String mode=currentMode();int action=info==null?EditorInfo.IME_ACTION_NONE:info.imeOptions&EditorInfo.IME_MASK_ACTION;long token=session.get();preview="";rawPreview="";visible=EngineSnapshot.empty();collapse();
+        EditorInfo info=getCurrentInputEditorInfo();String mode=currentMode();int action=info==null?EditorInfo.IME_ACTION_NONE:info.imeOptions&EditorInfo.IME_MASK_ACTION;long token=session.get();clearPreview();visible=EngineSnapshot.empty();collapse();
         render();submit(()->{if(!workerRaw.isEmpty()||!ninePrefix.isEmpty()){if(workerMode.equals("pinyin")){String raw=engineOpen?engine.rawInput():workerRaw;resetWorker();return new EngineSnapshot("","",Collections.emptyList(),raw);}return finishWorker();}if(info!=null&&(info.imeOptions&EditorInfo.IME_FLAG_NO_ENTER_ACTION)==0&&action!=EditorInfo.IME_ACTION_NONE&&action!=EditorInfo.IME_ACTION_UNSPECIFIED){main.post(()->{if(token==session.get()&&getCurrentInputConnection()!=null)getCurrentInputConnection().performEditorAction(action);});return EngineSnapshot.empty();}return new EngineSnapshot("","",Collections.emptyList(),"\n");},"",mode);
     }
     private void backspace(){
-        if(!preview.isEmpty()){preview=preview.substring(0,preview.offsetByCodePoints(preview.length(),-1));if(!rawPreview.isEmpty())rawPreview=rawPreview.substring(0,rawPreview.length()-1);showImmediate();}String mode=currentMode();long token=session.get();
-        submit(()->{if(!workerRaw.isEmpty()){if(workerMode.equals("pinyin")&&engineOpen)return engine.backspace();workerRaw=workerRaw.substring(0,workerRaw.length()-1);return searchWorker();}if(workerMode.equals("nine")&&!nineSegments.isEmpty()){String[] segment=nineSegments.removeLast();ninePrefix=ninePrefix.substring(0,ninePrefix.length()-segment[1].length());workerRaw=segment[0];return searchWorker();}main.post(()->{if(token!=session.get())return;InputConnection ic=getCurrentInputConnection();if(ic==null)return;CharSequence selected=ic.getSelectedText(0);if(selected!=null&&selected.length()>0)ic.commitText("",1);else ic.deleteSurroundingTextInCodePoints(1,0);});return EngineSnapshot.empty();},"",mode);
+        String mode=currentMode();
+        if(mode.equals("nine")&&!nineRawPreview.isEmpty()){String prior=nineRawPreview;nineRawPreview=nineRawPreview.substring(0,nineRawPreview.length()-1);rawPreview=LocalInputDictionary.nineKeyPending(nineRawPreview,prior,rawPreview);preview=nineVisiblePrefix+rawPreview;showImmediate();}
+        else if(!preview.isEmpty()){preview=preview.substring(0,preview.offsetByCodePoints(preview.length(),-1));if(!rawPreview.isEmpty())rawPreview=rawPreview.substring(0,rawPreview.length()-1);showImmediate();}long token=session.get();
+        submit(()->{nineReading="";if(!workerRaw.isEmpty()){if(workerMode.equals("pinyin")&&engineOpen)return engine.backspace();workerRaw=workerRaw.substring(0,workerRaw.length()-1);return searchWorker();}if(workerMode.equals("nine")&&!nineSegments.isEmpty()){String[] segment=nineSegments.removeLast();ninePrefix=ninePrefix.substring(0,ninePrefix.length()-segment[1].length());workerRaw=segment[0];return searchWorker();}main.post(()->{if(token!=session.get())return;InputConnection ic=getCurrentInputConnection();if(ic==null)return;CharSequence selected=ic.getSelectedText(0);if(selected!=null&&selected.length()>0)ic.commitText("",1);else ic.deleteSurroundingTextInCodePoints(1,0);});return EngineSnapshot.empty();},"",mode);
     }
     @Override public void choose(int index){
         if(visibleRevision!=revision||index<0||index>=visible.candidates.size())return;String kind=candidateMode,word=visible.candidates.get(index).text;int id=visible.candidates.get(index).id;String context=contextBeforeComposition();
@@ -312,7 +329,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
         submit(()->{
             if(kind.startsWith("predict")){resetWorker();if(inputDictionary!=null){if(kind.equals("predict_en")){if(inputDictionary.english()!=null)inputDictionary.english().learn(word,context);}else inputDictionary.learnChinese(word,context);}return new EngineSnapshot("","",Collections.emptyList(),word+(kind.equals("predict_en")?" ":""));}
             if(kind.equals("english")){if(inputDictionary!=null&&inputDictionary.english()!=null)inputDictionary.english().learn(word,workerContext);resetWorker();return new EngineSnapshot("","",Collections.emptyList(),word+" ");}
-            if(kind.equals("nine")){if(id>=nineCandidates.size())return searchWorker();NineKeyCandidate c=nineCandidates.get(id);int consumed=Math.min(workerRaw.length(),c.consumedDigits);if(consumed<=0)return searchWorker();nineSegments.addLast(new String[]{workerRaw.substring(0,consumed),c.text});ninePrefix+=c.text;workerRaw=workerRaw.substring(consumed);if(workerRaw.isEmpty()){String commit=ninePrefix;resetWorker();return new EngineSnapshot("","",Collections.emptyList(),commit);}return searchWorker();}
+            if(kind.equals("nine")){if(id>=nineCandidates.size())return searchWorker();NineKeyCandidate c=nineCandidates.get(id);int consumed=Math.min(workerRaw.length(),c.consumedDigits);if(consumed<=0)return searchWorker();nineSegments.addLast(new String[]{workerRaw.substring(0,consumed),c.text});ninePrefix+=c.text;workerRaw=workerRaw.substring(consumed);nineReading="";if(workerRaw.isEmpty()){String commit=ninePrefix;resetWorker();return new EngineSnapshot("","",Collections.emptyList(),commit);}return searchWorker();}
             return engineOpen?engine.select(id):EngineSnapshot.empty();
         },"",kind.equals("predict_en")?"english":kind.equals("predict_zh")?currentMode():kind);collapse();
     }
@@ -330,14 +347,14 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     }
     @Override public void longKey(String value){
         if(value.startsWith("DIRECT_")){directCommit(value.substring(7));return;}
-        switch(value){case "LANG":((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).showInputMethodPicker();break;case "SHIFT":keyboard.shift();break;case "APOSTROPHE":if(!prefs.nineKey())key("'");break;
-            case "DELETE_WORD":if(!preview.isEmpty()){preview="";rawPreview="";showImmediate();submit(()->{resetWorker();return EngineSnapshot.empty();},"",currentMode());}else editorAction(()->{InputConnection ic=getCurrentInputConnection();CharSequence before=ic.getTextBeforeCursor(128,0);if(before!=null){String s=before.toString();int n=s.length();while(n>0&&Character.isWhitespace(s.charAt(n-1)))n--;while(n>0&&!Character.isWhitespace(s.charAt(n-1)))n--;ic.deleteSurroundingText(s.length()-n,0);requestPrediction();}});break;
+        switch(value){case "LANG":((InputMethodManager)getSystemService(INPUT_METHOD_SERVICE)).showInputMethodPicker();break;case "SHIFT":keyboard.shift();break;case "APOSTROPHE":key("SPLIT");break;
+            case "DELETE_WORD":if(!preview.isEmpty()){clearPreview();showImmediate();submit(()->{resetWorker();return EngineSnapshot.empty();},"",currentMode());}else editorAction(()->{InputConnection ic=getCurrentInputConnection();CharSequence before=ic.getTextBeforeCursor(128,0);if(before!=null){String s=before.toString();int n=s.length();while(n>0&&Character.isWhitespace(s.charAt(n-1)))n--;while(n>0&&!Character.isWhitespace(s.charAt(n-1)))n--;ic.deleteSurroundingText(s.length()-n,0);requestPrediction();}});break;
             case ",":case "，":key("、");break;case ".":case "。":key("…");break;case "ENTER":key("\n");break;default:break;}
     }
     private String nineTranslationSource(int id){
         if(id<0||id>=nineCandidates.size())return "";NineKeyCandidate selected=nineCandidates.get(id);int consumed=selected.consumedDigits;if(consumed<=0||consumed>workerRaw.length())return "";
         StringBuilder text=new StringBuilder(ninePrefix).append(selected.text);String remaining=workerRaw.substring(consumed);
-        for(int step=0;step<64&&!remaining.isEmpty();step++){List<NineKeyCandidate> found=inputDictionary.suggestNineKey(remaining);if(found.isEmpty()){text.append(remaining);break;}NineKeyCandidate first=found.get(0);if(first.consumedDigits<=0||first.consumedDigits>remaining.length()){text.append(remaining);break;}text.append(first.text);remaining=remaining.substring(first.consumedDigits);}
+        for(int step=0;step<64&&!remaining.isEmpty();step++){List<NineKeyCandidate> found=inputDictionary.suggestNineKey(remaining);if(found.isEmpty()){text.append(LocalInputDictionary.nineKeyPreedit(remaining,found));break;}NineKeyCandidate first=found.get(0);if(first.consumedDigits<=0||first.consumedDigits>remaining.length()){text.append(LocalInputDictionary.nineKeyPreedit(remaining,found));break;}text.append(first.text);remaining=remaining.substring(first.consumedDigits);}
         return text.toString();
     }
     @Override public void detail(int index){translateCandidate(index,false);}
@@ -360,7 +377,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     private boolean detailAnchorMatches(){InputConnection ic=getCurrentInputConnection();if(ic==null||!detailAnchorContext.equals(contextBeforeComposition()))return false;CharSequence selected=ic.getSelectedText(0);return detailSelectedLength==(selected==null?0:selected.length());}
     private boolean detailMatches(long token,long generation,long request){return !destroyed&&inputViewActive&&token==session.get()&&generation==revision&&request==detailRequest&&detailTarget.equals(english?"zh":prefs.glossLanguage())&&detailAnchorMatches();}
     private void showDetailResult(){panels.detailResult(detailSource,detailTranslated,detailNote,detailExplanation.isEmpty()?"":detailExplanation+(detailExplanationNote.isEmpty()?"":"\n"+detailExplanationNote),detailPos,detailTarget,detailExample,detailExampleTranslation,detailExampleNote);}
-    private void commitTranslation(String value){if(value.isEmpty()||sensitive||detailSession!=session.get()||detailRevision!=revision||!detailAnchorMatches())return;InputConnection ic=getCurrentInputConnection();if(ic==null)return;long token=session.get();revision++;preview="";rawPreview="";visible=EngineSnapshot.empty();composingActive=false;
+    private void commitTranslation(String value){if(value.isEmpty()||sensitive||detailSession!=session.get()||detailRevision!=revision||!detailAnchorMatches())return;InputConnection ic=getCurrentInputConnection();if(ic==null)return;long token=session.get();revision++;clearPreview();visible=EngineSnapshot.empty();composingActive=false;
         // Commit in the same main-thread callback as the anchor check; a decoder round-trip lets the cursor move in between.
         if(detailAnchorRequired)predictionPicks++;else resetPredictionChain();ic.commitText(value,1);decoder.post(()->{if(token==session.get())resetWorker();});collapse();render();requestPrediction();}
     private String modelStatus(){return TranslationRepository.languageName(prefs.glossLanguage())+" · "+translations.modelStatusText(prefs.glossLanguage());}
@@ -402,7 +419,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
         }
     }
     private void editContext(int id){if(sensitive&&(id==android.R.id.copy||id==android.R.id.cut||id==android.R.id.selectAll))return;submit(this::finishWorker,"",currentMode());editorAction(()->{InputConnection ic=getCurrentInputConnection();boolean applied=ic.performContextMenuAction(id);if(!applied&&id==android.R.id.paste){String text=clipboard.currentText();if(!text.isEmpty())ic.commitText(text,1);}if(id==android.R.id.copy||id==android.R.id.cut)clipboard.record(clipboard.currentText());requestPrediction();});}
-    private void finishBeforeEditing(){if(!preview.isEmpty()){preview="";rawPreview="";visible=EngineSnapshot.empty();submit(this::finishWorker,"",currentMode());render();}}
+    private void finishBeforeEditing(){if(!preview.isEmpty()){clearPreview();visible=EngineSnapshot.empty();submit(this::finishWorker,"",currentMode());render();}}
     @Override public void onUpdateSelection(int oldStart,int oldEnd,int newStart,int newEnd,int candidatesStart,int candidatesEnd){
         super.onUpdateSelection(oldStart,oldEnd,newStart,newEnd,candidatesStart,candidatesEnd);InputConnection ic=getCurrentInputConnection();if(ic==null)return;
         if(!preview.isEmpty()){
@@ -411,12 +428,12 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
             CharSequence before=ic.getTextBeforeCursor(preview.length(),0),selected=ic.getSelectedText(0);
             if(before==null)return;
             if(before!=null&&before.toString().equals(preview)&&(selected==null||selected.length()==0))return;
-            session.incrementAndGet();revision++;detailRequest++;preview="";rawPreview="";visible=EngineSnapshot.empty();composingActive=false;ic.finishComposingText();decoder.post(this::resetWorker);collapse();render();requestPrediction();
+            session.incrementAndGet();revision++;detailRequest++;clearPreview();visible=EngineSnapshot.empty();composingActive=false;ic.finishComposingText();decoder.post(this::resetWorker);collapse();render();requestPrediction();
         }else if(oldStart!=newStart||oldEnd!=newEnd){if(detailAnchorRequired&&!detailAnchorMatches()){detailRequest++;detailRevision=-1;}requestPrediction();}
     }
     @Override public boolean onKeyDown(int code,KeyEvent event){if(code==KeyEvent.KEYCODE_BACK&&panels!=null&&panels.isOpen()){collapse();return true;}return super.onKeyDown(code,event);}
     @Override public void onFinishInputView(boolean finishing){inputViewActive=false;dismissPinyinBubble();if(keyboard!=null)keyboard.cancelTouch();if(candidates!=null)candidates.cancelTouch();if(expandedCandidates!=null)expandedCandidates.cancelTouch();collapse();super.onFinishInputView(finishing);}
-    @Override public void onFinishInput(){dismissPinyinBubble();rawPreview="";if(destroyed){super.onFinishInput();return;}session.incrementAndGet();revision++;preview="";rawPreview="";visible=EngineSnapshot.empty();composingActive=false;decoder.post(()->{resetWorker();if(engineOpen&&!privateInput)engine.flush();if(inputDictionary!=null)try{inputDictionary.flush();}catch(Exception ignored){}});if(pendingTranslation!=null)translation.removeCallbacks(pendingTranslation);super.onFinishInput();}
+    @Override public void onFinishInput(){dismissPinyinBubble();rawPreview="";if(destroyed){super.onFinishInput();return;}session.incrementAndGet();revision++;clearPreview();visible=EngineSnapshot.empty();composingActive=false;decoder.post(()->{resetWorker();if(engineOpen&&!privateInput)engine.flush();if(inputDictionary!=null)try{inputDictionary.flush();}catch(Exception ignored){}});if(pendingTranslation!=null)translation.removeCallbacks(pendingTranslation);super.onFinishInput();}
     @Override public void onConfigurationChanged(Configuration config){dismissPinyinBubble();super.onConfigurationChanged(config);restoreComposingSpan();configureKeyboard();if(panels!=null&&panels.isOpen())collapse();if(root!=null)root.requestLayout();}
     @Override public void onDestroy(){destroyed=true;dismissPinyinBubble();session.incrementAndGet();main.removeCallbacksAndMessages(null);if(clipboard!=null)clipboard.close();translations.close();decoder.post(()->{if(engineOpen){engine.close();engineOpen=false;}if(inputDictionary!=null){inputDictionary.close();inputDictionary=null;}decoderThread.quitSafely();});translation.post(()->translationThread.quitSafely());super.onDestroy();}
 }

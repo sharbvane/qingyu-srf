@@ -1,6 +1,6 @@
 package com.qingyu.core;
 
-/** A local Chinese reading matched by T9. Consumed digits are never guessed by the UI. */
+/** A T9 reading. Consumed length includes explicit separators in the raw input. */
 public final class NineKeyCandidate {
     public final String text;
     public final String pinyin;

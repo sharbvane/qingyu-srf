@@ -7,6 +7,8 @@ import android.graphics.Rect;
 import android.os.PersistableBundle;
 import android.os.SystemClock;
 import android.text.InputType;
+import android.view.InputDevice;
+import android.view.MotionEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
@@ -33,8 +35,8 @@ public class ImeV2Instrumentation extends ImeSmokeInstrumentation {
         pass("expand only within an active candidate row");
 
         clear();selectMode("中文 · 九键拼音");type("52432");awaitCandidate("开发");clickCandidate("开发");awaitText("开发");
-        clear();hold("2",620);awaitText("2");screenshot("v2-nine.png");
-        pass("nine-key 52432 selects 开发, long press commits digit without pinyin");
+        clear();long nineHold=beginNineHold("2");endNineHold(nineHold,"2",false);awaitText("2");screenshot("v2-nine.png");
+        pass("nine-key 52432 selects 开发, long press slide selects a digit without pinyin");
         selectMode("中文 · 全键拼音");clear();
 
         selectMode("English");type("hel");awaitCandidate("hello");awaitGloss("hello","你好");awaitText("hel");clickCandidate("hello");awaitText("hello ");
@@ -127,6 +129,13 @@ public class ImeV2Instrumentation extends ImeSmokeInstrumentation {
         pass("dark theme with new navigation and candidate learning gestures");
     }
     protected void selectMode(String title){nodeClick("toolbar_mode");buttonClick(title);keyboardReady();}
+    protected long beginNineHold(String digit){Rect r=new Rect();awaitNode("key_"+digit).getBoundsInScreen(r);long start=SystemClock.uptimeMillis();touch(r.centerX(),r.centerY(),true,start);SystemClock.sleep(620);awaitNode("hold_"+digit);return start;}
+    protected void endNineHold(long start,String choice,boolean cancel){
+        Rect r=new Rect();awaitNode("hold_"+choice).getBoundsInScreen(r);
+        MotionEvent move=MotionEvent.obtain(start,SystemClock.uptimeMillis(),MotionEvent.ACTION_MOVE,r.centerX(),r.centerY(),0);move.setSource(InputDevice.SOURCE_TOUCHSCREEN);check(automation.injectInputEvent(move,true),"Nine-key picker slide failed");move.recycle();SystemClock.sleep(70);
+        check(awaitNode("hold_"+choice).isSelected(),"Nine-key picker did not highlight "+choice);
+        MotionEvent end=MotionEvent.obtain(start,SystemClock.uptimeMillis(),cancel?MotionEvent.ACTION_CANCEL:MotionEvent.ACTION_UP,r.centerX(),r.centerY(),0);end.setSource(InputDevice.SOURCE_TOUCHSCREEN);check(automation.injectInputEvent(end,true),"Nine-key picker release failed");end.recycle();
+    }
     protected void setLanguage(String title){String value=getTargetContext().getSharedPreferences("qingyu",0).getString("gloss_language","en");String current=value.equals("ja")?"日语":value.equals("fr")?"法语":"英语";nodeClick("toolbar_more");buttonClick("释义显示语言 · "+current);buttonClick(title);closePanel();keyboardReady();}
     private void clickCandidateAfter(String word){awaitCandidate(word);clickCandidate(word);}
     protected void holdCandidate(String word){Rect bounds=new Rect();candidate(word).getBoundsInScreen(bounds);long start=SystemClock.uptimeMillis();touch(bounds.centerX(),bounds.centerY(),true,start);SystemClock.sleep(620);touch(bounds.centerX(),bounds.centerY(),false,SystemClock.uptimeMillis());}

@@ -10,12 +10,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sharbvane/qingyu-srf/releases/download/v0.6.0/Qingyu-0.6.0.apk"><img alt="Published APK v0.6.0" src="https://img.shields.io/badge/Published_APK-v0.6.0-476B57"></a>
+  <a href="https://github.com/sharbvane/qingyu-srf/releases/download/v0.6.5/Qingyu-0.6.5.apk"><img alt="Published APK v0.6.5" src="https://img.shields.io/badge/Published_APK-v0.6.5-476B57"></a>
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPL--3.0-blue.svg"></a>
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
 </p>
 
 **Qingyu is first a Chinese keyboard.** Type pinyin and choose Chinese as usual. A quiet gloss in the selected language appears above a candidate, with English as the default and local dictionaries first. Tapping “开发” still enters only “开发”.
+
+**Qingyu v0.6.5 nine-key update is now released:** [GitHub Release and APK](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.6.5), [SHA-256 file](https://github.com/sharbvane/qingyu-srf/releases/download/v0.6.5/Qingyu-0.6.5.apk.sha256), [installation notes](releases/README-v0.6.5.md), and [validation](docs/validation-v0.6.5.md). Nine-key preedit shows inferred pinyin, the left rail offers syllable alternatives, and holding a letter group opens a slide-to-select uppercase/lowercase/number picker.
 
 ## Preview
 
@@ -23,11 +25,11 @@
 | --- | --- |
 | ![Qingyu light keyboard with candidates and attached pinyin](docs/images/keyboard-v0.4.0-light.png) | ![Qingyu dark keyboard with candidates and attached pinyin](docs/images/keyboard-v0.4.0-dark.png) |
 
-**v0.6.0 is released**: get the APK and SHA-256 file from the [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.6.0). See the [validation record](docs/validation-v0.6.0.md) and [installation notes](releases/README-v0.6.0.md). Preview images illustrate the themes and do not show the latest v0.6 details.
+Preview images illustrate the themes and do not show the latest v0.6.5 details.
 
 ## Features
 
-- **Full pinyin and nine-key:** The AOSP decoder uses a pinned modern Rime-ice lexicon, with indexed alternate segmentations and bounded sentence composition. v0.6 adds context statistics from real Chinese text to improve sentence composition and prediction. Full pinyin has a manual segmentation key to insert a pinyin separator. Repeated word, initials and phrase choices gradually improve local ranking while preserving existing learning records. One-edit typo suggestions are optional candidates and preserve the original letters. Enter commits raw pinyin.
+- **Full pinyin and nine-key:** The AOSP decoder uses a pinned modern Rime-ice lexicon, with indexed alternate segmentations and bounded sentence composition. v0.6 adds context statistics from real Chinese text to improve sentence composition and prediction. Full pinyin has a manual segmentation key to insert a pinyin separator. Repeated word, initials and phrase choices gradually improve local ranking while preserving existing learning records. One-edit typo suggestions are optional candidates and preserve the original letters. Full-pinyin Enter commits raw letters; nine-key confirmation commits a Chinese candidate.
 - **English candidates:** Over 121,000 word forms, completions, explicit spelling suggestions and contextual next-word prediction, with Chinese glosses.
 - **Compact keyboard top:** Idle shows a short empty candidate strip and icon navigation. While composing, candidates replace the navigation area; navigation returns when composition ends. Fixed overall top space keeps the keys steady. The expanded list replaces the keys, scrolls continuously up and down, and wraps complete sentences and translations. A prediction chain stops after at most three selections; the rightmost X clears current predictions. Unreliable contexts can produce no prediction.
 - **Quiet language learning:** Local definitions come first; installed on-device models asynchronously fill missing visible character, word, phrase and sentence translations. Chinese candidates do not wait for translation. Tap enters the original word, hold opens layered details, and swipe up directly enters a concise translation in the selected language. Full dictionary senses remain in details. Switching the language updates candidates, details and swipe translations together. The compact candidate row and expanded list show no Google brand strip or badge; held-candidate details retain model attribution. See the [SDK attribution notes](third_party/mlkit/SOURCE.md) for the applicable source requirements.
@@ -44,11 +46,11 @@ Missing definitions or unavailable translations stay blank. Dictionary senses an
 
 ## Install and try it
 
-1. Download and install the [Qingyu v0.6.0 APK](https://github.com/sharbvane/qingyu-srf/releases/download/v0.6.0/Qingyu-0.6.0.apk), and get its SHA-256 file from the [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.6.0). Earlier versions are listed under [all GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases). Android 8.0 or newer is required.
+1. Download and install the [Qingyu v0.6.5 APK](https://github.com/sharbvane/qingyu-srf/releases/download/v0.6.5/Qingyu-0.6.5.apk), and get its SHA-256 file from the [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.6.5). Earlier versions are listed under [all GitHub Releases](https://github.com/sharbvane/qingyu-srf/releases). Android 8.0 or newer is required.
 2. Install and open Qingyu. Use **Enable Qingyu Input Method**, then **Switch to Qingyu**. Android requires these system settings steps.
 3. In any text field, try `anzhuo`, `dangang` or `nohao`. Tap a Chinese candidate to enter Chinese only.
 
-The current public release is **v0.6.0**. Download the APK and SHA-256 file from the [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.6.0), and read the [validation record](docs/validation-v0.6.0.md). It installs over v0.5 and preserves learning data. See [signing and backup](docs/release-signing.md). Long-term physical-device use remains unverified.
+The current public release is **v0.6.5**. Download the APK and SHA-256 file from the [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.6.5), and read the [validation record](docs/validation-v0.6.5.md). It installs over v0.6.0 and preserves learning data. See [signing and backup](docs/release-signing.md). Long-term physical-device use remains unverified.
 
 Choose English, Japanese, French, German, Russian or Spanish under More → annotation language. Explicitly selecting a required non-English language for the first time starts its optional model download. Normal typing never downloads a model. Wi-Fi is the default; Translation model management can explicitly allow mobile data. The page shows real transferred bytes, a known total or an indeterminate indicator, waiting states, failure reasons and retry, plus installed size and deletion. The five extra Japanese, French, German, Russian and Spanish models have been freshly downloaded and tested for on-device translation on the Android 15 / API 35 emulator. Downloads still require a network that can reach the official model service. Extra languages reserve no model storage before downloading. Chinese and English keyboards remain available.
 
@@ -91,7 +93,7 @@ pwsh -File scripts/setup-toolchain.ps1
 pwsh -File scripts/build.ps1 -Variant Release -Test
 ```
 
-Build output goes to `releases/`. Local tools and signing files are excluded by `.gitignore`. Restore the existing signing materials on a new machine; never generate a replacement key. See [signing](docs/release-signing.md), the [v0.6 validation record](docs/validation-v0.6.0.md) and [local installation notes and limits](releases/README-v0.6.0.md).
+Build output goes to `releases/`. Local tools and signing files are excluded by `.gitignore`. Restore the existing signing materials on a new machine; never generate a replacement key. See [signing](docs/release-signing.md), the [v0.6.5 validation record](docs/validation-v0.6.5.md) and [installation notes and limits](releases/README-v0.6.5.md).
 
 ## Roadmap
 

@@ -96,7 +96,19 @@ final class KeyboardTouchCheck {
             prefs.store.edit().putString("keyboard_mode","t9").commit();
             instrumentation.runOnMainSync(()-> {view.configure(false,false,"↵",false);layout(view);});
             Rect two=bounds(view,2);tap(instrumentation,view,two);expect(output,"KEY_2");
-            hold(instrumentation,view,two);expect(output,"DIRECT_2");up(instrumentation,view,two.centerX(),two.centerY());expect(output);
+            hold(instrumentation,view,two);expect(output);popupInside(instrumentation,view);
+            expectChoices(instrumentation,view,"A","B","C","a","b","c","2");
+            up(instrumentation,view,two.centerX(),two.centerY());expect(output,"DIRECT_a");
+            for(int digit=2;digit<=9;digit++) {
+                Rect group=bounds(view,digit);tap(instrumentation,view,group);expect(output,"KEY_"+digit);
+                String letters=new String[]{"abc","def","ghi","jkl","mno","pqrs","tuv","wxyz"}[digit-2];
+                for(String choice:new String[]{letters.substring(letters.length()-1).toUpperCase(java.util.Locale.ROOT),letters.substring(letters.length()-1),Integer.toString(digit)}) {
+                    hold(instrumentation,view,group);expect(output);popupInside(instrumentation,view);pickChoice(instrumentation,view,choice);expect(output,"DIRECT_"+choice);
+                }
+            }
+            hold(instrumentation,view,two);event(instrumentation,view,MotionEvent.ACTION_CANCEL,two.centerX(),two.centerY());up(instrumentation,view,two.centerX(),two.centerY());expect(output);
+            hold(instrumentation,view,two);instrumentation.runOnMainSync(view::resetModes);up(instrumentation,view,two.centerX(),two.centerY());expect(output);
+            hold(instrumentation,view,two);instrumentation.runOnMainSync(()->view.configure(true,false,"↵",false));up(instrumentation,view,two.centerX(),two.centerY());expect(output);
         } finally {
             instrumentation.runOnMainSync(()-> {if(keyboard[0]!=null)keyboard[0].cancelTouch();});
             prefs.store.edit().putString("keyboard_mode",previous).commit();
@@ -116,6 +128,17 @@ final class KeyboardTouchCheck {
                 check(bounds.left>=0 && bounds.top>=0 && bounds.right<=view.getWidth() && bounds.bottom<=view.getHeight(),"Hold picker escaped the keyboard");
             } catch(ReflectiveOperationException e){throw new AssertionError(e);}
         });
+    }
+    private static void expectChoices(Instrumentation instrumentation,KeyboardSurface view,String... expected) {
+        instrumentation.runOnMainSync(()->check(java.util.Arrays.equals(choices(view),expected),"Nine-key picker options differ"));
+    }
+    private static String[] choices(KeyboardSurface view) {
+        try{java.lang.reflect.Field field=KeyboardSurface.class.getDeclaredField("holdChoices");field.setAccessible(true);return (String[])field.get(view);}catch(ReflectiveOperationException e){throw new AssertionError(e);}
+    }
+    private static void pickChoice(Instrumentation instrumentation,KeyboardSurface view,String choice) {
+        String[] options=choices(view);int index=java.util.Arrays.asList(options).indexOf(choice);check(index>=0,"Missing nine-key picker choice "+choice);
+        Rect cell=bounds(view,1000+index);move(instrumentation,view,cell.centerX(),cell.centerY());
+        check(view.getAccessibilityNodeProvider().createAccessibilityNodeInfo(1000+index).isSelected(),"Nine-key slide did not select "+choice);up(instrumentation,view,cell.centerX(),cell.centerY());
     }
     private static void event(Instrumentation instrumentation,KeyboardSurface view,int action,float x,float y) {
         instrumentation.runOnMainSync(()-> {

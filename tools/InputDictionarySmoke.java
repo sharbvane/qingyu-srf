@@ -30,6 +30,32 @@ public final class InputDictionarySmoke {
         check(project.get(0).text.equals("开发项目"),"multiword nine-key segmentation");
         check(dictionary.suggestNineKey("644").stream().anyMatch(candidate->candidate.text.equals("你好")),"partial pinyin completion");
         check(dictionary.suggestNineKey("111").isEmpty(),"digit trust boundary");
+        check(LocalInputDictionary.nineKeyPreedit("64426",hello).equals("ni'hao"),"nine-key composition exposes pinyin, not key numbers");
+        check(LocalInputDictionary.nineKeyPreedit("644",dictionary.suggestNineKey("644")).equals("ni'h"),"partial preedit must not invent untyped completion letters");
+        check(LocalInputDictionary.nineKeyPending("644","64","ni").equals("nig"),"pending next key replaced already resolved pinyin");
+        check(LocalInputDictionary.nineKeyPending("6442","64426","ni'hao").equals("ni'ha"),"pending delete replaced already resolved pinyin");
+        check(LocalInputDictionary.nineKeyPending("64'","64","ni").equals("ni'")&&LocalInputDictionary.nineKeyPending("64","64'","ni'").equals("ni"),"pending separator insertion/deletion lost its boundary");
+        check(LocalInputDictionary.nineKeyPending("54","64","ni").equals(LocalInputDictionary.nineKeyFallback("54")),"unrelated pending keys reused old spelling");
+        for(String pending:new String[]{"2","5","548","64426","64'426","548'"}){
+            String fallback=LocalInputDictionary.nineKeyFallback(pending),preedit=LocalInputDictionary.nineKeyPreedit(pending,dictionary.suggestNineKey(pending));
+            check(fallback.matches("[a-z']+")&&fallback.replace("'","").length()==pending.replace("'","").length(),"cold/pending key fallback lost a key or displayed digits: "+pending);
+            check(preedit.matches("[a-z']+")&&preedit.replace("'","").length()==pending.replace("'","").length(),"live preedit lost a key or displayed digits: "+pending);
+        }
+        List<NineKeyCandidate> nineKey=dictionary.suggestNineKey("5485426","jiu");
+        check(nineKey.stream().anyMatch(candidate->candidate.text.equals("九键")&&candidate.pinyin.equals("jiu'jian")&&candidate.consumedDigits==7),"modern nine-key word is absent from bounded generic readings");
+        check(nineKey.stream().allMatch(candidate->candidate.pinyin.split("'",2)[0].equals("jiu")),"selected side syllable leaked other first readings");
+        List<String> readings=dictionary.nineKeyReadings("548");
+        check(readings.contains("jiu")&&readings.contains("liu")&&readings.contains("ji")&&readings.contains("li")&&readings.size()<=6,"side syllables must preserve long and short alternatives");
+        List<NineKeyCandidate> splitHello=dictionary.suggestNineKey("64'426");
+        check(splitHello.get(0).text.equals("你好")&&splitHello.get(0).consumedDigits==6&&LocalInputDictionary.nineKeyPreedit("64'426",splitHello).equals("ni'hao"),"explicit split changed text/raw consumed length");
+        List<NineKeyCandidate> splitNine=dictionary.suggestNineKey("548'5426","jiu");
+        check(splitNine.stream().anyMatch(candidate->candidate.text.equals("九键")&&candidate.consumedDigits==8),"manual syllable split rejected a modern full reading");
+        check(dictionary.suggestNineKey("6'4426").stream().noneMatch(candidate->candidate.text.equals("你好")),"explicit split was silently ignored");
+        check(dictionary.suggestNineKey("64'").stream().anyMatch(candidate->candidate.text.equals("你")&&candidate.consumedDigits==3),"trailing split must be consumed with its preceding syllable");
+        check(LocalInputDictionary.nineKeyPreedit("524329426468",java.util.Collections.singletonList(new NineKeyCandidate("开发","kai'fa",5))).equals("kai'fa'wgamgmt"),"partial candidate fallback must retain unconsumed keys");
+        for(String bad:new String[]{"'64","64''426","64 426","64126","64\n426","2".repeat(65)})check(dictionary.suggestNineKey(bad).isEmpty()&&LocalInputDictionary.nineKeyFallback(bad).isEmpty(),"T9 input trust boundary "+bad);
+        check(dictionary.suggestNineKey("5485426","JIU").isEmpty(),"side reading trust boundary");
+        System.out.println("NINE_KEY_V065_CHECKS_PASS: dynamic pinyin, raw separators, bounded modern readings, explicit first syllable, cold fallback and retained suffix");
         String longDigits="64426".repeat(8);
         List<NineKeyCandidate> longSentence=dictionary.suggestNineKey(longDigits);
         check(!longSentence.isEmpty() && longSentence.get(0).consumedDigits==40,"long digit sentence retains every input key");
@@ -85,7 +111,7 @@ public final class InputDictionarySmoke {
         LocalInputDictionary bounded=new LocalInputDictionary();for(int i=0;i<2200;i++)bounded.learn("zz"+(char)('a'+i%26)+(char)('a'+i/26%26)+(char)('a'+i/676),"测试","","ce'shi");check(((java.util.Map<?,?>)coded.get(bounded)).size()==2048,"unbounded personal counters");Field index=LocalInputDictionary.class.getDeclaredField("learnedPinyin");index.setAccessible(true);check(((java.util.Map<?,?>)index.get(bounded)).size()<=2048,"pruned counters left unbounded personal word index");bounded.close();
         check(args.length>=4,"Native dictionary and isolated user file are required");segmentedLearning(args,modern,coded,file,load);
         long start=System.nanoTime();
-        for(int i=0;i<200;i++) dictionary.suggestNineKey(new String[]{"64426","52432","9426468","524329426468"}[i%4]);
+        for(int i=0;i<200;i++) dictionary.suggestNineKey(new String[]{"64426","5485426","64'426","524329426468"}[i%4]);
         System.out.printf("ALL_INPUT_DICTIONARY_CHECKS_PASS: actual Android SQLite, 200 nine-key calls %.2f ms%n",(System.nanoTime()-start)/1e6);
         dictionary.close();
     }
