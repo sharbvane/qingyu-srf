@@ -16,7 +16,7 @@ public class ImeV3Instrumentation extends ImeV2Instrumentation {
     @Override protected void runChecks() throws Exception {
         if(modelsOnly){checkModelManagement();return;}
         if(debugTarget()){
-            KeyboardTouchCheck.run(this);pass("letter hold-slide, case, cancellation, cursor and repeat touch state check");
+            KeyboardTouchCheck.run(this,activity);pass("letter hold-slide, case, cancellation, cursor and repeat touch state check");
             mainCheck(()->CandidateLayoutCheck.run(getTargetContext()));pass("fixed candidate/grid bounds, prediction X and readable POS colors");
             mainCheck(()->PanelLayoutCheck.run(getTargetContext()));pass("all panel owners, continuous height and constrained window geometry");
         }

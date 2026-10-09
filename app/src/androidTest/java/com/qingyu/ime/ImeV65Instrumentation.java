@@ -26,7 +26,7 @@ public class ImeV65Instrumentation extends ImeV2Instrumentation {
         screenshot("nine-pinyin.png");
         pass("5485426 displays live alphabetic pinyin in both preedit and real composing span; fixed candidate/key geometry");
 
-        nodeClick("key_READING_jiu");String restricted=awaitPinyin("");check(restricted.startsWith("jiu"),"Side reading failed to restrict the leading syllable: "+restricted);
+        selectReading("jiu");String restricted=awaitPinyin("");check(restricted.startsWith("jiu"),"Side reading failed to restrict the leading syllable: "+restricted);
         findExpandedCandidate("九键");clickCandidate("九键");awaitText("九键");awaitNoComposition();
         pass("side jiu restricts ambiguity; 九键 is selectable and selection removes the composing bubble");
 
@@ -99,8 +99,27 @@ public class ImeV65Instrumentation extends ImeV2Instrumentation {
     private String pinyinDescription(AccessibilityNodeInfo node){if(node==null)return null;String description=String.valueOf(node.getContentDescription()),marker="原始拼音 · ";int at=description.indexOf(marker);if(at>=0)return description.substring(at+marker.length());for(int i=0;i<node.getChildCount();i++){String reading=pinyinDescription(node.getChild(i));if(reading!=null)return reading;}return null;}
     protected void awaitNoComposition(){long until=SystemClock.uptimeMillis()+4000;while(SystemClock.uptimeMillis()<until){if(accessiblePinyin().isEmpty()&&composing().isEmpty())return;SystemClock.sleep(35);}throw new AssertionError("Composition survived commit: "+composing());}
     protected void findExpandedCandidate(String word){
+        awaitCandidate(null);
         if(candidate(word)!=null)return;nodeClick("candidate_expand");SystemClock.sleep(180);
         for(int attempt=0;attempt<12&&candidate(word)==null;attempt++){AccessibilityNodeInfo host=awaitNode("panel_host"),visible=null;for(int i=0;i<128&&visible==null;i++)visible=walk(host,"candidate_"+i);check(visible!=null,"Expanded nine-key candidates unavailable");if(!visible.getParent().performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD))break;SystemClock.sleep(160);}
         check(candidate(word)!=null,"Missing expanded nine-key candidate "+word+"; editor="+text());
+    }
+    protected AccessibilityNodeInfo findReading(AccessibilityNodeInfo node){
+        String id=node.getViewIdResourceName();if(id!=null&&id.contains("key_READING_")&&!id.endsWith("BACK"))return node;
+        for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo child=node.getChild(i);if(child!=null){AccessibilityNodeInfo found=findReading(child);if(found!=null)return found;}}return null;
+    }
+    protected void selectReading(String reading){
+        String id="key_READING_"+reading;
+        long until=SystemClock.uptimeMillis()+5000;boolean forward=true;
+        while(SystemClock.uptimeMillis()<until){
+            if(android.os.Build.VERSION.SDK_INT>=33)automation.clearCache();
+            AccessibilityNodeInfo choice=find(id);
+            // Rail positions are reused after each selection; discard cached virtual nodes before acting.
+            if(choice!=null&&choice.performAction(AccessibilityNodeInfo.ACTION_CLICK)){SystemClock.sleep(160);return;}
+            AccessibilityNodeInfo first=findReading(awaitNode("panel_host"));
+            if(first!=null){AccessibilityNodeInfo host=first.getParent();int action=forward?AccessibilityNodeInfo.ACTION_SCROLL_FORWARD:AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD;if(!host.performAction(action))forward=!forward;}
+            SystemClock.sleep(100);
+        }
+        throw new AssertionError("No selectable side pinyin: "+reading+" composing="+composing());
     }
 }

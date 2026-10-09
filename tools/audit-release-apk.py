@@ -206,6 +206,23 @@ with zipfile.ZipFile(apk) as archive:
             plan = " ".join(str(row[-1]) for row in lexicon.execute(f"EXPLAIN QUERY PLAN SELECT text,pinyin,weight FROM words WHERE {field}=? ORDER BY weight DESC LIMIT 64", (code,)))
             assert "USING INDEX" in plan and "TEMP B-TREE" not in plan, plan
     metadata["chinese_pinyin"] = pinyin_manifest
+    t9_manifest = json.loads((ROOT / "third_party/pinyinime/t9-v1-manifest.json").read_text(encoding="utf-8-sig"))
+    t9_source = (ROOT / t9_manifest["path"]).read_bytes()
+    assert {"bytes": len(t9_source), "sha256": digest(t9_source)} == {"bytes": t9_manifest["bytes"], "sha256": t9_manifest["sha256"]}
+    assert t9_manifest["source_sha256"] == pinyin_manifest["lexicon"]["sha256"]
+    t9_binary = gzip.decompress(t9_source)
+    magic, schema, nodes, readings, syllables = struct.unpack_from(">5i", t9_binary)
+    assert magic == 0x51595439 and schema == 1
+    assert readings == t9_manifest["readings"] == pinyin_manifest["lexicon"]["readings"]
+    assert nodes == t9_manifest["nodes"] and syllables == t9_manifest["syllables"]
+    offset = 20
+    for _ in range(syllables):
+        size = struct.unpack_from(">H", t9_binary, offset)[0]
+        assert 1 <= size <= 6 and re.fullmatch(b"[a-z]+", t9_binary[offset+2:offset+2+size])
+        offset += 2 + size
+    assert len(t9_binary) - offset == t9_manifest["primitive_array_bytes"] == 14 * nodes + 8 + 8 * readings
+    assert metadata["assets"]["assets/pinyin/t9-v1.bin"] == {"bytes": len(t9_binary), "sha256": digest(t9_binary)}
+    metadata["chinese_t9"] = t9_manifest
     context_manifest = json.loads((ROOT / "third_party/input-data/chinese-context/manifest.json").read_text(encoding="utf-8-sig"))
     context_source = (ROOT / "app/src/main/assets/input/chinese-context-v1.bin.gz").read_bytes()
     assert {"bytes": len(context_source), "sha256": digest(context_source)} == {"bytes": context_manifest["model_bytes"], "sha256": context_manifest["model_sha256"]}

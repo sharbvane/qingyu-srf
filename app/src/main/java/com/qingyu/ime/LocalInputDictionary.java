@@ -29,6 +29,7 @@ import java.util.function.Consumer;
 final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon {
     private SQLiteDatabase database;
     private SQLiteDatabase pinyinDatabase;
+    private NineKeyLexicon nineLexicon;
     private ChineseContextModel contextModel;
     private volatile EnglishEngine english;
     private File learningFile;
@@ -42,8 +43,9 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
     private final Map<String,List<PinyinRow>> pinyinCache=new LinkedHashMap<>(64,.75f,true);
     private boolean pinyinDirty;
     private final Map<String,List<Row>> nineCache=new LinkedHashMap<>();
-    private final Map<String,List<Row>> nineModernCache=new LinkedHashMap<>();
     private final Map<String,List<String>> nineSyllableCache=new LinkedHashMap<>();
+    private final Map<String,List<NineWord>> nineWordCache=new LinkedHashMap<>(64,.75f,true);
+    private final Map<Integer,Row> nineRowCache=new LinkedHashMap<>(256,.75f,true);
     private final Map<String,String> glossCache=new LinkedHashMap<>();
     private final Map<String,String> posCache=new LinkedHashMap<>();
 
@@ -73,6 +75,7 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
             }
             // Optional modern data must never take English/T9 or native pinyin down.
             try{File modern=installAsset(context,"pinyin/lexicon-v2.db","lexicon-v2.db");dictionary.pinyinDatabase=SQLiteDatabase.openDatabase(modern.getPath(),null,SQLiteDatabase.OPEN_READONLY);}catch(Exception ignored){}
+            if(dictionary.pinyinDatabase!=null)try{dictionary.nineLexicon=NineKeyLexicon.load(context.getAssets().open("pinyin/t9-v1.bin"));}catch(Exception failure){android.util.Log.w("QingyuData","Modern T9 unavailable; legacy input remains ready",failure);}
             dictionary.pinyinLearningFile=new File(context.getFilesDir(),"pinyin-learning-v1.tsv");
             try{dictionary.loadPinyinLearning();}catch(Exception ignored){} // Malformed personal data is not an input failure.
             android.util.Log.i("QingyuData","Modern Chinese + personal data ready in "+(android.os.SystemClock.uptimeMillis()-start)+" ms");
@@ -220,35 +223,64 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
         return result;
     }
 
-    List<NineKeyCandidate> suggestNineKey(String raw) {return suggestNineKey(raw,"");}
-    List<NineKeyCandidate> suggestNineKey(String raw,String leadingReading) {
+    List<NineKeyCandidate> suggestNineKey(String raw) {return suggestNineKey(raw,"","");}
+    List<NineKeyCandidate> suggestNineKey(String raw,String selected) {return suggestNineKey(raw,selected,"");}
+    synchronized List<NineKeyCandidate> suggestNineKey(String raw,String selected,String context) {
         String digits=nineDigits(raw);
-        if(database==null || digits.isEmpty() || nineKeySelectionOffset(raw,leadingReading)<0) return Collections.emptyList();
-        LinkedHashMap<String,NineKeyCandidate> result=new LinkedHashMap<>();
-        List<Row> exact=new ArrayList<>(rows(digits));exact.addAll(modernNineRows(digits));
-        if(!leadingReading.isEmpty()&&nineKeySelectionOffset(raw,leadingReading)==raw.length())exact.addAll(selectedNineRows(leadingReading));
-        List<Row> ranked=new ArrayList<>(exact);
-        ranked.sort((a,b)->Double.compare(rowScore(b),rowScore(a)));
-        for(Row row:ranked) addNine(result,raw,row.text,row.pinyin,digits.length(),leadingReading);
-        if(result.isEmpty() && digits.length()>=8) {
-            NineKeyCandidate sentence=compose(raw,leadingReading);
-            if(sentence!=null) result.put(sentence.text,sentence);
+        if(database==null||digits.isEmpty()||nineKeySelectionOffset(raw,selected)<0)return Collections.emptyList();
+        List<NineWord> words=nineWords(raw,selected);List<NineKeyCandidate> full=new ArrayList<>(),completion=new ArrayList<>(),partial=new ArrayList<>();Map<String,Double> scores=new HashMap<>();
+        for(NineWord word:words) {
+            NineKeyCandidate candidate=word.candidate;double score=nineScore(word,context,false);String identity=candidate.text+"\t"+candidate.consumedDigits;
+            if(scores.containsKey(identity)&&scores.get(identity)>=score)continue;
+            scores.put(identity,score);List<NineKeyCandidate> target=candidate.consumedDigits==raw.length()?(word.completion?completion:full):partial;
+            target.removeIf(previous->previous.text.equals(candidate.text)&&previous.consumedDigits==candidate.consumedDigits);target.add(candidate);
         }
-        // Complete partial syllables without inventing a digit mapping.
-        try(Cursor c=database.rawQuery("SELECT text,pinyin,digits FROM nine WHERE digits>=? AND digits<? ORDER BY weight DESC LIMIT 48",new String[]{digits,digits+":"})) {
-            while(c.moveToNext()) {
-                String text=c.getString(0);
-                addNine(result,raw,text,c.getString(1),digits.length(),leadingReading);
+        full.sort((a,b)->Double.compare(scores.get(b.text+"\t"+b.consumedDigits),scores.get(a.text+"\t"+a.consumedDigits)));
+        completion.sort((a,b)->Double.compare(scores.get(b.text+"\t"+b.consumedDigits),scores.get(a.text+"\t"+a.consumedDigits)));
+        partial.sort((a,b)->{int length=Integer.compare(b.consumedDigits,a.consumedDigits);return length!=0?length:Double.compare(scores.get(b.text+"\t"+b.consumedDigits),scores.get(a.text+"\t"+a.consumedDigits));});
+        boolean fullSpelling=words.stream().anyMatch(word->!word.completion&&word.candidate.consumedDigits==raw.length()&&word.candidate.typedSpelling.equals(word.candidate.pinyin));
+        if(digits.length()>=4&&!fullSpelling) {
+            List<NineKeyCandidate> sentences=composeNine(raw,selected,context,words);
+            for(int i=sentences.size()-1;i>=0;i--){NineKeyCandidate candidate=sentences.get(i);full.removeIf(previous->previous.text.equals(candidate.text));full.add(0,candidate);}
+        }
+        LinkedHashMap<String,NineKeyCandidate> result=new LinkedHashMap<>();for(NineKeyCandidate candidate:full){result.putIfAbsent(candidate.text,candidate);if(result.size()==96)break;}
+        int completions=0;for(NineKeyCandidate candidate:completion){result.putIfAbsent(candidate.text,candidate);if(++completions==16)break;}
+        for(NineKeyCandidate candidate:partial)result.putIfAbsent(candidate.text,candidate);
+        List<NineKeyCandidate> answer=new ArrayList<>(result.values());if(answer.size()>128)answer.subList(128,answer.size()).clear();return Collections.unmodifiableList(answer);
+    }
+    private List<NineWord> nineWords(String raw,String selected) {
+        String key=raw+"\t"+selected;List<NineWord> cached=nineWordCache.get(key);if(cached!=null)return cached;List<NineWord> found=new ArrayList<>();
+        if(nineLexicon!=null&&pinyinDatabase!=null) {
+            List<NineKeyLexicon.Match> matches=nineLexicon.match(raw,selected);LinkedHashSet<Integer> missing=new LinkedHashSet<>();
+            for(NineKeyLexicon.Match match:matches)if(!nineRowCache.containsKey(match.row))missing.add(match.row);
+            List<Integer> ids=new ArrayList<>(missing);
+            for(int start=0;start<ids.size();start+=256){List<Integer> batch=ids.subList(start,Math.min(ids.size(),start+256));String[] args=new String[batch.size()];for(int i=0;i<args.length;i++)args[i]=String.valueOf(batch.get(i));
+                try(Cursor c=pinyinDatabase.rawQuery("SELECT rowid,text,pinyin,weight FROM words WHERE rowid IN ("+String.join(",",Collections.nCopies(args.length,"?"))+")",args)){while(c.moveToNext())nineRowCache.put(c.getInt(0),new Row(c.getString(1),c.getString(2),c.getInt(3)));}catch(android.database.SQLException ignored){}
             }
+            for(NineKeyLexicon.Match match:matches){Row row=nineRowCache.get(match.row);if(row!=null)found.add(new NineWord(new NineKeyCandidate(row.text,row.pinyin,match.spelling,match.consumed),row.weight,match.completion));}
+            while(nineRowCache.size()>2048)nineRowCache.remove(nineRowCache.keySet().iterator().next());
+        } else {
+            String digits=nineDigits(raw);
+            for(int length=1;length<=digits.length();length++)for(Row row:rows(digits.substring(0,length)))if(nineMatches(raw,row.pinyin,length,selected))found.add(new NineWord(new NineKeyCandidate(row.text,row.pinyin,nineConsumed(raw,length)),row.weight,false));
+            try(Cursor c=database.rawQuery("SELECT text,pinyin,weight FROM nine WHERE digits>=? AND digits<? ORDER BY weight DESC LIMIT 48",new String[]{digits,digits+":"})){while(c.moveToNext())if(nineMatches(raw,c.getString(1),digits.length(),selected))found.add(new NineWord(new NineKeyCandidate(c.getString(0),c.getString(1),raw.length()),c.getInt(2),true));}
         }
-        if(!leadingReading.isEmpty())for(Row row:selectedNineRows(leadingReading))addNine(result,raw,row.text,row.pinyin,leadingReading.replace("'","").length(),leadingReading);
-        // A phrase may end before the rest of a sentence. Its exact consumed
-        // count lets the service retain and decode every remaining key.
-        for(int size=Math.min(24,digits.length()-1);size>=2 && result.size()<64;size--) {
-            for(Row row:rows(digits.substring(0,size))) addNine(result,raw,row.text,row.pinyin,size,leadingReading);
-        }
-        List<NineKeyCandidate> candidates=new ArrayList<>(result.values());
-        return Collections.unmodifiableList(candidates.subList(0,Math.min(64,candidates.size())));
+        nineWordCache.put(key,found);while(nineWordCache.size()>64)nineWordCache.remove(nineWordCache.keySet().iterator().next());return found;
+    }
+    private double nineScore(NineWord word,String context,boolean sentencePart) {
+        NineKeyCandidate candidate=word.candidate;int initials=0;String[] typed=candidate.typedSpelling.split("'"),canonical=candidate.pinyin.split("'");
+        for(int i=0;i<Math.min(typed.length,canonical.length);i++)if(typed[i].length()==1&&canonical[i].length()>1)initials++;
+        String code=candidate.typedSpelling.replace("'","");
+        // Modern extended phrases often have a uniform 100 prior; corpus likelihood distinguishes these phrases from rare names.
+        int weight=contextModel!=null&&candidate.text.length()>=3?Math.max(10000,word.weight):word.weight;
+        double learned=pinyinBonus(pinyinLearning.getOrDefault(code+"\t"+candidate.text,0))+pinyinBonus(pinyinLearning.getOrDefault(pinyinCode(candidate.pinyin)+"\t"+candidate.text,0))+Math.min(3,pinyinBonus(chineseLearning.getOrDefault(candidate.text,0)));
+        // A frequent standalone shortcut must not overpower sentence context at every word boundary.
+        if(sentencePart)learned=Math.min(1.5,learned);
+        double lexical=Math.log1p(weight)+learned-.2*initials-(word.completion?.35:0);
+        return lexical+transitionScore(context,new PinyinEngine.Word(candidate.text,candidate.pinyin,lexical));
+    }
+    private static final class NineWord {
+        final NineKeyCandidate candidate;final int weight;final boolean completion;
+        NineWord(NineKeyCandidate candidate,int weight,boolean completion){this.candidate=candidate;this.weight=weight;this.completion=completion;}
     }
 
     private static String nineDigits(String raw) {
@@ -271,9 +303,6 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
         int count=0;for(int i=0;i<nineConsumed(raw,digits);i++){if(raw.charAt(i)=='\''){if(!boundaries.contains(count))return false;}else count++;}
         return true;
     }
-    private static void addNine(Map<String,NineKeyCandidate> result,String raw,String text,String reading,int consumed,String leadingReading) {
-        if(nineMatches(raw,reading,consumed,leadingReading))result.putIfAbsent(text,new NineKeyCandidate(text,reading,nineConsumed(raw,consumed)));
-    }
     /** A pending T9 press is a provisional letter, never a literal digit. */
     static String nineKeyFallback(String raw) {
         if(nineDigits(raw).isEmpty())return "";StringBuilder spelling=new StringBuilder();
@@ -282,7 +311,7 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
     static String nineKeyPreedit(String raw,List<NineKeyCandidate> candidates) {
         String digits=nineDigits(raw);if(digits.isEmpty())return "";
         if(candidates==null||candidates.isEmpty())return nineKeyFallback(raw);
-        NineKeyCandidate first=candidates.get(0);String reading=first.pinyin;StringBuilder spelling=new StringBuilder();int letters=0;
+        NineKeyCandidate first=candidates.get(0);String reading=first.typedSpelling;StringBuilder spelling=new StringBuilder();int letters=0;
         int limit=nineDigits(raw.substring(0,Math.min(raw.length(),Math.max(0,first.consumedDigits)))).length();
         for(int i=0;i<reading.length()&&letters<limit;i++){char letter=reading.charAt(i);spelling.append(letter);if(letter!='\'')letters++;}
         if(first.consumedDigits<raw.length()){
@@ -355,10 +384,11 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
         raw=raw.substring(offset);
         String digits=nineDigits(raw);if(digits.isEmpty()||database==null)return Collections.emptyList();
         LinkedHashSet<String> readings=new LinkedHashSet<>();
-        for(NineKeyCandidate candidate:suggestNineKey(raw)){String first=candidate.pinyin.split("'",2)[0];if(nineKeySelectionOffset(raw,first)>=0)readings.add(first);}
-        // Single-character readings share the same small indexed/cached queries.
-        for(int size=Math.min(6,digits.length());size>=1;size--)for(String reading:nineSyllables(digits.substring(0,size)))
-            if(nineKeySelectionOffset(raw,reading)>=0)readings.add(reading);
+        String letters=new String[]{"abc","def","ghi","jkl","mno","pqrs","tuv","wxyz"}[digits.charAt(0)-'2'];
+        for(int i=0;i<letters.length();i++)readings.add(String.valueOf(Character.toUpperCase(letters.charAt(i))));
+        for(int i=0;i<letters.length();i++)readings.add(String.valueOf(letters.charAt(i)));readings.add(digits.substring(0,1));
+        if(nineLexicon!=null)readings.addAll(nineLexicon.readings(raw));
+        else for(int size=Math.min(6,digits.length());size>=1;size--)for(String reading:nineSyllables(digits.substring(0,size)))if(nineKeySelectionOffset(raw,reading)>=0)readings.add(reading);
         return Collections.unmodifiableList(new ArrayList<>(readings));
     }
 
@@ -371,36 +401,6 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
         nineSyllableCache.put(digits,readings);if(nineSyllableCache.size()>256)nineSyllableCache.remove(nineSyllableCache.keySet().iterator().next());
         return readings;
     }
-    private List<Row> selectedNineRows(String reading) {
-        String cacheKey="'"+reading;List<Row> cached=nineModernCache.get(cacheKey);if(cached!=null)return cached;
-        StringBuilder digits=new StringBuilder();for(int i=0;i<reading.length();i++)if(reading.charAt(i)!='\'')digits.append(nineKeyDigit(reading.charAt(i)));
-        List<Row> result=new ArrayList<>();
-        try(Cursor c=database.rawQuery("SELECT text,pinyin,weight FROM nine WHERE digits=? AND pinyin=? ORDER BY weight DESC LIMIT 16",new String[]{digits.toString(),reading})) {
-            while(c.moveToNext())result.add(new Row(c.getString(0),c.getString(1),c.getInt(2)));
-        }
-        if(pinyinDatabase!=null)try(Cursor c=pinyinDatabase.rawQuery("SELECT text,pinyin,weight FROM words WHERE raw=? AND pinyin=? ORDER BY weight DESC LIMIT 16",new String[]{reading.replace("'",""),reading})) {
-            while(c.moveToNext())result.add(new Row(c.getString(0),c.getString(1),c.getInt(2)));
-        }catch(android.database.SQLException ignored){}
-        nineModernCache.put(cacheKey,result);if(nineModernCache.size()>256)nineModernCache.remove(nineModernCache.keySet().iterator().next());return result;
-    }
-    private List<Row> modernNineRows(String digits) {
-        if(pinyinDatabase==null||digits.length()<4||digits.length()>12)return Collections.emptyList();
-        List<Row> cached=nineModernCache.get(digits);if(cached!=null)return cached;
-        LinkedHashMap<String,Row> found=new LinkedHashMap<>();LinkedHashSet<String> queried=new LinkedHashSet<>();
-        // ponytail: short two-syllable modern coverage only; a T9 index is needed
-        // before extending this bounded lookup to unrestricted sentence graphs.
-        for(int split=Math.max(2,digits.length()-6);split<=Math.min(6,digits.length()-2)&&queried.size()<32;split++){
-            for(String first:nineSyllables(digits.substring(0,split)))for(String second:nineSyllables(digits.substring(split))){
-                String code=first+second;if(queried.size()>=32||!queried.add(code))continue;
-                try(Cursor c=pinyinDatabase.rawQuery("SELECT text,pinyin,weight FROM words WHERE raw=? ORDER BY weight DESC LIMIT 16",new String[]{code})){
-                    while(c.moveToNext()){String reading=c.getString(1);if(!reading.equals(first+"'"+second))continue;
-                        Row row=new Row(c.getString(0),reading,c.getInt(2));found.putIfAbsent(row.text+"\t"+reading,row);}
-                }catch(android.database.SQLException ignored){} // Legacy nine-key words remain usable.
-            }
-        }
-        List<Row> result=new ArrayList<>(found.values());nineModernCache.put(digits,result);
-        if(nineModernCache.size()>256)nineModernCache.remove(nineModernCache.keySet().iterator().next());return result;
-    }
 
     private List<Row> rows(String digits) {
         List<Row> cached=nineCache.get(digits);if(cached!=null) return cached;
@@ -412,36 +412,30 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
         if(nineCache.size()>256) nineCache.remove(nineCache.keySet().iterator().next());
         return found;
     }
-    private NineKeyCandidate compose(String raw,String leadingReading) {
-        // ponytail: bounded unigram segmentation, not a neural T9 language
-        // model; replace ranking when a measured ambiguity corpus warrants it.
-        String digits=nineDigits(raw);int length=digits.length();
-        double[] score=new double[length+1];java.util.Arrays.fill(score,Double.NEGATIVE_INFINITY);score[0]=0;
-        String[] text=new String[length+1],pinyin=new String[length+1];text[0]="";pinyin[0]="";
-        for(int start=0;start<length;start++) {
-            if(text[start]==null) continue;
-            for(int end=start+2;end<=Math.min(length,start+24);end++) {
-                List<Row> possible=rows(digits.substring(start,end));
-                if(!leadingReading.isEmpty()) {
-                    int rawStart=nineConsumed(raw,start),rawEnd=nineConsumed(raw,end);
-                    String required=nineKeyTrimSelection(raw.substring(rawStart,rawEnd),nineKeyRemainingSelection(raw,leadingReading,rawStart));
-                    if(!required.isEmpty()&&required.replace("'","").length()==end-start){possible=new ArrayList<>(possible);possible.addAll(selectedNineRows(required));}
-                }
-                if(possible.isEmpty()) continue;
-                Row row=null;
-                for(Row option:possible){String reading=pinyin[start]+(pinyin[start].isEmpty()?"":"'")+option.pinyin;
-                    if(nineMatches(raw,reading,end,leadingReading)&&(row==null||rowScore(option)+contextBonus(text[start],option.text)>rowScore(row)+contextBonus(text[start],row.text)))row=option;}
-                if(row==null)continue;
-                // A unigram probability penalty favors a few common words;
-                // the existing continuation map resolves everyday collisions.
-                double value=score[start]+rowScore(row)-15+contextBonus(text[start],row.text);
-                if(value>score[end]) {
-                    score[end]=value;text[end]=text[start]+row.text;
-                    pinyin[end]=pinyin[start]+(pinyin[start].isEmpty()?"":"'")+row.pinyin;
+    private static final class NinePath {
+        final String text,pinyin,typed;final double score;final int words;
+        NinePath(String text,String pinyin,String typed,double score,int words){this.text=text;this.pinyin=pinyin;this.typed=typed;this.score=score;this.words=words;}
+    }
+    private List<NineKeyCandidate> composeNine(String raw,String selected,String context,List<NineWord> first) {
+        List<List<NinePath>> paths=new ArrayList<>();for(int i=0;i<=raw.length();i++)paths.add(new ArrayList<>());paths.get(0).add(new NinePath("","","",0,0));
+        for(int start=0;start<raw.length();start++) {
+            if(paths.get(start).isEmpty()||raw.charAt(start)=='\'')continue;
+            List<NineWord> options=start==0?first:nineWords(raw.substring(start),nineKeyRemainingSelection(raw,selected,start));
+            Map<Integer,Integer> used=new HashMap<>();int expanded=0;
+            for(NineWord option:options) {
+                NineKeyCandidate word=option.candidate;if(option.completion||word.consumedDigits<=0)continue;int next=start+word.consumedDigits;
+                if(next>raw.length()||used.getOrDefault(next,0)>=64)continue;used.merge(next,1,Integer::sum);
+                for(NinePath previous:paths.get(start)) {
+                    if(expanded++>=2048)break;if(previous.text.length()+word.text.length()>64)continue;
+                    double score=previous.score+nineScore(option,context+previous.text,true)-15.5;
+                    NinePath candidate=new NinePath(previous.text+word.text,previous.pinyin+(previous.pinyin.isEmpty()?"":"'")+word.pinyin,previous.typed+(previous.typed.isEmpty()?"":"'")+word.typedSpelling,score,previous.words+1);
+                    List<NinePath> destination=paths.get(next);boolean better=true;
+                    for(int i=0;i<destination.size();i++)if(destination.get(i).text.equals(candidate.text)){if(destination.get(i).score>=score)better=false;else destination.remove(i);break;}
+                    if(better){destination.add(candidate);destination.sort((a,b)->Double.compare(b.score,a.score));if(destination.size()>16)destination.remove(destination.size()-1);}
                 }
             }
         }
-        return text[length]==null?null:new NineKeyCandidate(text[length],pinyin[length],raw.length());
+        List<NineKeyCandidate> result=new ArrayList<>();for(NinePath path:paths.get(raw.length()))result.add(new NineKeyCandidate(path.text,path.pinyin,path.typed,raw.length()));return result;
     }
 
     synchronized List<String> predictChinese(String context) {
@@ -478,7 +472,6 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
         chineseLearning.remove(key);chineseLearning.put(key,Math.min(1000,previous+1));
         if(chineseLearning.size()>2048) chineseLearning.remove(chineseLearning.keySet().iterator().next());
     }
-    private double rowScore(Row row) {return Math.log1p(row.weight)+Math.log1p(chineseLearning.getOrDefault(row.text,0))*2;}
     private double contextBonus(String context,String word) {
         String tail=chineseTail(context);double bonus=0;
         for(int length=1;length<=tail.length();length++) {
@@ -521,7 +514,7 @@ final class LocalInputDictionary implements AutoCloseable, PinyinEngine.Lexicon 
         try{flush();}catch(Exception ignored){} // Learning persistence can never suppress input.
         if(database!=null) {database.close();database=null;}
         if(pinyinDatabase!=null){pinyinDatabase.close();pinyinDatabase=null;}
-        contextModel=null;english=null;nineCache.clear();nineModernCache.clear();glossCache.clear();posCache.clear();chineseLearning.clear();pinyinCache.clear();pinyinLearning.clear();pinyinReferences.clear();learnedPinyin.clear();
+        contextModel=null;nineLexicon=null;english=null;nineCache.clear();nineWordCache.clear();nineRowCache.clear();nineSyllableCache.clear();glossCache.clear();posCache.clear();chineseLearning.clear();pinyinCache.clear();pinyinLearning.clear();pinyinReferences.clear();learnedPinyin.clear();
     }
     private static final class PinyinRow{final String text,pinyin;final int weight;PinyinRow(String text,String pinyin,int weight){this.text=text;this.pinyin=pinyin;this.weight=weight;}}
     private static final class Row {

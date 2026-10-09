@@ -195,6 +195,8 @@ def main():
         manifest['output'] = {'path': 'app/src/main/assets/pinyin/dict_pinyin.dat', 'bytes': len(model), 'sha256': hashlib.sha256(model).hexdigest(),
                               'serialized_bounds': bounds, 'actual_spelling_id_order_matches_v0_4': True}
     (NOTICE / 'model-v2-manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    from build_t9_lexicon import main as build_t9
+    build_t9()
     print(json.dumps(manifest, ensure_ascii=True))
 
 

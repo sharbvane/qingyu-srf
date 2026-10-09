@@ -63,7 +63,9 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     private volatile boolean destroyed;
     private volatile boolean translationReady;
     private final AtomicLong session=new AtomicLong();
-    private long revision,visibleRevision,detailSession,detailRevision,detailRequest,predictionRequest,glossRequest;
+    private volatile long revision;
+    private long visibleRevision,detailSession,detailRevision,detailRequest,predictionRequest,glossRequest;
+    private boolean skipNineSearch;
     private Runnable pendingTranslation;
     private final Map<String,String> activeGlosses=new HashMap<>();
     private final java.util.Set<String> activeModelWords=new LinkedHashSet<>();
@@ -157,7 +159,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
         synchronizeGlossLanguage();
         boolean chineseComposition=!english&&!numeric&&!sensitive&&!preview.isEmpty();
         keyboard.enterLabel(chineseComposition?currentMode().equals("nine")?"确认":"拼音":editorEnterLabel);
-        keyboard.nineState(chineseComposition&&currentMode().equals("nine"),nineReadings,!nineVisibleReading.isEmpty());renderPinyinBubble();
+        keyboard.nineState(chineseComposition&&currentMode().equals("nine"),nineReadings,!nineVisibleReading.isEmpty()||!nineVisiblePrefix.isEmpty());renderPinyinBubble();
         candidates.setContentDescription("候选词，上方为释义；左右滑动浏览，长按查看详情，上滑输入翻译"+(chineseComposition?"；原始拼音 · "+rawPreview:""));
         if(words.isEmpty()&&isCandidateExpanded())collapse();
         boolean predicting=!words.isEmpty()&&candidateMode.startsWith("predict");
@@ -237,7 +239,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     private EngineSnapshot snapshot(String raw,List<String> words,String commit){List<Candidate> items=new ArrayList<>();for(int i=0;i<words.size()&&i<128;i++)items.add(new Candidate(i,words.get(i)));return new EngineSnapshot(raw,workerRaw,items,commit);}
     private EngineSnapshot searchWorker(){
         if(workerMode.equals("english")){List<String> words=inputDictionary==null||inputDictionary.english()==null?Collections.emptyList():inputDictionary.english().suggest(workerRaw,workerContext);return snapshot(workerRaw,words,"");}
-        if(workerMode.equals("nine")){nineReading=LocalInputDictionary.nineKeyTrimSelection(workerRaw,nineReading);nineCandidates=inputDictionary==null?Collections.emptyList():inputDictionary.suggestNineKey(workerRaw,nineReading);List<String> words=new ArrayList<>();for(NineKeyCandidate c:nineCandidates)words.add(c.text);return snapshot(ninePrefix+LocalInputDictionary.nineKeyPreedit(workerRaw,nineCandidates,nineReading),words,"");}
+        if(workerMode.equals("nine")){nineReading=LocalInputDictionary.nineKeyTrimSelection(workerRaw,nineReading);if(skipNineSearch)return snapshot(ninePrefix+LocalInputDictionary.nineKeyPreedit(workerRaw,Collections.emptyList(),nineReading),Collections.emptyList(),"");nineCandidates=inputDictionary==null?Collections.emptyList():inputDictionary.suggestNineKey(workerRaw,nineReading,workerContext+ninePrefix);List<String> words=new ArrayList<>();for(NineKeyCandidate c:nineCandidates)words.add(c.text);return snapshot(ninePrefix+LocalInputDictionary.nineKeyPreedit(workerRaw,nineCandidates,nineReading),words,"");}
         if(engineOpen){engine.setContext(workerContext);return engine.search(workerRaw);}return new EngineSnapshot(workerRaw,workerRaw,Collections.emptyList(),"");
     }
     private void resetWorker(){if(engineOpen)engine.reset();workerRaw="";ninePrefix="";nineReading="";nineSegments.clear();nineCandidates=Collections.emptyList();}
@@ -245,7 +247,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
         String commit="";
         if(workerMode.equals("english")){commit=workerRaw;if(inputDictionary!=null&&inputDictionary.english()!=null&&!workerRaw.isEmpty())inputDictionary.english().learn(workerRaw,workerContext);}
         else if(workerMode.equals("nine")){
-            commit=ninePrefix;String remaining=workerRaw,selection=nineReading;for(int step=0;step<64&&!remaining.isEmpty();step++){List<NineKeyCandidate> found=inputDictionary==null?Collections.emptyList():inputDictionary.suggestNineKey(remaining,selection);if(found.isEmpty()){commit+=LocalInputDictionary.nineKeyPreedit(remaining,found,selection);break;}NineKeyCandidate first=found.get(0);if(first.consumedDigits<=0||first.consumedDigits>remaining.length()){commit+=LocalInputDictionary.nineKeyPreedit(remaining,found,selection);break;}commit+=first.text;selection=LocalInputDictionary.nineKeyRemainingSelection(remaining,selection,first.consumedDigits);remaining=remaining.substring(first.consumedDigits);}
+            commit=ninePrefix;String remaining=workerRaw,selection=nineReading;for(int step=0;step<64&&!remaining.isEmpty();step++){List<NineKeyCandidate> found=inputDictionary==null?Collections.emptyList():inputDictionary.suggestNineKey(remaining,selection,workerContext+commit);if(found.isEmpty()){commit+=LocalInputDictionary.nineKeyPreedit(remaining,found,selection);break;}NineKeyCandidate first=found.get(0);if(first.consumedDigits<=0||first.consumedDigits>remaining.length()){commit+=LocalInputDictionary.nineKeyPreedit(remaining,found,selection);break;}commit+=first.text;selection=LocalInputDictionary.nineKeyRemainingSelection(remaining,selection,first.consumedDigits);remaining=remaining.substring(first.consumedDigits);}
         }else if(!workerRaw.isEmpty()){
             if(engineOpen){EngineSnapshot state=engine.search(workerRaw);for(int i=0;i<64&&state.committedText.isEmpty()&&!state.candidates.isEmpty();i++)state=engine.select(state.candidates.get(0).id);commit=state.committedText.isEmpty()?state.composing:state.committedText;}else commit=workerRaw;
         }
@@ -256,10 +258,12 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
         long token=session.get(),generation=++revision;String context=contextBeforeComposition();
         decoder.post(()->{
             if(token!=session.get())return;EngineSnapshot result;String committed=suffix;
-            try{result=action.run();committed=result.committedText+suffix;workerRaw=result.rawPinyin;}catch(Exception|LinkageError error){result=new EngineSnapshot(mode.equals("nine")?ninePrefix+LocalInputDictionary.nineKeyPreedit(workerRaw,Collections.emptyList(),nineReading):workerRaw,workerRaw,Collections.emptyList(),"");}
+            // Keep every ordered edit and commit; only an obsolete candidate calculation can be skipped.
+            skipNineSearch=generation!=revision;
+            try{result=action.run();committed=result.committedText+suffix;workerRaw=result.rawPinyin;}catch(Exception|LinkageError error){result=new EngineSnapshot(mode.equals("nine")?ninePrefix+LocalInputDictionary.nineKeyPreedit(workerRaw,Collections.emptyList(),nineReading):workerRaw,workerRaw,Collections.emptyList(),"");}finally{skipNineSearch=false;}
             EngineSnapshot output=result;String commit=committed;String original=output.composing.isEmpty()?"":mode.equals("pinyin")&&engineOpen?engine.rawInput():mode.equals("nine")?LocalInputDictionary.nineKeyPreedit(output.rawPinyin,nineCandidates,nineReading):output.rawPinyin;
             String selectedPrefix=ninePrefix,selectedReading=nineReading;List<String> readings=new ArrayList<>(mode.equals("nine")&&inputDictionary!=null?inputDictionary.nineKeyReadings(output.rawPinyin,selectedReading):Collections.emptyList());
-            if(mode.equals("nine")&&!nineCandidates.isEmpty()){String[] spelling=nineCandidates.get(0).pinyin.split("'");int offset=selectedReading.isEmpty()?0:selectedReading.split("'").length;if(offset<spelling.length&&readings.remove(spelling[offset]))readings.add(0,spelling[offset]);}
+            if(mode.equals("nine")&&!nineCandidates.isEmpty()){String[] spelling=nineCandidates.get(0).typedSpelling.split("'");int offset=selectedReading.isEmpty()?0:selectedReading.split("'").length;if(offset<spelling.length&&readings.remove(spelling[offset]))readings.add(0,spelling[offset]);}
             main.post(()->{
                 if(destroyed||token!=session.get())return;InputConnection ic=getCurrentInputConnection();if(ic==null)return;if(!commit.isEmpty()){ic.commitText(commit,1);composingActive=false;}
                 if(!commit.isEmpty()&&!mode.equals("english")&&!privateInput&&prefs.learning()&&inputDictionary!=null)decoder.post(()->{if(token==session.get())inputDictionary.learnChinese(commit,context);});
@@ -286,10 +290,32 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     private void showImmediate(){InputConnection ic=getCurrentInputConnection();if(ic!=null)updateComposing(ic);visible=EngineSnapshot.empty();render();}
     private void directCommit(String text){resetPredictionChain();String mode=currentMode();submit(this::finishWorker,text,mode);clearPreview();visible=EngineSnapshot.empty();render();collapse();}
     private void clearComposition(){resetPredictionChain();predictionSuppressed=true;clearPreview();showImmediate();collapse();submit(()->{resetWorker();return EngineSnapshot.empty();},"",currentMode());}
+    private void undoNineSegment(){
+        if(nineSegments.isEmpty())return;
+        String[] segment=nineSegments.removeLast();String selection=nineReading;
+        ninePrefix=ninePrefix.substring(0,ninePrefix.length()-segment[1].length());
+        workerRaw=segment[0]+workerRaw;nineReading=segment[2];
+        if(!selection.isEmpty()&&LocalInputDictionary.nineKeySelectionOffset(segment[0],nineReading)==segment[0].length())nineReading+=(nineReading.isEmpty()?"":"'")+selection;
+        nineReading=LocalInputDictionary.nineKeyTrimSelection(workerRaw,nineReading);
+    }
+    private void selectNineLiteral(String literal){
+        int offset=LocalInputDictionary.nineKeySelectionOffset(workerRaw,nineReading);
+        if(offset<0||offset>=workerRaw.length())return;
+        int consumed=offset+1;if(consumed<workerRaw.length()&&workerRaw.charAt(consumed)=='\'')consumed++;
+        // Explicit letters stay composing; choosing a literal never chooses a Chinese word for the user.
+        String text=nineReading.replace("'","")+literal;
+        nineSegments.addLast(new String[]{workerRaw.substring(0,consumed),text,nineReading});
+        ninePrefix+=text;workerRaw=workerRaw.substring(consumed);nineReading="";
+    }
     @Override public void key(String value){
         if(getCurrentInputConnection()==null)return;
         detailRequest++;
-        if(value.startsWith("READING_")){if(!english&&!numeric&&!sensitive&&currentMode().equals("nine")&&!nineRawPreview.isEmpty()){String reading=value.substring(8);resetPredictionChain();submit(()->{if(reading.equals("BACK"))nineReading=LocalInputDictionary.nineKeyUndoSelection(nineReading);else if(inputDictionary!=null&&inputDictionary.nineKeyReadings(workerRaw,nineReading).contains(reading))nineReading=LocalInputDictionary.nineKeySelect(workerRaw,nineReading,reading);return searchWorker();},"","nine");}return;}
+        if(value.startsWith("READING_")){if(!english&&!numeric&&!sensitive&&currentMode().equals("nine")&&(!nineRawPreview.isEmpty()||!nineVisiblePrefix.isEmpty())){String reading=value.substring(8);resetPredictionChain();showImmediate();submit(()->{
+            if(reading.equals("BACK")){if(!nineReading.isEmpty())nineReading=LocalInputDictionary.nineKeyUndoSelection(nineReading);else undoNineSegment();}
+            else if(inputDictionary!=null&&inputDictionary.nineKeyReadings(workerRaw,nineReading).contains(reading)){
+                if(reading.matches("[A-Z2-9]"))selectNineLiteral(reading);else nineReading=LocalInputDictionary.nineKeySelect(workerRaw,nineReading,reading);
+            }
+            return searchWorker();},"","nine");}return;}
         switch(value){
             case "SHIFT":keyboard.shift();return;
             case "SPLIT":{String raw=currentMode().equals("nine")?nineRawPreview:rawPreview;if(!english&&!numeric&&!sensitive&&!raw.isEmpty()&&!raw.endsWith("'"))key("'");return;}
@@ -321,7 +347,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
         String mode=currentMode();
         if(mode.equals("nine")&&!nineRawPreview.isEmpty()){if(!nineVisibleReading.isEmpty()&&LocalInputDictionary.nineKeySelectionOffset(nineRawPreview,nineVisibleReading)==nineRawPreview.length())nineVisibleReading=LocalInputDictionary.nineKeyUndoSelection(nineVisibleReading);else{String prior=nineRawPreview;nineRawPreview=nineRawPreview.substring(0,nineRawPreview.length()-1);nineVisibleReading=LocalInputDictionary.nineKeyTrimSelection(nineRawPreview,nineVisibleReading);rawPreview=LocalInputDictionary.nineKeyPending(nineRawPreview,prior,rawPreview);preview=nineVisiblePrefix+rawPreview;}showImmediate();}
         else if(!preview.isEmpty()){preview=preview.substring(0,preview.offsetByCodePoints(preview.length(),-1));if(!rawPreview.isEmpty())rawPreview=rawPreview.substring(0,rawPreview.length()-1);showImmediate();}long token=session.get();
-        submit(()->{if(!workerRaw.isEmpty()){if(workerMode.equals("pinyin")&&engineOpen)return engine.backspace();if(workerMode.equals("nine")&&!nineReading.isEmpty()&&LocalInputDictionary.nineKeySelectionOffset(workerRaw,nineReading)==workerRaw.length())nineReading=LocalInputDictionary.nineKeyUndoSelection(nineReading);else{workerRaw=workerRaw.substring(0,workerRaw.length()-1);nineReading=LocalInputDictionary.nineKeyTrimSelection(workerRaw,nineReading);}return searchWorker();}if(workerMode.equals("nine")&&!nineSegments.isEmpty()){String[] segment=nineSegments.removeLast();ninePrefix=ninePrefix.substring(0,ninePrefix.length()-segment[1].length());workerRaw=segment[0];nineReading=segment[2];return searchWorker();}main.post(()->{if(token!=session.get())return;InputConnection ic=getCurrentInputConnection();if(ic==null)return;CharSequence selected=ic.getSelectedText(0);if(selected!=null&&selected.length()>0)ic.commitText("",1);else ic.deleteSurroundingTextInCodePoints(1,0);});return EngineSnapshot.empty();},"",mode);
+        submit(()->{if(!workerRaw.isEmpty()){if(workerMode.equals("pinyin")&&engineOpen)return engine.backspace();if(workerMode.equals("nine")&&!nineReading.isEmpty()&&LocalInputDictionary.nineKeySelectionOffset(workerRaw,nineReading)==workerRaw.length())nineReading=LocalInputDictionary.nineKeyUndoSelection(nineReading);else{workerRaw=workerRaw.substring(0,workerRaw.length()-1);nineReading=LocalInputDictionary.nineKeyTrimSelection(workerRaw,nineReading);}return searchWorker();}if(workerMode.equals("nine")&&!nineSegments.isEmpty()){undoNineSegment();return searchWorker();}main.post(()->{if(token!=session.get())return;InputConnection ic=getCurrentInputConnection();if(ic==null)return;CharSequence selected=ic.getSelectedText(0);if(selected!=null&&selected.length()>0)ic.commitText("",1);else ic.deleteSurroundingTextInCodePoints(1,0);});return EngineSnapshot.empty();},"",mode);
     }
     @Override public void choose(int index){
         if(visibleRevision!=revision||index<0||index>=visible.candidates.size())return;String kind=candidateMode,word=visible.candidates.get(index).text;int id=visible.candidates.get(index).id;String context=contextBeforeComposition();
@@ -354,7 +380,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     private String nineTranslationSource(int id){
         if(id<0||id>=nineCandidates.size())return "";NineKeyCandidate selected=nineCandidates.get(id);int consumed=selected.consumedDigits;if(consumed<=0||consumed>workerRaw.length())return "";
         StringBuilder text=new StringBuilder(ninePrefix).append(selected.text);String remaining=workerRaw.substring(consumed),selection=LocalInputDictionary.nineKeyRemainingSelection(workerRaw,nineReading,consumed);
-        for(int step=0;step<64&&!remaining.isEmpty();step++){List<NineKeyCandidate> found=inputDictionary.suggestNineKey(remaining,selection);if(found.isEmpty()){text.append(LocalInputDictionary.nineKeyPreedit(remaining,found,selection));break;}NineKeyCandidate first=found.get(0);if(first.consumedDigits<=0||first.consumedDigits>remaining.length()){text.append(LocalInputDictionary.nineKeyPreedit(remaining,found,selection));break;}text.append(first.text);selection=LocalInputDictionary.nineKeyRemainingSelection(remaining,selection,first.consumedDigits);remaining=remaining.substring(first.consumedDigits);}
+        for(int step=0;step<64&&!remaining.isEmpty();step++){List<NineKeyCandidate> found=inputDictionary.suggestNineKey(remaining,selection,workerContext+text);if(found.isEmpty()){text.append(LocalInputDictionary.nineKeyPreedit(remaining,found,selection));break;}NineKeyCandidate first=found.get(0);if(first.consumedDigits<=0||first.consumedDigits>remaining.length()){text.append(LocalInputDictionary.nineKeyPreedit(remaining,found,selection));break;}text.append(first.text);selection=LocalInputDictionary.nineKeyRemainingSelection(remaining,selection,first.consumedDigits);remaining=remaining.substring(first.consumedDigits);}
         return text.toString();
     }
     @Override public void detail(int index){translateCandidate(index,false);}

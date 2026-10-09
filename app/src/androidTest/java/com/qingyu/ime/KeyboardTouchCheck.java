@@ -1,22 +1,25 @@
 package com.qingyu.ime;
 
 import android.app.Instrumentation;
+import android.app.Activity;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.SystemClock;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.ViewConfiguration;
 import java.util.ArrayList;
 import java.util.List;
 
 /** A real MotionEvent/Handler check, called from the existing IME instrumentation thread. */
 final class KeyboardTouchCheck {
-    static void run(Instrumentation instrumentation) throws Exception {
+    static void run(Instrumentation instrumentation,Activity activity) throws Exception {
         ImePreferences prefs=new ImePreferences(instrumentation.getTargetContext());
         String previous=prefs.keyboardMode();
         prefs.store.edit().putString("keyboard_mode","full").commit();
         KeyboardSurface[] keyboard=new KeyboardSurface[1];
+        ViewGroup[] parent=new ViewGroup[1];
         List<String> output=new ArrayList<>();
         try {
             instrumentation.runOnMainSync(()-> {
@@ -60,6 +63,7 @@ final class KeyboardTouchCheck {
             Rect a=bounds(view,11),q=bounds(view,1),p=bounds(view,10),shift=bounds(view,20),space=bounds(view,32),delete=bounds(view,28);
             tap(instrumentation,view,a);expect(output,"KEY_a");
             check(view.getAccessibilityNodeProvider().createAccessibilityNodeInfo(20).getContentDescription().toString().equals("拼音分词"),"Chinese full keyboard did not replace Shift with 分词");
+            check(!view.getAccessibilityNodeProvider().createAccessibilityNodeInfo(20).isLongClickable(),"Full-pinyin split gained a nine-key number action");
             tap(instrumentation,view,shift);tap(instrumentation,view,a);expect(output,"KEY_SPLIT","KEY_a");
             tap(instrumentation,view,shift);tap(instrumentation,view,shift);expect(output,"KEY_SPLIT","KEY_SPLIT");
             check(!view.uppercase(),"Chinese split changed letter case");
@@ -95,6 +99,28 @@ final class KeyboardTouchCheck {
 
             prefs.store.edit().putString("keyboard_mode","t9").commit();
             instrumentation.runOnMainSync(()-> {view.configure(false,false,"↵",false);layout(view);});
+            Rect nineSplit=bounds(view,1);
+            check(view.getAccessibilityNodeProvider().createAccessibilityNodeInfo(1).getHintText().toString().contains("数字 1"),"Nine-key split omitted its number hint");
+            tap(instrumentation,view,nineSplit);expect(output,"KEY_SPLIT");
+            hold(instrumentation,view,nineSplit);expect(output);popupInside(instrumentation,view);expectChoices(instrumentation,view,"1");
+            pickChoice(instrumentation,view,"1");expect(output,"DIRECT_1");
+            hold(instrumentation,view,nineSplit);event(instrumentation,view,MotionEvent.ACTION_CANCEL,nineSplit.centerX(),nineSplit.centerY());
+            up(instrumentation,view,nineSplit.centerX(),nineSplit.centerY());expect(output);
+            hold(instrumentation,view,nineSplit);move(instrumentation,view,-1,nineSplit.centerY());up(instrumentation,view,nineSplit.centerX(),nineSplit.centerY());expect(output);
+            hold(instrumentation,view,nineSplit);instrumentation.runOnMainSync(view::resetModes);up(instrumentation,view,nineSplit.centerX(),nineSplit.centerY());expect(output);
+            hold(instrumentation,view,nineSplit);instrumentation.runOnMainSync(()->view.configure(true,false,"↵",false));up(instrumentation,view,nineSplit.centerX(),nineSplit.centerY());expect(output);
+            instrumentation.runOnMainSync(()->view.configure(false,false,"↵",false));
+            instrumentation.runOnMainSync(()->{parent[0]=activity.findViewById(android.R.id.content);parent[0].addView(view,new ViewGroup.LayoutParams(view.getWidth(),view.getHeight()));});
+            instrumentation.waitForIdleSync();SystemClock.sleep(80);
+            instrumentation.runOnMainSync(()->check(view.getAccessibilityNodeProvider().performAction(1,android.view.accessibility.AccessibilityNodeInfo.ACTION_LONG_CLICK,null),"Nine-key split lacked an accessible hold"));
+            expect(output);expectChoices(instrumentation,view,"1");
+            instrumentation.runOnMainSync(()->check(view.getAccessibilityNodeProvider().performAction(1000,android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK,null),"Digit 1 picker was not accessible"));
+            expect(output,"DIRECT_1");
+            instrumentation.runOnMainSync(()-> {
+                check(!view.getAccessibilityNodeProvider().performAction(1,0x7f0a1000+'2',null),"Split accepted an unrelated number action");
+                check(view.getAccessibilityNodeProvider().performAction(1,0x7f0a1000+'1',null),"Split rejected its direct number action");
+            });
+            expect(output,"DIRECT_1");
             Rect two=bounds(view,2);tap(instrumentation,view,two);expect(output,"KEY_2");
             hold(instrumentation,view,two);expect(output);popupInside(instrumentation,view);
             expectChoices(instrumentation,view,"A","B","C","a","b","c","2");
@@ -106,20 +132,36 @@ final class KeyboardTouchCheck {
                     hold(instrumentation,view,group);expect(output);popupInside(instrumentation,view);pickChoice(instrumentation,view,choice);expect(output,"DIRECT_"+choice);
                 }
             }
+            instrumentation.runOnMainSync(()->view.nineState(true,java.util.Arrays.asList("A","B","C","a","b","c","2")));
+            Rect lettersTop=readingBounds(view,"A"),lettersBottom=readingBounds(view,"a");
+            tap(instrumentation,view,lettersTop);expect(output,"KEY_READING_A");
+            for(int swipe=0;swipe<2;swipe++) {
+                event(instrumentation,view,MotionEvent.ACTION_DOWN,lettersBottom.centerX(),lettersBottom.bottom-2*dp);
+                move(instrumentation,view,lettersTop.centerX(),lettersTop.top+2*dp);up(instrumentation,view,lettersTop.centerX(),lettersTop.top+2*dp);expect(output);
+            }
+            tap(instrumentation,view,readingBounds(view,"2"));expect(output,"KEY_READING_2");
+            tap(instrumentation,view,readingBounds(view,"c"));expect(output,"KEY_READING_c");
+            int oldP=KeyboardSurface.readingNodeId("p");
+            instrumentation.runOnMainSync(()->view.nineState(true,java.util.Arrays.asList("p","q")));
+            instrumentation.runOnMainSync(()->view.nineState(true,java.util.Arrays.asList("q","p")));
+            instrumentation.runOnMainSync(()->check(view.getAccessibilityNodeProvider().performAction(oldP,android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK,null),"Reordered spelling lost its stable node"));
+            expect(output,"KEY_READING_p");
+            instrumentation.runOnMainSync(()->view.nineState(true,java.util.Collections.singletonList("q")));
+            instrumentation.runOnMainSync(()->check(!view.getAccessibilityNodeProvider().performAction(oldP,android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK,null),"Removed p node selected q"));expect(output);
             List<String> readings=java.util.Arrays.asList("shi","si","ri","shou","sou","rou","shan","ran");
             int width=view.getWidth(),height=view.getHeight();
             instrumentation.runOnMainSync(()->view.nineState(true,readings));
-            Rect railTop=bounds(view,17),railBottom=bounds(view,20);
-            check(bounds(view,24).isEmpty(),"Offscreen pinyin had actionable bounds");
+            Rect railTop=readingBounds(view,"shi"),railBottom=readingBounds(view,"shou");
+            check(readingBounds(view,"ran").isEmpty(),"Offscreen pinyin had actionable bounds");
             check(view.getAccessibilityNodeProvider().createAccessibilityNodeInfo(-1).isScrollable(),"Pinyin rail lacked accessibility scrolling");
             for(int swipe=0;swipe<2;swipe++) {
                 event(instrumentation,view,MotionEvent.ACTION_DOWN,railBottom.centerX(),railBottom.bottom-2*dp);
                 move(instrumentation,view,railTop.centerX(),railTop.top+2*dp);
                 up(instrumentation,view,railTop.centerX(),railTop.top+2*dp);expect(output);
             }
-            Rect last=bounds(view,24);
+            Rect last=readingBounds(view,"ran");
             check(!last.isEmpty() && last.top>=railTop.top && last.bottom<=railBottom.bottom,"Last pinyin did not scroll fully inside rail");
-            check(bounds(view,17).isEmpty(),"Scrolled-away pinyin remained actionable");
+            check(readingBounds(view,"shi").isEmpty(),"Scrolled-away pinyin remained actionable");
             tap(instrumentation,view,last);expect(output,"KEY_READING_ran");
             check(view.getWidth()==width && view.getHeight()==height,"Rail scrolling resized the keyboard");
             for(int swipe=0;swipe<2;swipe++) {
@@ -127,7 +169,7 @@ final class KeyboardTouchCheck {
                 move(instrumentation,view,railBottom.centerX(),railBottom.bottom-2*dp);
                 up(instrumentation,view,railBottom.centerX(),railBottom.bottom-2*dp);expect(output);
             }
-            tap(instrumentation,view,bounds(view,17));expect(output,"KEY_READING_shi");
+            tap(instrumentation,view,readingBounds(view,"shi"));expect(output,"KEY_READING_shi");
             event(instrumentation,view,MotionEvent.ACTION_DOWN,railTop.right+dp,railTop.centerY());
             up(instrumentation,view,railTop.right+dp,railTop.centerY());expect(output,"KEY_READING_shi");
             event(instrumentation,view,MotionEvent.ACTION_DOWN,railBottom.centerX(),railBottom.centerY());
@@ -143,17 +185,18 @@ final class KeyboardTouchCheck {
             instrumentation.runOnMainSync(()->view.nineState(true,java.util.Arrays.asList("wu","xu","yu","zu"),true));
             expectChoices(instrumentation,view,"A","B","C","a","b","c","2");
             pickChoice(instrumentation,view,"b");expect(output,"DIRECT_b");
-            tap(instrumentation,view,bounds(view,17));expect(output,"KEY_READING_BACK");
+            tap(instrumentation,view,readingBounds(view,"BACK"));expect(output,"KEY_READING_BACK");
             instrumentation.runOnMainSync(()->view.nineState(true,java.util.Collections.emptyList(),true));
-            tap(instrumentation,view,bounds(view,17));expect(output,"KEY_READING_BACK");
+            tap(instrumentation,view,readingBounds(view,"BACK"));expect(output,"KEY_READING_BACK");
             tap(instrumentation,view,bounds(view,18));expect(output);
             instrumentation.runOnMainSync(()->view.nineState(false,java.util.Collections.emptyList()));
+            instrumentation.runOnMainSync(()->check(!view.getAccessibilityNodeProvider().performAction(KeyboardSurface.readingNodeId("BACK"),android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK,null),"Removed back node selected punctuation"));expect(output);
             Rect comma=bounds(view,17);hold(instrumentation,view,comma);up(instrumentation,view,comma.centerX(),comma.centerY());expect(output,"APOSTROPHE");
             hold(instrumentation,view,two);event(instrumentation,view,MotionEvent.ACTION_CANCEL,two.centerX(),two.centerY());up(instrumentation,view,two.centerX(),two.centerY());expect(output);
             hold(instrumentation,view,two);instrumentation.runOnMainSync(view::resetModes);up(instrumentation,view,two.centerX(),two.centerY());expect(output);
             hold(instrumentation,view,two);instrumentation.runOnMainSync(()->view.configure(true,false,"↵",false));up(instrumentation,view,two.centerX(),two.centerY());expect(output);
         } finally {
-            instrumentation.runOnMainSync(()-> {if(keyboard[0]!=null)keyboard[0].cancelTouch();});
+            instrumentation.runOnMainSync(()-> {if(keyboard[0]!=null){keyboard[0].cancelTouch();if(parent[0]!=null)parent[0].removeView(keyboard[0]);}});
             prefs.store.edit().putString("keyboard_mode",previous).commit();
         }
     }
@@ -164,6 +207,7 @@ final class KeyboardTouchCheck {
     private static Rect bounds(KeyboardSurface view,int id) {
         Rect bounds=new Rect();view.getAccessibilityNodeProvider().createAccessibilityNodeInfo(id).getBoundsInParent(bounds);return bounds;
     }
+    private static Rect readingBounds(KeyboardSurface view,String reading){return bounds(view,KeyboardSurface.readingNodeId(reading));}
     private static void popupInside(Instrumentation instrumentation,KeyboardSurface view) {
         instrumentation.runOnMainSync(()-> {
             try {

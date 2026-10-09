@@ -1,0 +1,14 @@
+{
+  "format": "Qingyu T9 syllable graph v1; gzip; big endian primitive arrays",
+  "source": "app/src/main/assets/pinyin/lexicon-v2.db",
+  "source_sha256": "ef4c9c9f22deea61e02a0cdf71ad6be2e906af3088f0d3abd2657385034ad4ff",
+  "path": "app/src/main/assets/pinyin/t9-v1.bin.gz",
+  "sha256": "5960aca28e477f610e75d0387baf2a76d45c472aa21266e888c437b6f629a991",
+  "bytes": 5954618,
+  "nodes": 826868,
+  "readings": 599320,
+  "syllables": 416,
+  "primitive_array_bytes": 16370720,
+  "transformations": "Every source word reading retained; each syllable matches its full T9 code or initial digit; terminal rowids reference the unchanged source database; no example-specific aliases or weights.",
+  "license": "Same GPL-3.0-only and CC BY-SA 4.0 attribution as model-v2-manifest.json"
+}

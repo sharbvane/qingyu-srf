@@ -20,9 +20,13 @@ public final class InputDictionarySmoke {
         field.set(dictionary,SQLiteDatabase.openDatabase(args[0],null,SQLiteDatabase.OPEN_READONLY));
         check(args.length>=2,"Modern lexicon asset is required for this check");
         Field modern=LocalInputDictionary.class.getDeclaredField("pinyinDatabase");modern.setAccessible(true);modern.set(dictionary,SQLiteDatabase.openDatabase(args[1],null,SQLiteDatabase.OPEN_READONLY));
+        check(args.length>=6,"Modern T9 graph is required");Field graph=LocalInputDictionary.class.getDeclaredField("nineLexicon");graph.setAccessible(true);
+        long graphStart=System.nanoTime();graph.set(dictionary,NineKeyLexicon.load(Files.newInputStream(new File(args[5]).toPath())));
+        System.out.printf("T9_GRAPH_LOAD %.2f ms%n",(System.nanoTime()-graphStart)/1e6);t9GraphValidation();
         Field contextual=LocalInputDictionary.class.getDeclaredField("contextModel");contextual.setAccessible(true);
         if(args.length>4)contextual.set(dictionary,ChineseContextModel.load(Files.newInputStream(new File(args[4]).toPath())));
         List<NineKeyCandidate> hello=dictionary.suggestNineKey("64426");
+        for(int i=0;i<Math.min(5,hello.size());i++)System.out.println("NINE_HELLO "+i+" "+hello.get(i).text+" "+hello.get(i).typedSpelling+" "+hello.get(i).consumedDigits);
         check(hello.get(0).text.equals("你好") && hello.get(0).consumedDigits==5,"common nine-key exact reading");
         check(dictionary.suggestNineKey("52432").get(0).text.equals("开发"),"real full word dictionary");
         List<NineKeyCandidate> project=dictionary.suggestNineKey("524329426468");
@@ -31,7 +35,8 @@ public final class InputDictionarySmoke {
         check(dictionary.suggestNineKey("644").stream().anyMatch(candidate->candidate.text.equals("你好")),"partial pinyin completion");
         check(dictionary.suggestNineKey("111").isEmpty(),"digit trust boundary");
         check(LocalInputDictionary.nineKeyPreedit("64426",hello).equals("ni'hao"),"nine-key composition exposes pinyin, not key numbers");
-        check(LocalInputDictionary.nineKeyPreedit("644",dictionary.suggestNineKey("644")).equals("ni'h"),"partial preedit must not invent untyped completion letters");
+        NineKeyCandidate incompleteHello=dictionary.suggestNineKey("644").stream().filter(word->word.text.equals("你好")).findFirst().get();
+        check(LocalInputDictionary.nineKeyPreedit("644",java.util.Collections.singletonList(incompleteHello)).equals("ni'h"),"partial preedit must not invent untyped completion letters");
         check(LocalInputDictionary.nineKeyPending("644","64","ni").equals("nig"),"pending next key replaced already resolved pinyin");
         check(LocalInputDictionary.nineKeyPending("6442","64426","ni'hao").equals("ni'ha"),"pending delete replaced already resolved pinyin");
         check(LocalInputDictionary.nineKeyPending("64'","64","ni").equals("ni'")&&LocalInputDictionary.nineKeyPending("64","64'","ni'").equals("ni"),"pending separator insertion/deletion lost its boundary");
@@ -50,7 +55,7 @@ public final class InputDictionarySmoke {
         check(splitHello.get(0).text.equals("你好")&&splitHello.get(0).consumedDigits==6&&LocalInputDictionary.nineKeyPreedit("64'426",splitHello).equals("ni'hao"),"explicit split changed text/raw consumed length");
         List<NineKeyCandidate> splitNine=dictionary.suggestNineKey("548'5426","jiu");
         check(splitNine.stream().anyMatch(candidate->candidate.text.equals("九键")&&candidate.consumedDigits==8),"manual syllable split rejected a modern full reading");
-        check(dictionary.suggestNineKey("6'4426").stream().noneMatch(candidate->candidate.text.equals("你好")),"explicit split was silently ignored");
+        check(dictionary.suggestNineKey("6'4426").stream().noneMatch(candidate->candidate.text.equals("你好")&&candidate.consumedDigits==6),"explicit split was silently ignored");
         check(dictionary.suggestNineKey("64'").stream().anyMatch(candidate->candidate.text.equals("你")&&candidate.consumedDigits==3),"trailing split must be consumed with its preceding syllable");
         check(LocalInputDictionary.nineKeyPreedit("524329426468",java.util.Collections.singletonList(new NineKeyCandidate("开发","kai'fa",5))).equals("kai'fa'wgamgmt"),"partial candidate fallback must retain unconsumed keys");
         for(String bad:new String[]{"'64","64''426","64 426","64126","64\n426","2".repeat(65)})check(dictionary.suggestNineKey(bad).isEmpty()&&LocalInputDictionary.nineKeyFallback(bad).isEmpty(),"T9 input trust boundary "+bad);
@@ -86,6 +91,7 @@ public final class InputDictionarySmoke {
         for(String bad:new String[]{"NI","ni''hao","ni hao","niu'hao","ni'hao'xi"})check(dictionary.suggestNineKey("64426",bad).isEmpty(),"invalid/mismatched selected syllable prefix accepted: "+bad);
         check(LocalInputDictionary.nineKeySelect("64426","ni","shi").equals("ni"),"incompatible side choice silently changed raw input");
         System.out.println("NINE_KEY_V066_CHECKS_PASS: all legal side readings, sequential constrained syllables, full sentence, backtrack, explicit separators and retained partial-choice suffix");
+        nineKeyV067(dictionary);
         String longDigits="64426".repeat(8);
         List<NineKeyCandidate> longSentence=dictionary.suggestNineKey(longDigits);
         check(!longSentence.isEmpty() && longSentence.get(0).consumedDigits==40,"long digit sentence retains every input key");
@@ -146,6 +152,54 @@ public final class InputDictionarySmoke {
         dictionary.close();
     }
     private static int rank(List<PinyinEngine.Word> words,String text){for(int i=0;i<words.size();i++)if(words.get(i).text.equals(text))return i;return -1;}
+    private static int nineRank(List<NineKeyCandidate> words,String text){for(int i=0;i<words.size();i++)if(words.get(i).text.equals(text))return i;return -1;}
+    private static void nineKeyV067(LocalInputDictionary dictionary)throws Exception {
+        check(dictionary.nineKeyReadings("2").containsAll(java.util.Arrays.asList("A","B","C","a","b","c","2")),"ABC rail omitted a literal or initial letter");
+        for(char digit='2';digit<='9';digit++){String letters=new String[]{"abc","def","ghi","jkl","mno","pqrs","tuv","wxyz"}[digit-'2'];List<String> options=dictionary.nineKeyReadings(String.valueOf(digit));check(options.contains(String.valueOf(digit)),"rail omitted digit "+digit);for(char letter:letters.toCharArray())check(options.contains(String.valueOf(letter))&&options.contains(String.valueOf(Character.toUpperCase(letter))),"rail omitted letter "+letter);}
+        for(String raw:new String[]{"773","74873","7732","7487832"}) {
+            List<NineKeyCandidate> input=dictionary.suggestNineKey(raw);check(nineRank(input,"输入法")==0,"full/initial/mixed 输入法 not first for "+raw+": "+(input.isEmpty()?"empty":input.get(0).text));
+            NineKeyCandidate first=input.get(0);check(first.consumedDigits==raw.length(),"T9 initials consumed canonical letter count");check(LocalInputDictionary.nineKeyPreedit(raw,input).replace("'","").length()==raw.length(),"T9 preedit invented canonical full letters");
+        }
+        String selected="";for(String letter:new String[]{"s","r","f"}){check(dictionary.nineKeyReadings("773",selected).contains(letter),"initial rail did not advance to "+letter);selected=LocalInputDictionary.nineKeySelect("773",selected,letter);}
+        check(selected.equals("s'r'f")&&LocalInputDictionary.nineKeySelectionOffset("773",selected)==3&&dictionary.nineKeyReadings("773",selected).isEmpty(),"continuous initials selection lost its offset");
+        check(dictionary.suggestNineKey("773",selected).get(0).text.equals("输入法")&&LocalInputDictionary.nineKeyPreedit("773",dictionary.suggestNineKey("773",selected),selected).equals("s'r'f"),"selected initials changed canonical reading or preedit");
+        check(LocalInputDictionary.nineKeyUndoSelection(selected).equals("s'r")&&dictionary.nineKeyReadings("773","s'r").contains("d"),"initial backtrack did not restore all third-key letters");
+        String letters="";for(String letter:new String[]{"n","i","h","a","o"})letters=LocalInputDictionary.nineKeySelect("64426",letters,letter);
+        check(dictionary.suggestNineKey("64","n'i").get(0).text.equals("你")&&dictionary.suggestNineKey("64426",letters).get(0).text.equals("你好"),"individual letter choices did not join within a full syllable");
+        for(String[] entry:new String[][]{{"shujuku","数据库","shu'ju'ku"},{"anzhuo","安卓","an'zhuo"},{"dangang","单杠","dan'gang"},{"biancheng","编程","bian'cheng"},{"duanshipin","短视频","duan'shi'pin"},{"wangluo","网络","wang'luo"},{"gongzuo","工作","gong'zuo"},{"jintian","今天","jin'tian"},{"shouji","手机","shou'ji"},{"ruanjian","软件","ruan'jian"}}) {
+            String[] parts=entry[2].split("'");StringBuilder initial=new StringBuilder(),mixed=new StringBuilder();for(int i=0;i<parts.length;i++){initial.append(parts[i].charAt(0));mixed.append(i%2==0?parts[i]:parts[i].substring(0,1));}
+            for(String code:new String[]{entry[0]}){String digits=NineKeyLexicon.digits(code);List<NineKeyCandidate> result=dictionary.suggestNineKey(digits);int rank=nineRank(result,entry[1]);check(rank>=0&&rank<16,"modern generalized T9 missing "+entry[1]+" code="+code+" rank="+rank);}
+            StringBuilder mixedChoice=new StringBuilder();for(int i=0;i<parts.length;i++){if(i>0)mixedChoice.append("'");mixedChoice.append(i%2==0?parts[i]:parts[i].substring(0,1));}List<NineKeyCandidate> mixedWords=dictionary.suggestNineKey(NineKeyLexicon.digits(mixed.toString()),mixedChoice.toString());check(nineRank(mixedWords,entry[1])>=0&&nineRank(mixedWords,entry[1])<128,"explicit mixed spelling missing "+entry[1]);
+            String chosen=String.join("'",initial.toString().split(""));List<NineKeyCandidate> narrowed=dictionary.suggestNineKey(NineKeyLexicon.digits(initial.toString()),chosen);
+            // Very low-frequency readings share hundreds of two-initial collisions; a full first syllable disambiguates them.
+            boolean frequent=entry[1].equals("数据库")||entry[1].equals("编程")||entry[1].equals("网络")||entry[1].equals("工作")||entry[1].equals("今天")||entry[1].equals("手机");
+            if(frequent)check(nineRank(narrowed,entry[1])>=0,"common explicit initials missing "+entry[1]+" code="+chosen);
+        }
+        String raw=NineKeyLexicon.digits("wykdsp"),constraint="w'y'k'd's'p";List<NineKeyCandidate> sentence=dictionary.suggestNineKey(raw,constraint);
+        for(int i=0;i<Math.min(12,sentence.size());i++)System.out.println("T9_SENTENCE "+i+" "+sentence.get(i).text+" "+sentence.get(i).pinyin+" "+sentence.get(i).typedSpelling);
+        check(nineRank(sentence,"我要看短视频")>=0&&nineRank(sentence,"我要看短视频")<16,"context initials sentence not in front candidates");
+        Field learnedCode=LocalInputDictionary.class.getDeclaredField("pinyinLearning"),learnedText=LocalInputDictionary.class.getDeclaredField("chineseLearning");learnedCode.setAccessible(true);learnedText.setAccessible(true);
+        java.util.Map<String,Integer> codes=(java.util.Map<String,Integer>)learnedCode.get(dictionary),texts=(java.util.Map<String,Integer>)learnedText.get(dictionary),savedCodes=new java.util.HashMap<>(codes),savedTexts=new java.util.HashMap<>(texts);
+        try{codes.put("kd\t快点",100);codes.put("kuaidian\t快点",100);texts.put("快点",100);check(nineRank(dictionary.suggestNineKey(raw,constraint),"我要看短视频")>=0,"frequent unrelated shortcut suppressed an entire sentence");check(nineRank(dictionary.suggestNineKey("53","k'd'"),"快点")<3,"sentence protection weakened the standalone shortcut");}finally{codes.clear();codes.putAll(savedCodes);texts.clear();texts.putAll(savedTexts);}
+        System.out.println("T9_SENTENCE_LEARNING_PASS: frequent unrelated shortcut retains sentence alternatives and standalone priority");
+        check(sentence.stream().anyMatch(word->word.text.equals("短视频"))==false,"sentence output leaked suffix without consuming its prefix");
+        check(LocalInputDictionary.nineKeyRemainingSelection("7732","s'r'fa",2).equals("fa"),"mixed partial choice discarded the unconsumed full syllable");
+        check(dictionary.suggestNineKey("7'7'3","s'r'f").get(0).text.equals("输入法")&&dictionary.suggestNineKey("7'7'3","s'r'f").get(0).consumedDigits==5,"initial separators not counted as raw input");
+        for(String[] entry:new String[][]{{"kfxm","开发项目"},{"sjsrf","手机输入法"},{"mthj","明天回家"}}){
+            long began=System.nanoTime();List<NineKeyCandidate> unrestricted=dictionary.suggestNineKey(NineKeyLexicon.digits(entry[0]));
+            int position=nineRank(unrestricted,entry[1]);System.out.printf("T9_UNRESTRICTED %s rank=%d cold=%.2f ms first=%s%n",entry[0],position,(System.nanoTime()-began)/1e6,unrestricted.isEmpty()?"":unrestricted.get(0).text);
+            check(position>=0,"unrestricted sentence initials missing "+entry[1]);
+        }
+        check(nineRank(dictionary.suggestNineKey("58874","j't't'q'h"),"今天天气好")>=0,"explicit initials did not disambiguate a five-syllable sentence");
+        System.out.println("NINE_KEY_V067_CHECKS_PASS: all key letters/digits, full/initial/mixed whole corpus matching, consumed spelling, continuous initials/backtrack, modern words and contextual long sentence");
+    }
+    private static void t9GraphValidation()throws Exception {
+        java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();try(java.io.DataOutputStream out=new java.io.DataOutputStream(bytes)){out.writeInt(0x51595439);out.writeInt(1);out.writeInt(2);out.writeInt(1);out.writeInt(1);out.writeShort(1);out.writeByte('a');for(int value:new int[]{1,2,2,0,0,1,1,1})out.writeInt(value);out.writeShort(0);out.writeShort(0);out.writeInt(1);out.writeInt(1);}
+        byte[] valid=bytes.toByteArray();check(NineKeyLexicon.load(new java.io.ByteArrayInputStream(valid)).match("2","").get(0).spelling.equals("a"),"small T9 graph fixture did not decode");
+        for(int position:new int[]{0,8,20,23,valid.length-5,valid.length-4}){byte[] invalid=valid.clone();invalid[position]=(byte)0xff;boolean rejected=false;try{NineKeyLexicon.load(new java.io.ByteArrayInputStream(invalid));}catch(java.io.IOException expected){rejected=true;}check(rejected,"corrupt graph boundary accepted at "+position);}
+        boolean truncated=false;try{NineKeyLexicon.load(new java.io.ByteArrayInputStream(java.util.Arrays.copyOf(valid,valid.length-1)));}catch(java.io.IOException expected){truncated=true;}check(truncated,"truncated T9 graph accepted");
+        System.out.println("T9_GRAPH_VALIDATION_PASS: signature, size, spelling, offsets, row IDs and truncation");
+    }
     private static Candidate candidate(EngineSnapshot state,String text){for(Candidate c:state.candidates)if(c.text.equals(text))return c;throw new AssertionError("missing segmented candidate "+text);}
     private static String chooseSegmented(PinyinEngine engine){
         EngineSnapshot state=engine.search("woyaokanduanshipin");Candidate prefix=candidate(state,"我要看");check(prefix.id>=0,"fixture must exercise native partial selection");state=engine.select(prefix.id);check(state.committedText.isEmpty(),"partial prefix committed too early");return engine.select(candidate(state,"短视频").id).committedText;

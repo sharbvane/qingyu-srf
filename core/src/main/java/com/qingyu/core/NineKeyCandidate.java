@@ -4,8 +4,13 @@ package com.qingyu.core;
 public final class NineKeyCandidate {
     public final String text;
     public final String pinyin;
+    /** The letters actually represented by the pressed keys, including initials. */
+    public final String typedSpelling;
     public final int consumedDigits;
     public NineKeyCandidate(String text,String pinyin,int consumedDigits) {
-        this.text=text;this.pinyin=pinyin;this.consumedDigits=consumedDigits;
+        this(text,pinyin,pinyin,consumedDigits);
+    }
+    public NineKeyCandidate(String text,String pinyin,String typedSpelling,int consumedDigits) {
+        this.text=text;this.pinyin=pinyin;this.typedSpelling=typedSpelling;this.consumedDigits=consumedDigits;
     }
 }

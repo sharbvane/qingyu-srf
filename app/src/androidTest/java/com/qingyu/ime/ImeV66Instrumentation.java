@@ -5,7 +5,7 @@ import android.os.SystemClock;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 /** Sequential T9 choices exercise the installed keyboard, not a mock decoder. */
-public final class ImeV66Instrumentation extends ImeV65Instrumentation {
+public class ImeV66Instrumentation extends ImeV65Instrumentation {
     @Override protected String successMarker(){return "ALL_V66_IME_CHECKS_PASS";}
     @Override protected void runChecks() throws Exception {
         super.runChecks();
@@ -48,20 +48,5 @@ public final class ImeV66Instrumentation extends ImeV65Instrumentation {
     private AccessibilityNodeInfo firstReading(){
         AccessibilityNodeInfo panel=awaitNode("panel_host");
         AccessibilityNodeInfo found=findReading(panel);check(found!=null,"No visible reading in the rail");return found;
-    }
-    private AccessibilityNodeInfo findReading(AccessibilityNodeInfo node){
-        String id=node.getViewIdResourceName();if(id!=null&&id.contains("key_READING_")&&!id.endsWith("BACK"))return node;
-        for(int i=0;i<node.getChildCount();i++){AccessibilityNodeInfo child=node.getChild(i);if(child!=null){AccessibilityNodeInfo found=findReading(child);if(found!=null)return found;}}return null;
-    }
-    private void selectReading(String reading){
-        String id="key_READING_"+reading;
-        long until=SystemClock.uptimeMillis()+5000;
-        while(SystemClock.uptimeMillis()<until){
-            if(find(id)!=null){nodeClick(id);SystemClock.sleep(100);return;}
-            AccessibilityNodeInfo first=findReading(awaitNode("panel_host"));
-            if(first!=null){AccessibilityNodeInfo host=first.getParent();if(!host.performAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD))host.performAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);}
-            SystemClock.sleep(100);
-        }
-        throw new AssertionError("No selectable side pinyin: "+reading+" composing="+composing());
     }
 }
