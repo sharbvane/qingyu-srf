@@ -16,13 +16,14 @@ import java.util.zip.GZIPInputStream;
 /** A syllable graph of every source reading; edges accept full spelling or initials. */
 final class NineKeyLexicon {
     private final String[] syllables,codes;
-    private final int[] children,terminals,weights,rowids,frequencies;
+    private final int[] children,terminals,weights,rowids,frequencies,syllableWeights;
     private final short[] labels;
     // ponytail: frequency-bounded 512 states and 128 complete matches per prefix; widen after measured common-word misses.
     private static final int BEAM=512;
     private NineKeyLexicon(String[] syllables,int[] children,int[] terminals,int[] weights,short[] labels,int[] rowids,int[] frequencies) {
         this.syllables=syllables;this.children=children;this.terminals=terminals;this.weights=weights;this.labels=labels;this.rowids=rowids;this.frequencies=frequencies;
         codes=new String[syllables.length];for(int i=0;i<codes.length;i++)codes[i]=digits(syllables[i]);
+        syllableWeights=new int[syllables.length];for(int child=children[0];child<children[1];child++)syllableWeights[labels[child]]=weights[child];
     }
     static NineKeyLexicon load(InputStream source)throws IOException {
         PushbackInputStream sniff=new PushbackInputStream(source,2);int first=sniff.read(),second=sniff.read();if(second>=0)sniff.unread(second);if(first>=0)sniff.unread(first);
@@ -55,7 +56,9 @@ final class NineKeyLexicon {
         StringBuilder result=new StringBuilder();for(int i=0;i<letters.length();i++){char letter=letters.charAt(i);if(letter=='\'')continue;result.append(letter<='c'?'2':letter<='f'?'3':letter<='i'?'4':letter<='l'?'5':letter<='o'?'6':letter<='s'?'7':letter<='v'?'8':'9');}return result.toString();
     }
     List<String> readings(String raw) {
-        List<String> result=new ArrayList<>();for(int i=0;i<syllables.length;i++)if(end(raw,0,codes[i])>=0)result.add(syllables[i]);return result;
+        List<Integer> valid=new ArrayList<>();for(int i=0;i<syllables.length;i++)if(end(raw,0,codes[i])>=0)valid.add(i);
+        valid.sort(Comparator.comparingInt((Integer label)->syllableWeights[label]).reversed().thenComparing(label->syllables[label]));
+        List<String> result=new ArrayList<>();for(int label:valid)result.add(syllables[label]);return result;
     }
     private static int end(String raw,int start,String code) {
         int position=start;for(int i=0;i<code.length();i++){if(position>=raw.length()||raw.charAt(position++)!=code.charAt(i))return -1;}
@@ -102,6 +105,11 @@ final class NineKeyLexicon {
     private static boolean allowed(char[] required,boolean[] hard,boolean[] inside,int start,String spelling) {
         int end=start+spelling.length();if(inside[start]||end<inside.length&&inside[end])return false;
         for(int i=0;i<spelling.length()&&start+i<required.length;i++){int index=start+i;if(required[index]!=0&&required[index]!=spelling.charAt(i)||i>0&&hard[index])return false;}return true;
+    }
+    static boolean matchesSelection(String raw,String selected,String typed) {
+        char[] required=new char[raw.length()];boolean[] hard=new boolean[raw.length()+1],inside=new boolean[raw.length()+1];int offset=0;
+        for(String part:selected.isEmpty()?new String[0]:selected.split("'")){int start=offset;for(int i=0;i<part.length();i++){if(offset>=raw.length())return false;required[offset++]=part.charAt(i);}if(part.length()>1){hard[start]=true;hard[offset]=true;for(int i=start+1;i<offset;i++)inside[i]=true;}if(offset<raw.length()&&raw.charAt(offset)=='\'')offset++;}
+        offset=0;for(String part:typed.split("'")){if(!allowed(required,hard,inside,offset,part))return false;offset=end(raw,offset,digits(part));if(offset<0)return false;}return offset==raw.length();
     }
     private static String joined(String before,String next){return before.isEmpty()?next:before+"'"+next;}
     private void advance(List<Map<Integer,State>> positions,List<List<Match>> found,State before,int node,int offset,String typed,boolean initial) {

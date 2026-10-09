@@ -92,6 +92,7 @@ public final class InputDictionarySmoke {
         check(LocalInputDictionary.nineKeySelect("64426","ni","shi").equals("ni"),"incompatible side choice silently changed raw input");
         System.out.println("NINE_KEY_V066_CHECKS_PASS: all legal side readings, sequential constrained syllables, full sentence, backtrack, explicit separators and retained partial-choice suffix");
         nineKeyV067(dictionary);
+        nineKeyV070(dictionary,args);
         String longDigits="64426".repeat(8);
         List<NineKeyCandidate> longSentence=dictionary.suggestNineKey(longDigits);
         check(!longSentence.isEmpty() && longSentence.get(0).consumedDigits==40,"long digit sentence retains every input key");
@@ -192,6 +193,33 @@ public final class InputDictionarySmoke {
         }
         check(nineRank(dictionary.suggestNineKey("58874","j't't'q'h"),"今天天气好")>=0,"explicit initials did not disambiguate a five-syllable sentence");
         System.out.println("NINE_KEY_V067_CHECKS_PASS: all key letters/digits, full/initial/mixed whole corpus matching, consumed spelling, continuous initials/backtrack, modern words and contextual long sentence");
+    }
+    private static void nineKeyV070(LocalInputDictionary dictionary,String[] args)throws Exception {
+        for(char digit='2';digit<='9';digit++){
+            List<String> readings=dictionary.nineKeyReadings(String.valueOf(digit));boolean literals=false;
+            for(String reading:readings){if(reading.matches("[A-Z0-9]"))literals=true;else check(!literals,"uppercase/digit interrupted usable lower-case readings for "+digit);}
+            check(readings.get(readings.size()-1).equals(String.valueOf(digit)),"digit should follow the spelling choices");
+        }
+        List<String> rail=dictionary.nineKeyReadings("7426");check(rail.indexOf("shan")<rail.indexOf("pian"),"common syllable frequency did not order the rail");
+        check(PinyinEngine.typedReading("wo'yao'kan'duan'shi'pin","woyaokdsp").equals("wo'yao'k'd's'p"),"generic mixed reading lost typed letters");
+        for(String wrong:new String[]{"wykdspx","wykpds","w'o'yaokdsp","nohao"})check(PinyinEngine.typedReading(wrong.equals("nohao")?"ni'hao":"wo'yao'kan'duan'shi'pin",wrong).isEmpty(),"mismatched mixed reading accepted "+wrong);
+        for(String[] word:new String[][]{{"shurk","输入框"},{"gongzuojh","工作计划"},{"duansp","短视频"}}){List<PinyinEngine.Word> result=dictionary.lookup(word[0],"");check(rank(result,word[1])>=0,"mixed local word missing "+word[0]+" → "+word[1]);}
+        File user=new File(args[3]+".v070"),saved=new File(args[3]+".v070.tsv");Files.deleteIfExists(user.toPath());Files.deleteIfExists(saved.toPath());
+        LocalInputDictionary isolated=new LocalInputDictionary();Field base=LocalInputDictionary.class.getDeclaredField("database"),modern=LocalInputDictionary.class.getDeclaredField("pinyinDatabase"),graph=LocalInputDictionary.class.getDeclaredField("nineLexicon"),model=LocalInputDictionary.class.getDeclaredField("contextModel"),file=LocalInputDictionary.class.getDeclaredField("pinyinLearningFile");for(Field field:new Field[]{base,modern,graph,model,file})field.setAccessible(true);
+        base.set(isolated,SQLiteDatabase.openDatabase(args[0],null,SQLiteDatabase.OPEN_READONLY));modern.set(isolated,SQLiteDatabase.openDatabase(args[1],null,SQLiteDatabase.OPEN_READONLY));model.set(isolated,ChineseContextModel.load(Files.newInputStream(new File(args[4]).toPath())));graph.set(isolated,NineKeyLexicon.load(Files.newInputStream(new File(args[5]).toPath())));file.set(isolated,saved);
+        PinyinEngine engine=new PinyinEngine();engine.open(args[2],user.getPath());engine.setLexicon(isolated);engine.setLearningEnabled(false);isolated.setLearningEnabled(false);
+        try{
+            for(String[] sentence:new String[][]{{"woyaokanduanshipin","我要看短视频"},{"wykdsp","我要看短视频"},{"woyaokdsp","我要看短视频"},{"mthj","明天回家"},{"mingtianhj","明天回家"},{"kfxm","开发项目"},{"gongzuojh","工作计划"},{"womenmingtianqubeijing","我们明天去北京"},{"womenmingtianzaitaolun","我们明天再讨论"},{"wanshangwomenyiqichifan","晚上我们一起吃饭"},{"nixianzaiyoushijianma","你现在有时间吗"},{"qingbangwodakaishezhi","请帮我打开设置"}}){
+                long started=System.nanoTime();engine.reset();EngineSnapshot state=engine.search(sentence[0]);int position=-1;for(int i=0;i<state.candidates.size();i++)if(state.candidates.get(i).text.equals(sentence[1])){position=i;break;}
+                System.out.printf("V070_SENTENCE %s rank=%d first=%s time=%.2f ms%n",sentence[0],position,state.candidates.isEmpty()?"":state.candidates.get(0).text,(System.nanoTime()-started)/1e6);
+                check(position>=0&&position<16,"daily sentence not in front candidates "+sentence[0]);check(engine.previewCandidate(state.candidates.get(position).id).equals(sentence[1]),"sentence preview dropped letters");check(engine.select(state.candidates.get(position).id).committedText.equals(sentence[1]),"sentence selection consumed the wrong raw span");
+            }
+            isolated.setLearningEnabled(true);for(int i=0;i<3;i++)isolated.learn("wo'yao'kan'duan'shi'pin","我要看短视频","","wo'yao'kan'duan'shi'pin");
+            check(nineRank(isolated.suggestNineKey("995377","w'y'k'd's'p"),"我要看短视频")>=0,"new whole learned phrase missing from T9 initials");isolated.flush();
+        }finally{engine.close();isolated.close();Files.deleteIfExists(user.toPath());}
+        LocalInputDictionary restored=new LocalInputDictionary();base.set(restored,SQLiteDatabase.openDatabase(args[0],null,SQLiteDatabase.OPEN_READONLY));modern.set(restored,SQLiteDatabase.openDatabase(args[1],null,SQLiteDatabase.OPEN_READONLY));file.set(restored,saved);java.lang.reflect.Method load=LocalInputDictionary.class.getDeclaredMethod("loadPinyinLearning");load.setAccessible(true);load.invoke(restored);
+        try{check(nineRank(restored.suggestNineKey("995377","w'y'k'd's'p"),"我要看短视频")>=0,"personal phrase did not survive T9 reload");}finally{restored.close();Files.deleteIfExists(saved.toPath());}
+        System.out.println("NINE_KEY_V070_CHECKS_PASS: frequent spelling/lowercase before literals, full/initial/mixed sentence candidates and commits, whole learned phrase durable T9 recall");
     }
     private static void t9GraphValidation()throws Exception {
         java.io.ByteArrayOutputStream bytes=new java.io.ByteArrayOutputStream();try(java.io.DataOutputStream out=new java.io.DataOutputStream(bytes)){out.writeInt(0x51595439);out.writeInt(1);out.writeInt(2);out.writeInt(1);out.writeInt(1);out.writeShort(1);out.writeByte('a');for(int value:new int[]{1,2,2,0,0,1,1,1})out.writeInt(value);out.writeShort(0);out.writeShort(0);out.writeInt(1);out.writeInt(1);}

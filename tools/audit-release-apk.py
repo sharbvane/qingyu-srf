@@ -96,7 +96,7 @@ with zipfile.ZipFile(apk) as archive:
     names = set(archive.namelist())
     libs = [entry for entry in archive.infolist() if entry.filename.startswith("lib/") and entry.filename.endswith(".so")]
     assert {entry.filename.split("/")[1] for entry in libs} == {"arm64-v8a", "armeabi-v7a", "x86_64"}
-    assert len(libs) == 6
+    assert len(libs) == 9
     for entry in libs:
         name = entry.filename
         blob = archive.read(name)
@@ -149,6 +149,15 @@ with zipfile.ZipFile(apk) as archive:
         blob = archive.read(name)
         assert blob == expected, name
         metadata["assets"][name] = {"bytes": len(blob), "sha256": digest(blob)}
+    identifier = json.loads((ROOT / "third_party/mlkit/language-id-manifest.json").read_text(encoding="utf-8-sig"))
+    assert identifier["dependency"] == "com.google.mlkit:language-id:17.0.6"
+    for name, expected in identifier["files"].items():
+        blob = archive.read(name)
+        assert {"bytes": len(blob), "sha256": digest(blob)} == expected, name
+        if name.startswith("assets/"):
+            source_assets.add(name)
+            metadata["assets"][name] = expected
+    metadata["offline_language_identification"] = identifier
     # AGP's compiled ART startup profiles are build output, not language models.
     metadata["build_generated_assets"] = {}
     for name, folder in [("baseline.prof", "binary_art_profile"), ("baseline.profm", "binary_art_profile_metadata")]:

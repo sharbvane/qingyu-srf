@@ -1,0 +1,24 @@
+{
+  "dependency": "com.google.mlkit:language-id:17.0.6",
+  "official_url": "https://dl.google.com/dl/android/maven2/com/google/mlkit/language-id/17.0.6/language-id-17.0.6.aar",
+  "aar_bytes": 2335810,
+  "aar_sha256": "3610374edfab8537c795195d53645c53923afa1acbe80ef25f5fc8551076a8f7",
+  "files": {
+    "assets/tflite_langid.tflite.jpg": {
+      "bytes": 315520,
+      "sha256": "7f931f6f7c1dd0ec591ace7780df91645a450fafc83505f3ff45ce5ef7c8441b"
+    },
+    "lib/arm64-v8a/liblanguage_id_l2c_jni.so": {
+      "bytes": 1019560,
+      "sha256": "4479b044bbdad9a938fea15698dfa3473e73bd6bab9f8e0468fc3cc6069c137e"
+    },
+    "lib/armeabi-v7a/liblanguage_id_l2c_jni.so": {
+      "bytes": 609636,
+      "sha256": "1c1a8baa63ecc473e611902a8aa010fa526f2a35594c302836f7279d1c73aa17"
+    },
+    "lib/x86_64/liblanguage_id_l2c_jni.so": {
+      "bytes": 1324488,
+      "sha256": "2d4c44ca649d27bc76600dcf31bee9312cc34e175e38214fc4dc0e85ff67a58d"
+    }
+  }
+}

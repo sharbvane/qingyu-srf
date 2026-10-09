@@ -5,7 +5,7 @@ import android.os.SystemClock;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 /** T9 matching and rail choices run against the installed, signed IME. */
-public final class ImeV67Instrumentation extends ImeV66Instrumentation {
+public class ImeV67Instrumentation extends ImeV66Instrumentation {
     @Override protected String successMarker(){return "ALL_V67_IME_CHECKS_PASS";}
     @Override protected void runChecks() throws Exception {
         if(debugTarget()){KeyboardTouchCheck.run(this,activity);pass("actual touch and accessibility checks cover split digit 1, all ABC rail choices, cancellation and existing keyboard gestures");}
@@ -51,8 +51,10 @@ public final class ImeV67Instrumentation extends ImeV66Instrumentation {
         pass("long-sentence initials use the same syllable graph and context composition; selecting the full sentence leaves no raw tail");
 
         clear();type("23");awaitCandidate(null);selectReading("A");
+        awaitComposingLiteral("A",false);
         check(composing().startsWith("A")&&composing().length()>1,"Explicit A discarded the unselected tail: "+composing());
         key("READING_BACK");awaitPinyin("");selectReading("b");selectReading("3");
+        awaitComposingLiteral("b3",true);
         check(composing().equals("b3"),"Explicit number lost a chosen lowercase prefix: "+composing());
         key("READING_BACK");check(awaitPinyin("").startsWith("b"),"Back did not restore the prefix and raw tail");
         key("CLEAR");awaitText("");awaitNoComposition();
@@ -65,6 +67,7 @@ public final class ImeV67Instrumentation extends ImeV66Instrumentation {
         pass("split has a numeric 1 hold picker that commits only on release and cancels cleanly; short press still separates pinyin");
         clear();
     }
+    private void awaitComposingLiteral(String expected,boolean exact){long until=SystemClock.uptimeMillis()+5000;while(SystemClock.uptimeMillis()<until){String value=composing();if(exact?value.equals(expected):value.startsWith(expected))return;SystemClock.sleep(35);}throw new AssertionError("Literal selection did not synchronize: "+composing()+" expected "+expected);}
     private void awaitFirst(String word){
         long until=SystemClock.uptimeMillis()+5000;
         while(SystemClock.uptimeMillis()<until){AccessibilityNodeInfo first=find("candidate_0");if(first!=null&&word.contentEquals(first.getText()))return;SystemClock.sleep(35);}

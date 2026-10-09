@@ -19,4 +19,19 @@
     <item name="translation_copy" type="id" />
     <item name="pinyin_preedit" type="id" />
     <item name="update_status" type="id" />
+    <item name="edit_actions" type="id" />
+    <item name="edit_status" type="id" />
+    <item name="edit_left" type="id" />
+    <item name="edit_right" type="id" />
+    <item name="edit_home" type="id" />
+    <item name="edit_end" type="id" />
+    <item name="edit_select" type="id" />
+    <item name="edit_select_all" type="id" />
+    <item name="edit_copy" type="id" />
+    <item name="edit_cut" type="id" />
+    <item name="edit_paste" type="id" />
+    <item name="edit_clipboard" type="id" />
+    <item name="edit_delete" type="id" />
+    <item name="edit_undo" type="id" />
+    <item name="edit_translate" type="id" />
 </resources>

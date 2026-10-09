@@ -16,6 +16,10 @@ import com.google.mlkit.nl.translate.TranslateRemoteModel;
 import com.google.mlkit.nl.translate.Translation;
 import com.google.mlkit.nl.translate.Translator;
 import com.google.mlkit.nl.translate.TranslatorOptions;
+import com.google.mlkit.nl.languageid.IdentifiedLanguage;
+import com.google.mlkit.nl.languageid.LanguageIdentification;
+import com.google.mlkit.nl.languageid.LanguageIdentificationOptions;
+import com.google.mlkit.nl.languageid.LanguageIdentifier;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.File;
@@ -33,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -74,6 +79,10 @@ final class TranslationRepository implements AutoCloseable {
     private volatile Function<String, String> englishLookup;
     private volatile boolean closed;
     private volatile boolean modelPlatformSupported = true;
+    private volatile boolean languageIdPlatformSupported = true;
+    private LanguageIdentifier languageIdentifier;
+    private final AtomicLong editorGeneration=new AtomicLong();
+    private EditorRequest activeEditorRequest;
     private long modelGeneration;
 
     TranslationRepository(Context context) { this(context, null); }
@@ -90,7 +99,8 @@ final class TranslationRepository implements AutoCloseable {
             if (closed) return;
             long pageSize=android.system.Os.sysconf(android.system.OsConstants._SC_PAGESIZE);
             if(pageSize!=4096){String[] abis=android.os.Process.is64Bit()?android.os.Build.SUPPORTED_64_BIT_ABIS:android.os.Build.SUPPORTED_32_BIT_ABIS;
-                modelPlatformSupported=abis.length>0&&packagedModelSupportsPageSize(this.context,abis[0],pageSize);}
+                modelPlatformSupported=abis.length>0&&packagedModelSupportsPageSize(this.context,abis[0],pageSize);
+                languageIdPlatformSupported=abis.length>0&&packagedLibrarySupportsPageSize(this.context,abis[0],"liblanguage_id_l2c_jni.so",pageSize);}
         });
         for(String language:GLOSS_LANGUAGES){String error=this.context.getSharedPreferences("qingyu",Context.MODE_PRIVATE).getString("model_error_"+language,"");if(!error.isEmpty()){modelErrors.put(language,error);states.put(language,State.FAILED);}}
         refreshModels("en", null);
@@ -199,6 +209,121 @@ final class TranslationRepository implements AutoCloseable {
         worker.postDelayed(()->{if(closed)return;if(generation!=modelGeneration){result(callback,"","翻译模型已更改，请重新查看");return;}translate(text,source,target,callback,attempts+1);},350);
     }
 
+    /** Explicit editor action; no text leaves the device and missing models are never downloaded. */
+    void translateEditor(String text, boolean selected, String target, Callback callback) {
+        if (callback == null) return;
+        long editorRevision=editorGeneration.incrementAndGet();
+        worker.post(() -> {
+            if (closed) return;
+            if(editorRevision!=editorGeneration.get()){result(callback,"","翻译已取消，原文未替换");return;}
+            if(activeEditorRequest!=null)activeEditorRequest.finish("","翻译已取消，原文未替换");
+            if (text == null || text.isEmpty() || !isGlossLanguage(target)) { result(callback,"","没有可翻译的内容"); return; }
+            // shortcut: bound one editor request to 4096 characters/64 spans, select a smaller range for larger documents.
+            if (text.length() > EditorTranslation.MAX_TEXT) { result(callback,"","文字过长，请选择较小范围再翻译"); return; }
+            String sample=EditorTranslation.languageSample(text);
+            boolean han=EditorTranslation.hasHan(sample), kana=EditorTranslation.hasKana(sample);
+            if (sample.isEmpty()) { result(callback,"","没有可翻译的文字"); return; }
+            EditorRequest request=new EditorRequest(modelGeneration,editorRevision,callback);
+            activeEditorRequest=request;
+            worker.postDelayed(request.timeout,45000);
+            if (!selected || han && !kana && EditorTranslation.hasNonHanLetter(sample)) {
+                beginEditorTranslation(text,"zh",target,request); return;
+            }
+            String hanSample=han&&kana?EditorTranslation.separatedHanSample(sample):"";
+            if(!hanSample.isEmpty()) {
+                identifyLanguage(hanSample,(language,note)->worker.post(()->{
+                    if(!request.active())return;
+                    if(language.equals("zh"))beginEditorTranslation(text,"zh",target,request);
+                    else identifyEditorSource(text,sample,target,han,kana,request);
+                }));return;
+            }
+            identifyEditorSource(text,sample,target,han,kana,request);
+        });
+    }
+
+    void cancelEditorTranslation() {
+        long revision=editorGeneration.incrementAndGet();
+        worker.post(()->{if(activeEditorRequest!=null&&activeEditorRequest.editorRevision<revision)activeEditorRequest.finish("","翻译已取消，原文未替换");});
+    }
+
+    private void identifyEditorSource(String text,String sample,String target,boolean han,boolean kana,EditorRequest request) {
+        identifyLanguage(sample,(language,note)->worker.post(()->{
+                if(!request.active())return;
+                // Han-only short Chinese words often have too little evidence for language identification.
+                String detected=language;
+                if(detected.isEmpty() && han && !kana && !EditorTranslation.hasNonHanLetter(sample))detected="zh";
+                if(detected.isEmpty()){request.finish("",note);return;}
+                if(!supported(detected)){request.finish("","暂不支持识别到的语言，原文已保留");return;}
+                beginEditorTranslation(text,detected,detected.equals("zh")?target:"zh",request);
+        }));
+    }
+
+    void identifyLanguage(String text, Callback callback) {
+        if(callback==null)return;
+        worker.post(()->{
+            if(closed)return;
+            if(text==null||text.isEmpty()||text.length()>EditorTranslation.MAX_TEXT){result(callback,"","无法可靠识别语言，原文已保留");return;}
+            if(!languageIdPlatformSupported){result(callback,"","当前设备无法加载语言识别组件，原文已保留");return;}
+            try {
+                if(languageIdentifier==null)languageIdentifier=LanguageIdentification.getClient(
+                        new LanguageIdentificationOptions.Builder().setConfidenceThreshold(0.01f).build());
+                languageIdentifier.identifyPossibleLanguages(text)
+                    .addOnSuccessListener(executor,languages->{
+                        String[] tags=new String[languages.size()];float[] confidence=new float[languages.size()];
+                        for(int i=0;i<languages.size();i++){IdentifiedLanguage language=languages.get(i);tags[i]=language.getLanguageTag();confidence[i]=language.getConfidence();}
+                        String detected=EditorTranslation.confidentLanguage(tags,confidence);
+                        result(callback,detected,detected.isEmpty()?"无法可靠识别语言，原文已保留":"语言已离线识别");
+                    })
+                    .addOnFailureListener(executor,failure->result(callback,"","语言识别失败，原文已保留"));
+            }catch(RuntimeException|LinkageError failure){result(callback,"","语言识别组件无法加载，原文已保留");}
+        });
+    }
+
+    private void beginEditorTranslation(String text,String source,String target,EditorRequest request) {
+        if(!request.active())return;
+        EditorTranslation.Plan plan;
+        try{plan=EditorTranslation.plan(text,source);}
+        catch(IllegalArgumentException invalid){request.finish("","文字分段较多，请选择较小范围再翻译");return;}
+        if(plan.count==0){request.finish("","没有可翻译的中文，原文已保留");return;}
+        request.plan=plan;request.source=source;request.target=target;
+        String modelLanguage=target.equals("zh")?source:target;
+        refreshModels(modelLanguage,state->worker.post(()->{
+            if(!request.active())return;
+            if(!source.equals("zh")&&state!=State.READY){request.finish("",languageName(source)+" · "+modelStatusText(source)+"，原文已保留");return;}
+            request.next();
+        }));
+    }
+
+    private final class EditorRequest {
+        EditorTranslation.Plan plan;
+        String source,target;
+        final long generation;
+        final long editorRevision;
+        final Callback callback;
+        final ArrayList<String> translated=new ArrayList<>();
+        final Runnable timeout=()->finish("","翻译超时，原文已保留");
+        int part;
+        boolean ended;
+        EditorRequest(long generation,long editorRevision,Callback callback){this.generation=generation;this.editorRevision=editorRevision;this.callback=callback;}
+        boolean active(){if(ended||closed)return false;if(editorRevision!=editorGeneration.get()){finish("","翻译已取消，原文未替换");return false;}if(generation!=modelGeneration){finish("","翻译模型已更改，请重试");return false;}return true;}
+        void next() {
+            if(!active())return;
+            while(part<plan.parts.size()&&!plan.parts.get(part).translate)part++;
+            if(part==plan.parts.size()){
+                try{finish(plan.apply(translated),"文字已翻译 · 标点、数字与分隔内容已保留");}
+                catch(IllegalArgumentException invalid){finish("","译文不完整，原文已保留");}
+                return;
+            }
+            String text=plan.parts.get(part++).text;
+            translate(text,source,target,(value,note)->worker.post(()->{
+                if(!active())return;
+                if(value.isEmpty()){finish("",note+"，原文已保留");return;}
+                translated.add(value);next();
+            }));
+        }
+        void finish(String value,String note){if(ended||closed)return;ended=true;if(activeEditorRequest==this)activeEditorRequest=null;worker.removeCallbacks(timeout);result(callback,value,note);}
+    }
+
     State status(String language) { return modelPlatformSupported && supported(language) ? states.getOrDefault(modelKey(language), State.CHECKING) : State.UNSUPPORTED; }
     String modelStatusText(String language) {
         if(!supported(language))return stateText(State.UNSUPPORTED);
@@ -206,12 +331,16 @@ final class TranslationRepository implements AutoCloseable {
         return status(language)==State.FAILED && error!=null ? error : stateText(status(language));
     }
     static boolean packagedModelSupportsPageSize(Context context,String abi,long pageSize) {
+        return packagedLibrarySupportsPageSize(context,abi,"libtranslate_jni.so",pageSize);
+    }
+    static boolean packagedLibrarySupportsPageSize(Context context,String abi,String library,long pageSize) {
         if(!"arm64-v8a".equals(abi)&&!"x86_64".equals(abi)&&!"armeabi-v7a".equals(abi))return false;
+        if(!"libtranslate_jni.so".equals(library)&&!"liblanguage_id_l2c_jni.so".equals(library))return false;
         android.content.pm.ApplicationInfo app=context.getApplicationInfo();
         try {
             ArrayList<String> apks=new ArrayList<>();apks.add(app.sourceDir);if(app.splitSourceDirs!=null)java.util.Collections.addAll(apks,app.splitSourceDirs);
             for(String apk:apks)try(ZipFile archive=new ZipFile(apk)){
-                ZipEntry entry=archive.getEntry("lib/"+abi+"/libtranslate_jni.so");
+                ZipEntry entry=archive.getEntry("lib/"+abi+"/"+library);
                 if(entry!=null)try(InputStream input=archive.getInputStream(entry)){return modelLibrarySupportsPageSize(libraryHeader(input),pageSize);}
             }
         }catch(IOException|RuntimeException ignored){}
@@ -504,6 +633,7 @@ final class TranslationRepository implements AutoCloseable {
             pending.clear(); cache.evictAll(); phrases.clear(); english.close();
             for (Translator translator : clients.values()) closeClient(translator);
             clients.clear();
+            if(languageIdentifier!=null){try{languageIdentifier.close();}catch(RuntimeException|LinkageError ignored){}languageIdentifier=null;}
             if (ownedThread != null) ownedThread.quitSafely();
         });
     }

@@ -12,7 +12,11 @@ import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.content.res.ColorStateList;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
+import android.view.HapticFeedbackConstants;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
@@ -44,10 +48,24 @@ final class ImePanels {
     private Bitmap transitionBitmap;
     private Drawable transitionImage;
     private Runnable panelChanged=()->{};
+    private final Handler touchTimer=new Handler(Looper.getMainLooper());
+    private Button editDelete,editUndo,editTranslate,editSelect,pressedDelete;
+    private TextView editStatus;
+    private boolean editSecure,canUndo,translateBusy,deleteTouchClick;
+    private String editMessage="撤回仅作用于当前输入框";
+    private final Runnable deleteRepeat=new Runnable(){
+        @Override public void run(){
+            if(pressedDelete==null||!active.equals("edit")||!pressedDelete.isShown()){cancelTouch();return;}
+            action.accept("DELETE");if(pressedDelete!=null&&active.equals("edit"))touchTimer.postDelayed(this,48);
+        }
+    };
     ImePanels(Context context,ImePreferences prefs,View keyboard,Consumer<String> action){
         this.context=context;this.prefs=prefs;this.keyboard=keyboard;this.action=action;
         colors=new Palette(prefs.dark(context));toolbar=new LinearLayout(context);toolbar.setGravity(Gravity.CENTER_VERTICAL);
         body=new FrameLayout(context){
+            @Override protected void onDetachedFromWindow(){cancelTouch();super.onDetachedFromWindow();}
+            @Override protected void onVisibilityChanged(View changed,int visibility){super.onVisibilityChanged(changed,visibility);if(visibility!=View.VISIBLE)cancelTouch();}
+            @Override protected void onWindowVisibilityChanged(int visibility){super.onWindowVisibilityChanged(visibility);if(visibility!=View.VISIBLE)cancelTouch();}
             @Override protected void onMeasure(int widthSpec,int heightSpec){
                 keyboard.measure(widthSpec,View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
                 int height=keyboard.getMeasuredHeight();
@@ -70,8 +88,8 @@ final class ImePanels {
     boolean isOpen(){return !active.isEmpty();}
     void onPanelChanged(Runnable callback){panelChanged=callback;}
     void refresh(){colors=new Palette(prefs.dark(context));toolbar.setBackgroundColor(colors.background);String[] commands={"more","edit","emoji","mode","hide"};for(int i=0;i<toolbar.getChildCount();i++){ImageButton button=(ImageButton)toolbar.getChildAt(i);boolean selected=owner().equals(commands[i]);button.setSelected(selected);button.setImageDrawable(new NavIcon(i,selected?colors.accent:colors.secondary,dp(23)));}body.setBackgroundColor(colors.background);body.requestLayout();panelChanged.run();}
-    void close(){if(active.isEmpty()){keyboard.setVisibility(View.VISIBLE);return;}snapshot();active="";detailTranslation="";removePanel();keyboard.setVisibility(View.VISIBLE);refresh();animateIncoming(keyboard);}
-    private void removePanel(){if(body.getChildCount()>1)body.removeViewAt(1);}
+    void close(){cancelTouch();if(active.isEmpty()){keyboard.setVisibility(View.VISIBLE);return;}snapshot();active="";detailTranslation="";removePanel();keyboard.setVisibility(View.VISIBLE);refresh();animateIncoming(keyboard);}
+    private void removePanel(){cancelTouch();if(body.getChildCount()>1)body.removeViewAt(1);editDelete=null;editUndo=null;editTranslate=null;editSelect=null;editStatus=null;}
     void showCandidates(View grid){snapshot();removePanel();active="candidates";keyboard.setVisibility(View.INVISIBLE);if(grid.getParent() instanceof android.view.ViewGroup)((android.view.ViewGroup)grid.getParent()).removeView(grid);body.addView(grid,new FrameLayout.LayoutParams(-1,-1));refresh();animateIncoming(grid);}
     private void snapshot(){
         if(outgoing!=null)outgoing.cancel();if(transitionImage!=null)body.getOverlay().remove(transitionImage);if(transitionBitmap!=null)transitionBitmap.recycle();transitionImage=null;transitionBitmap=null;
@@ -118,7 +136,48 @@ final class ImePanels {
     }
     void styles(){LinearLayout p=begin("style","键盘风格");row(p,new String[]{"柔和圆角","清简平面"},new String[]{"style_classic","style_flat"});p.addView(text("保持墨绿色，仅调整键帽与间距",12,colors.secondary),new LinearLayout.LayoutParams(-1,dp(38)));}
     void modes(){LinearLayout p=begin("mode","键盘模式");row(p,new String[]{"中文 · 全键拼音","中文 · 九键拼音"},new String[]{"mode_full","mode_t9"});row(p,new String[]{"English"},new String[]{"mode_english"});}
-    void edit(boolean secure,boolean selecting){LinearLayout p=begin("edit","文本编辑");row(p,new String[]{"←","→","行首","行尾"},new String[]{"left","right","home","end"});row(p,new String[]{selecting?"结束选择":"选择","全选","复制","剪切"},new String[]{"select","select_all","copy","cut"});row(p,new String[]{"粘贴","剪贴板"},new String[]{"paste","clipboard"});if(secure){for(int i=2;i<((LinearLayout)p.getChildAt(2)).getChildCount();i++)((LinearLayout)p.getChildAt(2)).getChildAt(i).setEnabled(false);}}
+    void edit(boolean secure,boolean selecting){
+        editSecure=secure;
+        if(active.equals("edit")&&editSelect!=null){setEditSelecting(selecting);updateEditState();return;}
+        LinearLayout p=begin("edit","文本编辑");
+        editStatus=text("",11,colors.secondary);editStatus.setId(R.id.edit_status);editStatus.setPadding(dp(5),0,dp(5),0);editStatus.setSingleLine(true);editStatus.setEllipsize(android.text.TextUtils.TruncateAt.END);editStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);p.addView(editStatus,new LinearLayout.LayoutParams(-1,dp(24)));
+        ScrollView scroll=new ScrollView(context);scroll.setId(R.id.edit_actions);scroll.setFillViewport(true);LinearLayout grid=new LinearLayout(context);grid.setOrientation(LinearLayout.VERTICAL);scroll.addView(grid,new ScrollView.LayoutParams(-1,-2));p.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        editRow(grid,new String[]{"←","→","行首","行尾"},new String[]{"left","right","home","end"},new int[]{R.id.edit_left,R.id.edit_right,R.id.edit_home,R.id.edit_end});
+        editRow(grid,new String[]{"选择","全选","复制","剪切"},new String[]{"select","select_all","copy","cut"},new int[]{R.id.edit_select,R.id.edit_select_all,R.id.edit_copy,R.id.edit_cut});
+        editRow(grid,new String[]{"粘贴","剪贴板","撤回","翻译","退格"},new String[]{"paste","clipboard","undo","edit_translate","DELETE"},new int[]{R.id.edit_paste,R.id.edit_clipboard,R.id.edit_undo,R.id.edit_translate,R.id.edit_delete});
+        editDelete=p.findViewById(R.id.edit_delete);editUndo=p.findViewById(R.id.edit_undo);editTranslate=p.findViewById(R.id.edit_translate);editSelect=p.findViewById(R.id.edit_select);editDelete.setOnTouchListener(this::deleteTouch);setEditSelecting(selecting);updateEditState();
+    }
+    private void editRow(LinearLayout parent,String[] names,String[] commands,int[] ids){
+        LinearLayout row=new LinearLayout(context);row.setMinimumHeight(dp(54));
+        for(int i=0;i<names.length;i++){
+            String command=commands[i];Button b=button(names[i],()->{if(!command.equals("DELETE")||!deleteTouchClick)action.accept(command);});b.setId(ids[i]);b.setMinWidth(0);b.setMinimumWidth(0);b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setMaxLines(2);
+            if(command.equals("left"))b.setContentDescription("向左移动光标");else if(command.equals("right"))b.setContentDescription("向右移动光标");
+            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);lp.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(b,lp);
+        }
+        parent.addView(row,new LinearLayout.LayoutParams(-1,0,1));
+    }
+    private void setEditSelecting(boolean selecting){editSelect.setText(selecting?"结束选择":"选择");editSelect.setContentDescription(editSelect.getText());editSelect.setSelected(selecting);editSelect.setTextColor(selecting?colors.accent:colors.text);}
+    void editState(boolean undoAvailable,boolean busy,String status){canUndo=undoAvailable;translateBusy=busy;editMessage=status==null||status.isEmpty()?"撤回仅作用于当前输入框":status;if(active.equals("edit"))updateEditState();}
+    private void updateEditState(){
+        if(editUndo==null)return;
+        for(int id:new int[]{R.id.edit_select_all,R.id.edit_copy,R.id.edit_cut,R.id.edit_paste,R.id.edit_clipboard})enabled(body.findViewById(id),!editSecure);
+        enabled(editUndo,canUndo&&!editSecure);enabled(editTranslate,!translateBusy&&!editSecure);editTranslate.setText(translateBusy?"翻译中":"翻译");editTranslate.setContentDescription(translateBusy?"正在翻译，原文保持不变":"翻译当前文字");
+        String status=editSecure?"密码内容不记录、不翻译":translateBusy?"正在翻译，原文保持不变":editMessage;editStatus.setText(status);editStatus.setContentDescription(status);
+    }
+    private void enabled(View view,boolean enabled){view.setEnabled(enabled);view.setAlpha(enabled?1f:.42f);}
+    private boolean deleteTouch(View view,MotionEvent event){
+        switch(event.getActionMasked()){
+            case MotionEvent.ACTION_DOWN:
+                cancelTouch();if(!view.isEnabled()||!active.equals("edit"))return true;pressedDelete=(Button)view;view.setPressed(true);if(prefs.haptic())view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);action.accept("DELETE");if(pressedDelete!=null&&active.equals("edit"))touchTimer.postDelayed(deleteRepeat,380);return true;
+            case MotionEvent.ACTION_MOVE:
+                if(event.getX()<0||event.getX()>=view.getWidth()||event.getY()<0||event.getY()>=view.getHeight())cancelTouch();return true;
+            case MotionEvent.ACTION_UP:
+                boolean clicked=pressedDelete==view;cancelTouch();if(clicked){deleteTouchClick=true;try{view.performClick();}finally{deleteTouchClick=false;}}return true;
+            case MotionEvent.ACTION_CANCEL:case MotionEvent.ACTION_POINTER_DOWN:cancelTouch();return true;
+            default:return true;
+        }
+    }
+    void cancelTouch(){touchTimer.removeCallbacks(deleteRepeat);if(pressedDelete!=null)pressedDelete.setPressed(false);pressedDelete=null;}
     void clipboard(List<String> entries,Consumer<String> paste,Consumer<String> remove){
         LinearLayout p=begin("clipboard","剪贴板 · "+entries.size()+" / 100");Button clear=button("清空历史",()->action.accept("clear_clipboard"));p.addView(clear,new LinearLayout.LayoutParams(-1,dp(32)));
         ScrollView scroll=new ScrollView(context);LinearLayout list=new LinearLayout(context);list.setOrientation(LinearLayout.VERTICAL);scroll.addView(list);p.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));

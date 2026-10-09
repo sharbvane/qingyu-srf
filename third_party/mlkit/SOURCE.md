@@ -1,5 +1,30 @@
 # ML Kit on-device translation
 
+## v0.7.0 offline language identification
+
+Editor selections additionally use the official bundled dependency
+`com.google.mlkit:language-id:17.0.6`, checked on 2026-10-09 against
+https://developers.google.com/ml-kit/language/identification/android .
+It distinguishes supported foreign selections on-device; uncertain results
+leave the original text unchanged. Identification does not download a
+translation model or send editor text to a remote translation endpoint.
+
+The official AAR is 2,335,810 bytes, SHA-256
+`3610374edfab8537c795195d53645c53923afa1acbe80ef25f5fc8551076a8f7`.
+Its shared identifier asset `tflite_langid.tflite.jpg` is 315,520 bytes,
+SHA-256 `7f931f6f7c1dd0ec591ace7780df91645a450fafc83505f3ff45ce5ef7c8441b`.
+This small shared identification resource is bundled; optional translation
+weights still download on demand. Per-ABI upstream library sizes and hashes
+are pinned in [language-id-manifest.json](language-id-manifest.json).
+The final APK audit compares these bytes without modifying SDK libraries.
+ARM64/x86_64 libraries must pass the same actual LOAD/rounded-RELRO safety
+check as translation before loading on a 16KB-page device. The 32-bit ARM
+identifier supports 4KB pages. No physical ARM64 validation is implied.
+
+Editor translation rules and text-preservation limits are documented in
+[text-editing.md](../../docs/text-editing.md). The privacy/SDK disclosures
+below apply to both translation and identification.
+
 Dependency: `com.google.mlkit:translate:17.0.3`, verified against the official
 Android guide on 2026-10-08; attribution rechecked on 2026-10-07:
 https://developers.google.com/ml-kit/language/translation/android
@@ -15,7 +40,9 @@ of remaining in an ambiguous waiting state. Model existence checks do not
 download files. Candidate generation and editor operations do not wait for
 dictionary lookup, model checks, downloads or inference.
 
-Supported input sources are Chinese and English. Chinese annotations select
+Keyboard input sources remain Chinese and English. The text-editing panel also
+detects selected English, Japanese, French, German, Russian and Spanish locally
+and translates them to Chinese when the required models are installed. Chinese annotations select
 English, Japanese, French, German, Russian or Spanish; English annotations
 select Chinese. The APK bundles only Chinese/English dictionaries and local
 phrase meanings, not these optional model weights. Extra languages occupy no
@@ -132,7 +159,7 @@ so the packaged file names and encoded-byte hashes can differ. The final
 package audit compares decoded RGBA pixels and the original 528×48
 dimensions; both remain identical to the official source graphics. It
 records source and packaged hashes separately in the version's
-`releases/qa/<version>/release-package.json`.
+[`docs/release-package-v0.7.0.json`](../../docs/release-package-v0.7.0.json).
 
 ## v0.6.6: ARM64 / 16 KiB compatibility gate
 

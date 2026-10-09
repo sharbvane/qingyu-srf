@@ -24,6 +24,7 @@ public final class PinyinEngine implements ChineseEngine {
         default double transitionScore(String before,String text){return 0;}
         default double transitionScore(String before,Word word){return transitionScore(before,word.text);}
         default List<String> predict(String context){return Collections.emptyList();}
+        default List<Word> compose(String code,String context){return Collections.emptyList();}
         default String sourceExample(String text){return "";}
     }
     public static final class Word {
@@ -384,7 +385,11 @@ public final class PinyinEngine implements ChineseEngine {
         boolean contextual=lexicon.contextReady();
         boolean[] phonetic=contextual?ChineseCorrection.completePrefixes(raw):null;
         boolean completePhonetic=phonetic==null||phonetic[raw.length()];
-        List<Word> sentences=completeWord||raw.length()<8||!completePhonetic?Collections.emptyList():sentenceWords(raw,before,queried,160);
+        boolean abbreviated=abbreviatedInput(raw);
+        List<Word> sentences;
+        if(completeWord||raw.length()<4||raw.length()<8&&!abbreviated||!completePhonetic&&!abbreviated)sentences=Collections.emptyList();
+        else if(abbreviated&&!completePhonetic){try{sentences=lexicon.compose(raw,before);}catch(RuntimeException unavailable){sentences=Collections.emptyList();}}
+        else sentences=sentenceWords(raw,before,queried,160);
         LinkedHashMap<String,Candidate> merged=new LinkedHashMap<>();
         Map<String,Candidate> nativeWords=new HashMap<>();
         for(Candidate candidate:nativeList)nativeWords.putIfAbsent(candidate.text,candidate);
@@ -395,6 +400,7 @@ public final class PinyinEngine implements ChineseEngine {
             // immediately afterwards without hijacking ordinary single keys.
             merged.put(nativeList.get(0).text,nativeList.get(0));
         }
+        if(abbreviated&&!completePhonetic)for(Word word:sentences)appendWord(merged,nativeWords,word);
         for(Word word:ranked)appendWord(merged,nativeWords,word);
         // AOSP keeps its preferred sentence when the same result is supported
         // by the modern word graph. An alternate syllable split is promoted
@@ -466,6 +472,26 @@ public final class PinyinEngine implements ChineseEngine {
         String canonical=word.pinyin.replace(" ","'");
         return canonical.replace("'","").equals(requested)||canonical.replace("lue","lve").replace("nue","nve").replace("'","").equals(requested);
     }
+    private static boolean abbreviatedInput(String raw) {
+        int letters=0,vowels=0;boolean adjacent=false,consonant=false;
+        for(int i=0;i<raw.length();i++){char letter=raw.charAt(i);if(letter=='\''){consonant=false;continue;}letters++;boolean next="aeiouv".indexOf(letter)<0;if(next&&consonant)adjacent=true;if(!next)vowels++;consonant=next;}
+        return adjacent&&vowels*2<letters;
+    }
+
+    /** Actual full/initial letters per syllable; never invents omitted letters. */
+    public static String typedReading(String reading,String raw) {
+        if(reading==null||raw==null||raw.isEmpty()||raw.length()>MAX_PINYIN_LENGTH*2-1||!raw.matches("[a-z]+(?:'[a-z]+)*")||!reading.matches("[a-z]{1,6}(?:'[a-z]{1,6})*"))return "";
+        String[] positions=new String[raw.length()+1];positions[0]="";
+        for(String part:reading.split("'")){
+            String[] next=new String[raw.length()+1];
+            for(int start=0;start<raw.length();start++)if(positions[start]!=null){
+                if(raw.startsWith(part,start)){int end=start+part.length();if(end<raw.length()&&raw.charAt(end)=='\'')end++;if(next[end]==null)next[end]=positions[start]+(positions[start].isEmpty()?"":"'")+part;}
+                if(raw.charAt(start)==part.charAt(0)){int end=start+1;if(end<raw.length()&&raw.charAt(end)=='\'')end++;if(next[end]==null)next[end]=positions[start]+(positions[start].isEmpty()?"":"'")+part.charAt(0);}
+            }
+            positions=next;
+        }
+        return positions[raw.length()]==null?"":positions[raw.length()];
+    }
 
     private static final class Path {
         final String text,pinyin;final double score;final int words;
@@ -475,7 +501,7 @@ public final class PinyinEngine implements ChineseEngine {
         if(raw.length()<4||raw.length()>MAX_PINYIN_LENGTH)return Collections.emptyList();
         ArrayList<ArrayList<Path>> paths=new ArrayList<>();for(int i=0;i<=raw.length();i++)paths.add(new ArrayList<>());
         paths.get(0).add(new Path("","",0,0));
-        int used=0,expansions=0;
+        boolean abbreviations=abbreviatedInput(raw)&&!ChineseCorrection.completePrefixes(raw)[raw.length()];int used=0,expansions=0;
         for(int start=0;start<raw.length()&&used<budget;start++) {
             List<Path> preceding=paths.get(start);if(preceding.isEmpty())continue;
             // Indexed lexical edges are shared, but corpus/user context is
@@ -484,13 +510,16 @@ public final class PinyinEngine implements ChineseEngine {
             String precedingContext=contextual?"":before+preceding.get(0).text;
             boolean[] complete=contextual?ChineseCorrection.completePrefixes(raw.substring(start)):null;
             for(int end=start+1;end<=Math.min(raw.length(),start+32)&&used<budget;end++) {
-                if(complete!=null&&!complete[end-start])continue;
+                if(!abbreviations&&complete!=null&&!complete[end-start])continue;
                 String code=raw.substring(start,end);if(code.replace("'","").isEmpty())continue;
                 List<Word> options=words(code,precedingContext,queried);used++;
                 int next=end;while(next<raw.length()&&raw.charAt(next)=='\'')next++;
                 int optionsUsed=0;
                 for(Word word:options) {
-                    if(!fullReading(word,code))continue;
+                    boolean full=fullReading(word,code);
+                    // A legal full-pinyin sentence must not spend its bounded
+                    // beam on unrelated words matched only by their initials.
+                    if(!full&&(!abbreviations||typedReading(word.pinyin,code).isEmpty()))continue;
                     // Isolated interjections n/m/ng are accepted normally by
                     // AOSP, but are weak evidence inside a typed sentence. In
                     // particular n+o+hao must not suppress nohao -> 你好.
@@ -501,7 +530,7 @@ public final class PinyinEngine implements ChineseEngine {
                         if(contextual&&expansions>=8192)break;
                         expansions++;
                         double transition=0;if(contextual)try{transition=lexicon.transitionScore(before+previous.text,word);if(!Double.isFinite(transition))transition=0;}catch(RuntimeException ignored){}
-                        Path candidate=new Path(previous.text+word.text,previous.pinyin+(previous.pinyin.isEmpty()?"":"'")+word.pinyin,previous.score+Math.min(30,word.score)-15.5+transition,previous.words+1);
+                        Path candidate=new Path(previous.text+word.text,previous.pinyin+(previous.pinyin.isEmpty()?"":"'")+word.pinyin,previous.score+Math.min(30,word.score)-15.5+transition-(full?0:3),previous.words+1);
                         ArrayList<Path> destination=paths.get(next);
                         boolean better=true;
                         for(int index=0;index<destination.size();index++)if(destination.get(index).text.equals(candidate.text)) {

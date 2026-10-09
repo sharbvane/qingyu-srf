@@ -18,6 +18,7 @@ __pycache__/
 *.log
 *.tmp
 releases/qa/
+release/
 release-signing/
 
 # Signing material and credentials

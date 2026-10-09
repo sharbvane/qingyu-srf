@@ -1,4 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application><activity android:name="com.qingyu.ime.BrowserEditorActivity" android:exported="true" android:launchMode="singleTop" android:theme="@android:style/Theme.Material.Light.NoActionBar" /></application>
     <instrumentation android:name="com.qingyu.ime.ImeSmokeInstrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu baseline IME checks" />
     <instrumentation android:name="com.qingyu.ime.AppUpdateInstrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu update checks" />
     <instrumentation android:name="com.qingyu.ime.ImeV2Instrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu v0.2 interaction checks" />
@@ -9,6 +10,8 @@
     <instrumentation android:name="com.qingyu.ime.ImeV65Instrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu v0.6.5 nine-key checks" />
     <instrumentation android:name="com.qingyu.ime.ImeV66Instrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu v0.6.6 sequential nine-key checks" />
     <instrumentation android:name="com.qingyu.ime.ImeV67Instrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu v0.6.7 nine-key matching checks" />
+    <instrumentation android:name="com.qingyu.ime.ImeV7Instrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu v0.7 editor and input checks" />
+    <instrumentation android:name="com.qingyu.ime.EditorTranslationInstrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu editor translation checks" />
     <instrumentation android:name="com.qingyu.ime.TranslationModelInstrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu on-device translation checks" />
     <instrumentation android:name="com.qingyu.ime.ReleaseMigrationInstrumentation" android:targetPackage="com.qingyu.ime" android:label="Qingyu signed release migration checks" />
 </manifest>
