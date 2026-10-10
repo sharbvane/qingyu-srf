@@ -21,9 +21,9 @@
 
 ## Demo Video
 
-<p align="center"><a href="https://raw.githubusercontent.com/sharbvane/qingyu-srf/main/docs/media/qingyu-demo.mp4"><img src="docs/images/qingyu-demo-preview.gif" width="300" alt="Animated preview of the Qingyu Input Method demo; click to download the full video" /></a></p>
+<p align="center"><a href="https://youtube.com/shorts/frqGa0asCkQ"><img src="docs/images/qingyu-demo-preview.gif" width="300" alt="Animated preview of the Qingyu Input Method demo; click to watch on YouTube" /></a></p>
 
-<p align="center"><a href="https://raw.githubusercontent.com/sharbvane/qingyu-srf/main/docs/media/qingyu-demo.mp4">▶ Download the full demo (30 seconds · 1080 × 1920 · MP4 · 8.1 MB)</a></p>
+<p align="center"><a href="https://youtube.com/shorts/frqGa0asCkQ">▶ Watch the full 30-second demo on YouTube</a></p>
 
 ## Preview
 
