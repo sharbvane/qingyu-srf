@@ -22,6 +22,15 @@ public final class EditorTranslationChecks {
         check(EditorTranslation.plan("cafe\u0301\u00a0beau","fr").parts.get(0).text.equals("cafe\u0301"), "decomposed accent belongs to word");
         check(EditorTranslation.plan("cafe\u0301\u00a0beau","fr").apply(Arrays.asList("咖啡","美丽"))
                 .equals("咖啡\u00a0美丽"), "NBSP is a protected separator");
+        EditorTranslation.Plan sentence = EditorTranslation.plan("I would like to watch short videos.", "en");
+        check(sentence.count == 1 && sentence.parts.get(0).text.equals("I would like to watch short videos"), "whole foreign clause enters the model together");
+        check(sentence.apply(Collections.singletonList("我想看短视频。")).equals("我想看短视频."), "ordinary word spacing follows the translated language while punctuation stays exact");
+        check(EditorTranslation.plan("开发 设计", "zh").apply(Arrays.asList("develop", "design")).equals("develop design"), "spaced Chinese retains local word translation without requiring a model");
+        check(EditorTranslation.plan("  Hello there  my friend\tgood night\r\n42🙂good\u00a0day ", "en")
+                .apply(Arrays.asList("你好", "我的朋友", "晚安", "好", "天"))
+                .equals("  你好  我的朋友\t晚安\r\n42🙂好\u00a0天 "), "indentation, repeated spaces, tabs, CRLF, NBSP and protected tokens remain exact");
+        check(EditorTranslation.plan("This is https://x.test/path the `source code`\nfor me", "en")
+                .apply(Arrays.asList("这是", "该", "给我")).equals("这是 https://x.test/path 该 `source code`\n给我"), "whole phrases cannot swallow technical text or its surrounding spaces");
         check(EditorTranslation.plan("你好world","zh").apply(Collections.singletonList("hello")).equals("helloworld"), "mixed foreign text is unchanged");
         check(EditorTranslation.plan("开发 こんにちは ABC","zh").apply(Collections.singletonList("develop")).equals("develop こんにちは ABC"), "mixed Japanese kana and Latin letters stay unchanged");
         check(EditorTranslation.separatedHanSample("开发 こんにちは ABC").equals("开发"), "isolated Chinese evidence in Han/kana mixed selection");
@@ -29,6 +38,18 @@ public final class EditorTranslationChecks {
         check(EditorTranslation.plan("今日は友達と映画を見ます。🙂2026","zh").count == 0, "unselected native Japanese is never partially translated as Chinese");
         check(EditorTranslation.plan("开发 日本語を勉強する ABC","zh").apply(Collections.singletonList("develop")).equals("develop 日本語を勉強する ABC"), "Japanese Han connected to kana stays foreign in a mixed selection");
         check(EditorTranslation.plan("你好こんにちは","zh").count == 0, "inseparable Chinese/kana ambiguity retains original text");
+        check(EditorTranslation.kanaHanRuns("你好こんにちは开发カタカナ 你好こんにちは https://x.test/中文かな `代码かな`")
+                .equals(Arrays.asList("你好","开发")), "unique glued Han spans exclude protected technical text");
+        check(EditorTranslation.kanaHanContexts("你好こんにちは 你好カタカナ 你好こ https://x.test/你好かな 我的你好こ", "你好")
+                .equals(Arrays.asList("你好こ", "你好カ")), "all unique adjacent-kana contexts exclude protected and partial Han matches");
+        check(EditorTranslation.kanaHanContexts("こんにちは你好 お名前", "你好").equals(Collections.singletonList("は你好")), "preceding kana supplies context when no following kana exists");
+        check(EditorTranslation.kanaHanContexts("今日は友達と映画を見ます", "今日").equals(Collections.singletonList("今日は")), "Japanese particle remains in Han identification context");
+        check(EditorTranslation.plan("你好こんにちは开发カタカナ！2026🙂\r\n", "zh", new java.util.HashSet<>(Arrays.asList("你好", "开发")))
+                .apply(Arrays.asList("hello", "develop")).equals("helloこんにちはdevelopカタカナ！2026🙂\r\n"), "confirmed Chinese runs translate without touching adjacent kana or separators");
+        check(EditorTranslation.plan("你好こんにちは 日本語を勉強する", "zh", Collections.singleton("你好"))
+                .apply(Collections.singletonList("hello")).equals("helloこんにちは 日本語を勉強する"), "Japanese Han and unknown runs remain protected beside confirmed Chinese");
+        check(EditorTranslation.plan("你好こんにちは https://x.test/你好かな", "zh", Collections.singleton("你好"))
+                .apply(Collections.singletonList("hello")).equals("helloこんにちは https://x.test/你好かな"), "approved text inside a URL cannot bypass protection");
         check(EditorTranslation.plan("foo(中文) 变量=1 http://x.test/中文","zh").count == 0, "code and URL bodies are opaque");
         check(EditorTranslation.plan("42🙂\r\n","zh").count == 0, "nonwords never translate");
         check(EditorTranslation.languageSample("https://x.test/中文 `日本語` hello 42🙂").trim().equals("hello"), "language detection excludes protected technical tokens");

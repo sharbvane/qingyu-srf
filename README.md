@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/sharbvane/qingyu-srf/releases/download/v0.7.0/Qingyu-0.7.0.apk"><img alt="公开下载 APK v0.7.0" src="https://img.shields.io/badge/Published_APK-v0.7.0-476B57"></a>
+  <a href="https://github.com/sharbvane/qingyu-srf/releases/download/v0.7.1/Qingyu-0.7.1.apk"><img alt="公开下载 APK v0.7.1" src="https://img.shields.io/badge/Published_APK-v0.7.1-476B57"></a>
   <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/License-GPL--3.0-blue.svg"></a>
   <img alt="Android 8.0+" src="https://img.shields.io/badge/Android-8.0%2B-3DDC84?logo=android&logoColor=white">
 </p>
@@ -21,9 +21,9 @@
 
 | 文本编辑 | 深色九键 |
 | --- | --- |
-| ![轻语文本编辑面板：退格、撤回与翻译](docs/images/editor-v0.7.0-light.png) | ![轻语深色键盘：候选区与贴边凸出的拼音](docs/images/nine-v0.7.0-dark.png) |
+| ![轻语文本编辑面板：退格、撤回与翻译](docs/images/editor-v0.7.1-light.png) | ![轻语深色键盘：候选区与贴边凸出的拼音](docs/images/nine-v0.7.1-dark.png) |
 
-**v0.7.0 文本编辑与输入体验优化版现已发布**：[GitHub Release 与 APK 下载](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.7.0)，附 [SHA-256 校验文件](https://github.com/sharbvane/qingyu-srf/releases/download/v0.7.0/Qingyu-0.7.0.apk.sha256)、[安装说明](releases/README-v0.7.0.md)和[验证记录](docs/validation-v0.7.0.md)。上方截图为 v0.7.0 实际编辑面板与深色九键界面。
+**v0.7.1 编辑面板与候选稳定性优化版现已发布**：[GitHub Release 与 APK 下载](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.7.1)，附 [SHA-256 校验文件](https://github.com/sharbvane/qingyu-srf/releases/download/v0.7.1/Qingyu-0.7.1.apk.sha256)、[安装说明](releases/README-v0.7.1.md)和[验证记录](docs/validation-v0.7.1.md)。上方截图为 v0.7.1 实际编辑面板与深色九键界面。
 
 ## 功能
 
@@ -32,10 +32,10 @@
 - **中文全拼与九键**：AOSP 原生解码器结合固定版本的 Rime-ice 现代词库及本地索引，支持多种拼音切分、整句组词与分段选词。v0.6 加入真实中文语料的上下文统计，改善长句组词与预测；全拼「分词」键可手动加入拼音分隔。长期选词习惯在本机逐步提高词语、简拼和短语排序，保留已有学习记录；轻微误触纠错仅作为可选候选，原始拼音始终保留。全拼原始拼音在键盘左上方紧贴边缘凸出显示；全拼回车提交原始拼音。九键显示按键组合对应的候选拼音，确认提交中文候选。
 - **九键布局与滑选**：三列字母键配合左侧标点或拼音选择、右侧删除和清空、双行高确认键；独立分词、符号与数字入口。长按字母组展开大小写字母和数字浮层，滑动高亮，松手输入选中的单个字符，取消不输入。左侧拼音栏可上下滚动查看全部读音；选中一个音节后自动显示下一音节，保留整段待选输入。回退按钮可重选上一音节；整段音节已选完时退格也先回退选择。拼音随候选与分段选词同步更新，数字仅在明确选择或数字模式中上屏。
 - **英文候选与预测**：12 万余词形的补全、拼写建议、上下文下一词预测；英文候选默认显示中文释义，空格保留实际输入的拼写。
-- **紧凑键盘顶部**：空闲时显示较矮的空候选栏与图标导航；正在输入时，候选区覆盖导航区域，结束后恢复导航。顶部整体保留固定空间，按键位置不跳动。展开列表替换按键区域，可上下连续滑动浏览；长句及对应翻译完整换行。连续选择预测最多 3 轮，右侧「X」立即清空当前预测；没有可靠上下文时可不显示预测。
+- **紧凑键盘顶部**：空闲时显示较矮的空候选栏与图标导航；正在输入时，候选区覆盖导航区域，结束后恢复导航。顶部整体保留固定空间，按键位置不跳动。异步查询期间保留已有候选与匹配释义，同词更新保留触控与滚动状态，相同释义批次不重复取消加载。展开列表替换按键区域，可上下连续滑动浏览；长句及对应翻译完整换行。连续选择预测最多 3 轮，右侧「X」立即清空当前预测；没有可靠上下文时可不显示预测。
 - **自然接触外语**：本地释义优先，已下载的端侧模型异步补充可见候选的单字、词语、短语和长句翻译，不等待翻译才显示中文候选。轻点输入原词，长按查看分层详情，上滑直接输入所选语言的简洁译文；完整多义解释保留在详情中。语言切换同步更新候选、详情与上滑译文。普通候选栏与展开列表不显示 Google 品牌栏或标识；长按详情保留模型译文来源，具体来源要求见 [SDK 说明](third_party/mlkit/SOURCE.md)。
 - **短语与句子翻译**：常用短语先查本地；其他句子使用下载后的端侧模型，译文异步返回，失败不改变原输入。
-- **简洁导航与编辑**：更多、文本编辑、Emoji、键盘模式与收起；再次点同一图标关闭。选择、复制、剪切、粘贴和最近 100 条剪贴板，新增支持长按连续删除的退格、逐步撤回，以及直接替换原文的文本翻译。未选区只翻中文；选中文或混合内容只翻其中中文；选纯外语按可信的端侧识别与已安装模型译为中文。原标点、数字、Emoji、换行和空白保留，失败或输入内容变化不替换；撤回只记录当前框的本机内存历史，外部修改使旧历史失效。[行为与边界](docs/text-editing.md)。
+- **简洁导航与编辑**：更多、文本编辑、Emoji、键盘模式与收起；再次点同一图标关闭。圆形方向盘支持四向光标、选区与行首行尾；右侧两列四行提供全选、复制、剪切、粘贴和最近 100 条剪贴板，以及支持长按连续删除的退格、逐步撤回，以及直接替换原文的文本翻译。未选区只翻中文；选中文或混合内容只翻其中中文；选纯外语按可信的端侧识别与已安装模型译为中文。原标点、数字、Emoji、换行与连续空格保留；外语整句的普通词间空格随译文自然调整，失败或输入内容变化不替换；撤回只记录当前框的本机内存历史，外部修改使旧历史失效。[行为与边界](docs/text-editing.md)。
 - **更新与项目入口**：「更多 → 检查更新」在应用内查看 GitHub 正式版本、更新说明和 APK 大小，下载后校验版本与签名，再进入系统安装流程。「项目主页」打开官方 GitHub 项目页。
 - **分词与快捷输入**：中文全拼使用「分词」键调整拼音切分；英文保留 Shift 临时大写与双击锁定。普通字母长按后左滑选大写、右滑选小写；带数字的字母长按后左侧大写、中间小写、右侧数字，松手输入选中字符。
 - **克制的词性配色**：确有 jieba 词性标签的中文词，以低饱和颜色区分名词、动词、形容词、副词与虚词。未知词和英文保持中性颜色；标签为词典默认词性，不作上下文消歧。
@@ -47,13 +47,13 @@
 
 ## 安装与使用
 
-1. 下载并安装 [Qingyu v0.7.0 APK](https://github.com/sharbvane/qingyu-srf/releases/download/v0.7.0/Qingyu-0.7.0.apk)，从 [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.7.0) 获取 SHA-256 校验文件。历史版本见[全部 Releases](https://github.com/sharbvane/qingyu-srf/releases)。适用于 Android 8.0 及以上。
+1. 下载并安装 [Qingyu v0.7.1 APK](https://github.com/sharbvane/qingyu-srf/releases/download/v0.7.1/Qingyu-0.7.1.apk)，从 [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.7.1) 获取 SHA-256 校验文件。历史版本见[全部 Releases](https://github.com/sharbvane/qingyu-srf/releases)。适用于 Android 8.0 及以上。
 2. 安装并打开「轻语输入法」，依次选择「启用轻语输入法」和「切换到轻语」。这是 Android 的系统设置步骤。
 3. 在任意输入框试试 `anzhuo`、`dangang` 或 `nohao`。点中文候选，上屏的只有中文。
 
-当前公开版本：**v0.7.0**。APK、SHA-256 和[验证记录](docs/validation-v0.7.0.md)见 [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.7.0)。可从 v0.6.7 覆盖安装并保留学习记录；签名与备份方式见[说明](docs/release-signing.md)。真机长期使用尚未验证。
+当前公开版本：**v0.7.1**。APK、SHA-256 和[验证记录](docs/validation-v0.7.1.md)见 [GitHub Release](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.7.1)。可从 v0.7.0 覆盖安装并保留学习记录；签名与备份方式见[说明](docs/release-signing.md)。真机长期使用尚未验证。
 
-在「更多 → 释义显示语言」选择英语、日语、法语、德语、俄语或西班牙语。首次明确选择所需的非英语语言会发起按需模型下载；普通打字不触发下载。默认使用 Wi-Fi，也可在「翻译模型管理」明确允许移动数据。管理页显示真实已下载字节、可读取的总量、等待状态及失败原因，可重试、查看实际已安装大小或删除模型；总量未知时显示不定进度。日、法、德、俄、西五种额外模型已在 Android 15 / API 35 模拟器上实际重新下载并完成端侧翻译检查，网络仍需能访问官方模型服务。未下载的额外语言不预占模型存储，中文和英文键盘始终保留。
+在「更多 → 释义显示语言」选择英语、日语、法语、德语、俄语或西班牙语。首次明确选择所需的非英语语言会发起按需模型下载；普通打字不触发下载。默认使用 Wi-Fi，也可在「翻译模型管理」明确允许移动数据。管理页显示真实已下载字节、可读取的总量、等待状态及失败原因，可重试、查看实际已安装大小或删除模型；总量未知时显示不定进度。v0.6.6 验证中，日、法、德、俄、西五种额外模型均在 Android 15 / API 35 模拟器上实际重新下载并完成端侧翻译检查；本轮 v0.7.1 最终正式包另通过日语、德语模型删除重下回归。网络仍需能访问官方模型服务。未下载的额外语言不预占模型存储，中文和英文键盘始终保留。
 
 「检查更新」也可从应用设置打开。安装更新需要 Android 的安装来源授权及系统确认；不静默安装。下载恢复、包校验和失败处理见[应用内更新说明](docs/in-app-updates.md)。
 
@@ -94,7 +94,7 @@ pwsh -File scripts/setup-toolchain.ps1
 pwsh -File scripts/build.ps1 -Variant Release -Test
 ```
 
-构建产物位于 `releases/`；项目内工具和签名密钥会被 `.gitignore` 排除。新环境应先恢复已有签名材料，禁止生成替代密钥；见[签名说明](docs/release-signing.md)。v0.7.0 测试方法与实际验证范围见[验证记录](docs/validation-v0.7.0.md)，安装与已知限制见[发布说明](releases/README-v0.7.0.md)。
+构建产物位于 `releases/`；项目内工具和签名密钥会被 `.gitignore` 排除。新环境应先恢复已有签名材料，禁止生成替代密钥；见[签名说明](docs/release-signing.md)。v0.7.1 测试方法与实际验证范围见[验证记录](docs/validation-v0.7.1.md)，安装与已知限制见[发布说明](releases/README-v0.7.1.md)。
 
 ## 路线图
 

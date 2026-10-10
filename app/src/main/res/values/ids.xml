@@ -23,6 +23,8 @@
     <item name="edit_status" type="id" />
     <item name="edit_left" type="id" />
     <item name="edit_right" type="id" />
+    <item name="edit_up" type="id" />
+    <item name="edit_down" type="id" />
     <item name="edit_home" type="id" />
     <item name="edit_end" type="id" />
     <item name="edit_select" type="id" />

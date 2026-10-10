@@ -226,19 +226,27 @@ final class TranslationRepository implements AutoCloseable {
             EditorRequest request=new EditorRequest(modelGeneration,editorRevision,callback);
             activeEditorRequest=request;
             worker.postDelayed(request.timeout,45000);
-            if (!selected || han && !kana && EditorTranslation.hasNonHanLetter(sample)) {
-                beginEditorTranslation(text,"zh",target,request); return;
-            }
-            String hanSample=han&&kana?EditorTranslation.separatedHanSample(sample):"";
-            if(!hanSample.isEmpty()) {
-                identifyLanguage(hanSample,(language,note)->worker.post(()->{
-                    if(!request.active())return;
-                    if(language.equals("zh"))beginEditorTranslation(text,"zh",target,request);
-                    else identifyEditorSource(text,sample,target,han,kana,request);
-                }));return;
-            }
-            identifyEditorSource(text,sample,target,han,kana,request);
+            try {
+                request.identifyKanaRuns(text,EditorTranslation.kanaHanRuns(text),0,
+                        ()->chooseEditorSource(text,selected,target,sample,han,kana,request));
+            } catch (IllegalArgumentException invalid) { request.finish("","文字分段较多，请选择较小范围再翻译"); }
         });
+    }
+
+    private void chooseEditorSource(String text,boolean selected,String target,String sample,boolean han,boolean kana,EditorRequest request) {
+        if(!request.active())return;
+        if (!selected || !request.chineseKanaRuns.isEmpty() || han && !kana && EditorTranslation.hasNonHanLetter(sample)) {
+            beginEditorTranslation(text,"zh",target,request); return;
+        }
+        String hanSample=han&&kana?EditorTranslation.separatedHanSample(sample):"";
+        if(!hanSample.isEmpty()) {
+            identifyLanguage(hanSample,(language,note)->worker.post(()->{
+                if(!request.active())return;
+                if(language.equals("zh"))beginEditorTranslation(text,"zh",target,request);
+                else identifyEditorSource(text,sample,target,han,kana,request);
+            }));return;
+        }
+        identifyEditorSource(text,sample,target,han,kana,request);
     }
 
     void cancelEditorTranslation() {
@@ -282,7 +290,7 @@ final class TranslationRepository implements AutoCloseable {
     private void beginEditorTranslation(String text,String source,String target,EditorRequest request) {
         if(!request.active())return;
         EditorTranslation.Plan plan;
-        try{plan=EditorTranslation.plan(text,source);}
+        try{plan=EditorTranslation.plan(text,source,request.chineseKanaRuns);}
         catch(IllegalArgumentException invalid){request.finish("","文字分段较多，请选择较小范围再翻译");return;}
         if(plan.count==0){request.finish("","没有可翻译的中文，原文已保留");return;}
         request.plan=plan;request.source=source;request.target=target;
@@ -301,16 +309,38 @@ final class TranslationRepository implements AutoCloseable {
         final long editorRevision;
         final Callback callback;
         final ArrayList<String> translated=new ArrayList<>();
+        final Set<String> chineseKanaRuns=new HashSet<>();
         final Runnable timeout=()->finish("","翻译超时，原文已保留");
         int part;
         boolean ended;
         EditorRequest(long generation,long editorRevision,Callback callback){this.generation=generation;this.editorRevision=editorRevision;this.callback=callback;}
         boolean active(){if(ended||closed)return false;if(editorRevision!=editorGeneration.get()){finish("","翻译已取消，原文未替换");return false;}if(generation!=modelGeneration){finish("","翻译模型已更改，请重试");return false;}return true;}
+        void identifyKanaRuns(String text,java.util.List<String> runs,int index,Runnable ready) {
+            if(!active())return;
+            if(index==runs.size()){ready.run();return;}
+            String run=runs.get(index);
+            identifyLanguage(run,(language,note)->worker.post(()->{
+                if(!active())return;
+                Runnable next=()->identifyKanaRuns(text,runs,index+1,ready);
+                if(!language.equals("zh")){next.run();return;}
+                // Shared Kanji needs its adjacent grammar context, not an isolated Chinese label.
+                try{identifyKanaContexts(run,EditorTranslation.kanaHanContexts(text,run),0,next);}
+                catch(IllegalArgumentException invalid){finish("","文字分段较多，请选择较小范围再翻译");}
+            }));
+        }
+        void identifyKanaContexts(String run,java.util.List<String> contexts,int index,Runnable next) {
+            if(!active())return;
+            if(index==contexts.size()){if(!contexts.isEmpty())chineseKanaRuns.add(run);next.run();return;}
+            identifyLanguage(contexts.get(index),(language,note)->worker.post(()->{
+                if(!active())return;
+                if(language.equals("zh"))identifyKanaContexts(run,contexts,index+1,next);else next.run();
+            }));
+        }
         void next() {
             if(!active())return;
             while(part<plan.parts.size()&&!plan.parts.get(part).translate)part++;
             if(part==plan.parts.size()){
-                try{finish(plan.apply(translated),"文字已翻译 · 标点、数字与分隔内容已保留");}
+                try{finish(plan.apply(translated),"文字已翻译 · 原标点与非文字内容已保留");}
                 catch(IllegalArgumentException invalid){finish("","译文不完整，原文已保留");}
                 return;
             }

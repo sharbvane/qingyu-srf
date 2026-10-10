@@ -1,5 +1,5 @@
-ALL_ENGLISH_ENGINE_CHECKS_PASS: 121167 words, 1000 completion/correction/prediction calls 1034.56 ms
-T9_GRAPH_LOAD 178.61 ms
+ALL_ENGLISH_ENGINE_CHECKS_PASS: 121167 words, 1000 completion/correction/prediction calls 1348.72 ms
+T9_GRAPH_LOAD 157.27 ms
 T9_GRAPH_VALIDATION_PASS: signature, size, spelling, offsets, row IDs and truncation
 NINE_HELLO 0 你好 ni'hao 5
 NINE_HELLO 1 你敢 ni'gan 5
@@ -22,24 +22,24 @@ T9_SENTENCE 9 委员会的商品 wei'yuan'kuai'de'shang'pin w'y'k'd's'p
 T9_SENTENCE 10 我也看到审批 wo'ye'kan'dao'shen'pi w'y'k'd's'p
 T9_SENTENCE 11 我也看到视频 wo'ye'kan'dao'shi'pin w'y'k'd's'p
 T9_SENTENCE_LEARNING_PASS: frequent unrelated shortcut retains sentence alternatives and standalone priority
-T9_UNRESTRICTED kfxm rank=6 cold=10.91 ms first=可我
-T9_UNRESTRICTED sjsrf rank=1 cold=121.11 ms first=实际上是的
-T9_UNRESTRICTED mthj rank=1 cold=81.15 ms first=媒体库
+T9_UNRESTRICTED kfxm rank=6 cold=15.00 ms first=可我
+T9_UNRESTRICTED sjsrf rank=1 cold=124.59 ms first=实际上是的
+T9_UNRESTRICTED mthj rank=1 cold=101.67 ms first=媒体库
 NINE_KEY_V067_CHECKS_PASS: all key letters/digits, full/initial/mixed whole corpus matching, consumed spelling, continuous initials/backtrack, modern words and contextual long sentence
-V070_SENTENCE woyaokanduanshipin rank=0 first=我要看短视频 time=117.13 ms
-V070_SENTENCE wykdsp rank=7 first=网友看短视频 time=128.79 ms
-V070_SENTENCE woyaokdsp rank=3 first=我要看的视频 time=170.58 ms
-V070_SENTENCE mthj rank=0 first=明天回家 time=69.44 ms
-V070_SENTENCE mingtianhj rank=0 first=明天回家 time=176.02 ms
-V070_SENTENCE kfxm rank=0 first=开发项目 time=65.51 ms
-V070_SENTENCE gongzuojh rank=0 first=工作计划 time=139.61 ms
-V070_SENTENCE womenmingtianqubeijing rank=0 first=我们明天去北京 time=122.63 ms
-V070_SENTENCE womenmingtianzaitaolun rank=0 first=我们明天再讨论 time=120.90 ms
-V070_SENTENCE wanshangwomenyiqichifan rank=0 first=晚上我们一起吃饭 time=113.85 ms
-V070_SENTENCE nixianzaiyoushijianma rank=0 first=你现在有时间吗 time=138.56 ms
-V070_SENTENCE qingbangwodakaishezhi rank=0 first=请帮我打开设置 time=83.56 ms
+V070_SENTENCE woyaokanduanshipin rank=0 first=我要看短视频 time=131.78 ms
+V070_SENTENCE wykdsp rank=7 first=网友看短视频 time=130.39 ms
+V070_SENTENCE woyaokdsp rank=3 first=我要看的视频 time=189.01 ms
+V070_SENTENCE mthj rank=0 first=明天回家 time=78.91 ms
+V070_SENTENCE mingtianhj rank=0 first=明天回家 time=204.14 ms
+V070_SENTENCE kfxm rank=0 first=开发项目 time=73.76 ms
+V070_SENTENCE gongzuojh rank=0 first=工作计划 time=162.41 ms
+V070_SENTENCE womenmingtianqubeijing rank=0 first=我们明天去北京 time=137.06 ms
+V070_SENTENCE womenmingtianzaitaolun rank=0 first=我们明天再讨论 time=125.66 ms
+V070_SENTENCE wanshangwomenyiqichifan rank=0 first=晚上我们一起吃饭 time=134.31 ms
+V070_SENTENCE nixianzaiyoushijianma rank=0 first=你现在有时间吗 time=146.13 ms
+V070_SENTENCE qingbangwodakaishezhi rank=0 first=请帮我打开设置 time=105.64 ms
 NINE_KEY_V070_CHECKS_PASS: frequent spelling/lowercase before literals, full/initial/mixed sentence candidates and commits, whole learned phrase durable T9 recall
 PERSONALIZATION kd 快点 initial=15 one-choice=15 after-12=1
 PERSONALIZATION kd reopened=1; new phrase=你好轻语 / nihaoqingyu / nhqy; private learning unchanged
 PERSONALIZATION segmented 我要看 + 短视频: suffix/whole exactly 3; full/wykdsp persisted; preview/private unchanged
-ALL_INPUT_DICTIONARY_CHECKS_PASS: actual Android SQLite, 200 nine-key calls 732.39 ms
+ALL_INPUT_DICTIONARY_CHECKS_PASS: actual Android SQLite, 200 nine-key calls 909.16 ms

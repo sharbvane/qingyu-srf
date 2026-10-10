@@ -97,7 +97,7 @@ public class ImeV2Instrumentation extends ImeSmokeInstrumentation {
         setText("hello world");nodeClick("toolbar_edit");buttonClick("全选");awaitSelection(0,11);buttonClick("复制");awaitClip("hello world");
         buttonClick("剪切");awaitText("");buttonClick("粘贴");awaitText("hello world");closePanel();keyboardReady();
         pass("editor select all, copy, cut and paste use actual system InputConnection");
-        setText("abc");nodeClick("toolbar_edit");buttonClick("选择");buttonClick("←");awaitSelection(2,3);buttonClick("复制");awaitClip("c");buttonClick("结束选择");closePanel();keyboardReady();
+        setText("abc");nodeClick("toolbar_edit");nodeClick("edit_select");nodeClick("edit_left");awaitSelection(2,3);buttonClick("复制");awaitClip("c");nodeClick("edit_select");closePanel();keyboardReady();
         pass("selection mode extends with the cursor and copies only the selection");
 
         nodeClick("toolbar_edit");buttonClick("剪贴板");buttonClick("清空历史");awaitHistoryCount(0);closePanel();keyboardReady();

@@ -8,7 +8,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.inputmethod.InputMethodManager;
 
 /** Exercises the real editing panel against the active Android editor. */
-public final class ImeV7Instrumentation extends ImeV67Instrumentation {
+public class ImeV7Instrumentation extends ImeV67Instrumentation {
     private boolean modelsAvailable,editorOnly;
     @Override public void onCreate(android.os.Bundle args){modelsAvailable=args!=null&&"true".equals(args.getString("models_available"));editorOnly=args!=null&&"true".equals(args.getString("editor_only"));super.onCreate(args);}
     @Override protected String successMarker(){return "ALL_V7_IME_CHECKS_PASS";}
@@ -53,8 +53,7 @@ public final class ImeV7Instrumentation extends ImeV67Instrumentation {
             closePanel();setText(original);select(2,original.length()-2);openEdit();nodeClick("edit_translate");
             long until=SystemClock.uptimeMillis()+45000;while(text().equals(original)&&SystemClock.uptimeMillis()<until)SystemClock.sleep(50);
             String translated=text();check(translated.startsWith("前缀")&&translated.endsWith(". 123😊\n后缀")&&!translated.equals(original)&&translated.substring(2,translated.length()-2).matches("(?s).*\\p{IsHan}.*"),"Foreign selection was not replaced safely: "+translated);
-            check(translated.chars().filter(c->c==' ').count()==original.chars().filter(c->c==' ').count(),"Foreign translation changed original spaces");
-            nodeClick("edit_undo");awaitText(original);pass("installed English model detects a foreign selection, replaces only that range, preserves original separators and supports undo");
+            nodeClick("edit_undo");awaitText(original);pass("installed English model translates a complete foreign phrase naturally, protects suffix formatting and supports undo");
         }
         closePanel();setText("123😊\nEnglish https://example.org/中文");openEdit();nodeClick("edit_translate");awaitStatus("没有可翻译");awaitText("123😊\nEnglish https://example.org/中文");
         pass("unselected foreign or protected technical content is never translated or modified");
@@ -81,7 +80,8 @@ public final class ImeV7Instrumentation extends ImeV67Instrumentation {
     private void launchBrowser(String fixture){getContext().startActivity(new android.content.Intent(getContext(),BrowserEditorActivity.class).putExtra("fixture",fixture).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK|android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP));SystemClock.sleep(200);}
     private String webText(){for(android.view.accessibility.AccessibilityWindowInfo window:automation.getWindows()){AccessibilityNodeInfo root=window.getRoot();if(root!=null)for(AccessibilityNodeInfo node:root.findAccessibilityNodeInfosByViewId("android:id/text1"))if(node.getText()!=null&&node.getText().toString().startsWith("browser: "))return node.getText().toString().substring(9);}return null;}
     private void awaitWeb(String value){long until=SystemClock.uptimeMillis()+15000;while(SystemClock.uptimeMillis()<until){if(value.equals(webText()))return;SystemClock.sleep(50);}throw new AssertionError("Browser expected "+value+" actual "+webText());}
-    private void focusBrowser(){SystemClock.sleep(300);long now=SystemClock.uptimeMillis();touch(220,400,true,now);touch(220,400,false,now+40);keyboardReady();}
+    private void focusBrowser(){long until=SystemClock.uptimeMillis()+15000,nextTap=0;while(SystemClock.uptimeMillis()<until){if(find("key_SPACE")!=null){SystemClock.sleep(450);collectKeys();return;}if(SystemClock.uptimeMillis()>=nextTap){for(android.view.accessibility.AccessibilityWindowInfo window:automation.getWindows()){AccessibilityNodeInfo root=window.getRoot();if(root==null||!getContext().getPackageName().contentEquals(root.getPackageName()==null?"":root.getPackageName()))continue;AccessibilityNodeInfo field=browserField(root);if(field!=null){android.graphics.Rect bounds=new android.graphics.Rect();field.getBoundsInScreen(bounds);long now=SystemClock.uptimeMillis();touch(bounds.centerX(),bounds.centerY(),true,now);touch(bounds.centerX(),bounds.centerY(),false,now+60);break;}}nextTap=SystemClock.uptimeMillis()+500;}SystemClock.sleep(50);}throw new AssertionError("Browser textarea did not start its own input connection");}
+    private AccessibilityNodeInfo browserField(AccessibilityNodeInfo root){if(root.isEditable()&&root.isVisibleToUser())return root;for(int i=0;i<root.getChildCount();i++){AccessibilityNodeInfo child=root.getChild(i);if(child!=null){AccessibilityNodeInfo field=browserField(child);if(field!=null)return field;}}return null;}
     private void openEdit(){nodeClick("toolbar_edit");awaitNode("edit_delete");SystemClock.sleep(160);}
     private void select(int start,int end){runOnMainSync(()->editor.setSelection(start,end));waitForIdleSync();SystemClock.sleep(120);}
     private void awaitEditorTranslation(String expected){long until=SystemClock.uptimeMillis()+15000;while(SystemClock.uptimeMillis()<until){if(expected.equals(text()))return;SystemClock.sleep(40);}throw new AssertionError("Editor replacement expected "+expected+" actual "+text()+" status "+String.valueOf(awaitNode("edit_status").getText()));}

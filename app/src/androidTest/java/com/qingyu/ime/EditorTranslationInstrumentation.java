@@ -38,18 +38,33 @@ public final class EditorTranslationInstrumentation extends Instrumentation {
                 check(identified.await(15,TimeUnit.SECONDS)&&onMain[0]&&value[0].equals(code),"real offline main-thread language detection "+code+" got "+value[0]);
             }
             report.append("PASS real bundled offline detection of Chinese and six supported foreign languages\n");
+            for(String sample:new String[]{"今日","今日は","友達","友達と","映画","映画を","見","見ま","你好","你好こ","开发","开发こ"}) {
+                CountDownLatch returned=new CountDownLatch(1);String[] language={""};
+                repository.identifyLanguage(sample,(value,note)->{language[0]=value;returned.countDown();});
+                check(returned.await(15,TimeUnit.SECONDS),"Han/kana context identification timed out");
+                report.append("CONTEXT_ID ").append(sample).append(" -> ").append(language[0].isEmpty()?"und":language[0]).append('\n');
+            }
             String local="开发，2026🙂\r\n设计\tHello! https://example.org/中文 `中文代码` user@example.org";
             String[] mixed=editor(repository,local,false,"en");
             check(mixed[0].equals("develop，2026🙂\r\ndesign\tHello! https://example.org/中文 `中文代码` user@example.org"),"local editor translation with protected original text");
             check(editor(repository,"开发 French 文本",true,"en")[0].contains(" French "),"mixed selected foreign words retained");
             check(editor(repository,"开发 こんにちは ABC",true,"en")[0].equals("develop こんにちは ABC"),"selected Chinese mixed with kana and Latin must preserve foreign content");
             check(editor(repository,"开发 日本語を勉強する ABC",true,"en")[0].equals("develop 日本語を勉強する ABC"),"selected Chinese keeps Japanese Han/kana tokens intact");
-            check(editor(repository,"今日は友達と映画を見ます。🙂2026",false,"en")[0].isEmpty(),"unselected native Japanese must not have its Han partially translated");
+            check(editor(repository,"开发こんにちは ABC",true,"en")[0].equals("developこんにちは ABC"),"glued Chinese and Japanese selection translates only identified Chinese");
+            check(editor(repository,"你好こんにちは 123🙂\r\n",false,"en")[0].equals("helloこんにちは 123🙂\r\n"),"unselected glued Chinese translates without touching kana or separators");
+            String[] nativeJapanese=editor(repository,"今日は友達と映画を見ます。🙂2026",false,"en");
+            check(nativeJapanese[0].isEmpty(),"unselected native Japanese must not have its Han partially translated: "+nativeJapanese[0]+" ("+nativeJapanese[1]+")");
             check(editor(repository,"123🙂 https://x.test/中文 `代码`",false,"en")[0].isEmpty(),"technical-only content must not change");
             check(editor(repository,"Hello world",false,"en")[0].isEmpty(),"unselected non-Chinese content must not change");
             check(editor(repository,"字".repeat(4097),false,"en")[0].isEmpty(),"large editor selection rejected safely");
             report.append("PASS actual local Chinese, mixed selection, protected technical content, no-selection rule and size limits\n");
             if(modelsAvailable){
+                String sentence="I would like to watch short videos with my friends.";
+                EditorTranslation.Plan sentencePlan=EditorTranslation.plan(sentence,"en");
+                check(sentencePlan.count==1&&sentencePlan.parts.get(0).text.equals(sentence.substring(0,sentence.length()-1)),"English sentence must enter the translator as one clause");
+                String[] fluent=editor(repository,sentence,true,"en");
+                check(!fluent[0].isEmpty()&&fluent[0].contains("朋友")&&(fluent[0].contains("视频")||fluent[0].contains("短片"))&&fluent[0].endsWith("."),"whole English sentence keeps its meaning and original punctuation "+fluent[1]);
+                report.append("PASS whole English clause translation with natural Chinese order and protected original punctuation\n");
                 for(String code:TranslationRepository.glossLanguages()) {
                     String[] value=editor(repository,"今天下午和朋友喝咖啡，2026🙂\r\n明天继续",false,code);
                     check(!value[0].isEmpty()&&value[0].contains("，2026🙂\r\n")&&!value[0].equals("今天下午和朋友喝咖啡，2026🙂\r\n明天继续"),"real installed model editor translation "+code+" "+value[1]);
@@ -121,11 +136,19 @@ public final class EditorTranslationInstrumentation extends Instrumentation {
         EditorTranslation.Plan plan=EditorTranslation.plan("开发，2026👩‍👩‍👧‍👦\r\n设计\tHello https://x.test/中文 `代码`","zh");
         check(plan.count==2&&plan.apply(Arrays.asList("develop.","design!")).equals("develop，2026👩‍👩‍👧‍👦\r\ndesign\tHello https://x.test/中文 `代码`"),"protection parser");
         check(EditorTranslation.plan("cafe\u0301\u00a0beau","fr").apply(Arrays.asList("咖啡","美丽")).equals("咖啡\u00a0美丽"),"combining marks and NBSP");
+        EditorTranslation.Plan sentence=EditorTranslation.plan("I would like to watch short videos.","en");
+        check(sentence.count==1&&sentence.parts.get(0).text.equals("I would like to watch short videos")
+                &&sentence.apply(Collections.singletonList("我想看短视频。")).equals("我想看短视频."),"ordinary foreign word spaces belong to a complete clause, not separate word translations");
+        check(EditorTranslation.plan("  Hello there  my friend\tgood night\r\n42🙂good\u00a0day ","en")
+                .apply(Arrays.asList("你好","我的朋友","晚安","好","天")).equals("  你好  我的朋友\t晚安\r\n42🙂好\u00a0天 "),"formatted whitespace remains verbatim around complete clauses");
         boolean rejected=false;try{plan.apply(Collections.singletonList("develop"));}catch(IllegalArgumentException expected){rejected=true;}check(rejected,"partial results must be rejected");
         check(EditorTranslation.confidentLanguage(new String[]{"en","fr"},new float[]{.68f,.62f}).isEmpty(),"ambiguous identification cannot alter the editor");
         check(EditorTranslation.plan("开发 こんにちは ABC","zh").apply(Collections.singletonList("develop")).equals("develop こんにちは ABC"),"mixed kana and Latin protected");
         check(EditorTranslation.separatedHanSample("今日は友達と映画を見ます").isEmpty(),"native connected Japanese preserves identification path");
         check(EditorTranslation.plan("你好こんにちは","zh").count==0,"inseparable Han/kana content is preserved conservatively");
+        check(EditorTranslation.kanaHanRuns("你好こんにちは https://x.test/中文かな").equals(Collections.singletonList("你好")),"glued Han identification excludes protected technical text");
+        check(EditorTranslation.plan("你好こんにちは 日本語を勉強する","zh",Collections.singleton("你好"))
+                .apply(Collections.singletonList("hello")).equals("helloこんにちは 日本語を勉強する"),"confirmed Chinese identification never unprotects Japanese Han");
     }
     private static void cancellation(TranslationRepository repository,Handler worker)throws Exception {
         CountDownLatch mainBlocked=new CountDownLatch(1),releaseMain=new CountDownLatch(1),registered=new CountDownLatch(1),cancelled=new CountDownLatch(1),returned=new CountDownLatch(1);

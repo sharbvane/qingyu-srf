@@ -18,7 +18,6 @@ public final class BrowserEditorActivity extends Activity {
         TextView value=new TextView(this);value.setId(android.R.id.text1);value.setContentDescription("Qingyu browser state");value.setText("loading");root.addView(value,new LinearLayout.LayoutParams(-1,100));
         browser=new WebView(this);browser.getSettings().setJavaScriptEnabled(true);root.addView(browser,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
         browser.addJavascriptInterface(new Object(){@JavascriptInterface public void changed(String text){runOnUiThread(()->value.setText("browser: "+text));}},"fixture");
-        browser.setWebViewClient(new WebViewClient(){@Override public void onPageFinished(WebView view,String url){browser.evaluateJavascript("document.getElementById('e').focus()",null);}});
         String text="translate".equals(getIntent().getStringExtra("fixture"))?"开发，123😊\nEnglish":"";
         browser.loadDataWithBaseURL("https://qingyu.invalid/","<meta name='viewport' content='width=device-width,initial-scale=1'><textarea id='e' style='width:90%;height:140px;font-size:24px'></textarea><script>var e=document.getElementById('e');e.value="+org.json.JSONObject.quote(text)+";function report(){fixture.changed(e.value)};e.addEventListener('input',report);report();</script>","text/html","UTF-8",null);
     }

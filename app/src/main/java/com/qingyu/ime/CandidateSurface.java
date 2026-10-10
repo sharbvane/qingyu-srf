@@ -91,10 +91,11 @@ final class CandidateSurface extends View {
         setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
     }
     private float dp(float n){return n*density;}
+    void pending(boolean value){String label=String.valueOf(getContentDescription()).replace("；候选更新中","");setContentDescription(label+(value?"；候选更新中":""));}
     private boolean landscape(){return getResources().getConfiguration().orientation==Configuration.ORIENTATION_LANDSCAPE;}
     void update(String composing,List<String> words,boolean translate,String status) {
         boolean wordsChanged=!this.words.equals(words);
-        boolean changed=wordsChanged||!this.composing.equals(composing);
+        boolean changed=wordsChanged||this.composing.isEmpty()!=composing.isEmpty();
         if(changed){cancelTouch();clearVirtualFocus();generation++;scroll=0;notifiedFirst=notifiedLast=-1;}
         boolean translationChanged=translations!=translate;
         this.composing=composing;if(wordsChanged)this.words=new ArrayList<>(words);translations=translate;

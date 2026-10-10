@@ -2,10 +2,12 @@ package com.qingyu.ime;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Collections;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Protected text never enters the translator and is copied back verbatim. */
+/** Formatting and protected tokens are copied verbatim; ordinary word spaces belong to the phrase. */
 final class EditorTranslation {
     static final int MAX_TEXT = 4096, MAX_SEGMENTS = 64;
     private static final Pattern TECHNICAL = Pattern.compile(
@@ -37,9 +39,12 @@ final class EditorTranslation {
     }
 
     static Plan plan(String text, String source) {
+        return plan(text, source, Collections.emptySet());
+    }
+    static Plan plan(String text, String source, Set<String> chineseKanaRuns) {
         if (text == null || text.length() > MAX_TEXT) throw new IllegalArgumentException("Text too long");
         boolean[] protectedText = protectedText(text);
-        if (source.equals("zh")) protectKanaWords(text, protectedText);
+        if (source.equals("zh")) protectKanaWords(text, protectedText, chineseKanaRuns);
         ArrayList<Part> parts = new ArrayList<>(); int count = 0, at = 0;
         while (at < text.length()) {
             int start = at, code = text.codePointAt(at);
@@ -48,7 +53,8 @@ final class EditorTranslation {
             while (at < text.length()) {
                 code = text.codePointAt(at);
                 boolean next = !protectedText[at] && (letter(code, source)
-                        || translate && !source.equals("zh") && mark(code));
+                        || translate && !source.equals("zh") && mark(code)
+                        || translate && wordSpace(text, at, source, protectedText));
                 if (next != translate) break;
                 at += Character.charCount(code);
             }
@@ -56,6 +62,41 @@ final class EditorTranslation {
             parts.add(new Part(text.substring(start, at), translate));
         }
         return new Plan(parts, count);
+    }
+
+    static List<String> kanaHanRuns(String text) {
+        if (text == null || text.length() > MAX_TEXT) throw new IllegalArgumentException("Text too long");
+        boolean[] technical = protectedText(text), connected = technical.clone();
+        protectKanaWords(text, connected, Collections.emptySet());
+        ArrayList<String> runs = new ArrayList<>();
+        for (int at = 0; at < text.length();) {
+            int code = text.codePointAt(at);
+            if (!letter(code, "zh") || technical[at] || !connected[at]) { at += Character.charCount(code); continue; }
+            int start = at;
+            while (at < text.length() && letter(text.codePointAt(at), "zh") && !technical[at] && connected[at]) at += Character.charCount(text.codePointAt(at));
+            String run = text.substring(start, at);
+            if (!runs.contains(run)) runs.add(run);
+            if (runs.size() > MAX_SEGMENTS) throw new IllegalArgumentException("Too many segments");
+        }
+        return runs;
+    }
+
+    static List<String> kanaHanContexts(String text, String run) {
+        boolean[] technical = protectedText(text); ArrayList<String> contexts = new ArrayList<>();
+        if (run.isEmpty()) return contexts;
+        for (int start = text.indexOf(run); start >= 0; start = text.indexOf(run, start + run.length())) {
+            int end = start + run.length();
+            if (technical[start] || start > 0 && letter(text.codePointBefore(start), "zh")
+                    || end < text.length() && letter(text.codePointAt(end), "zh")) continue;
+            String context = "";
+            if (end < text.length() && !technical[end] && kana(text.codePointAt(end)))
+                context = text.substring(start, end + Character.charCount(text.codePointAt(end)));
+            else if (start > 0 && !technical[start - 1] && kana(text.codePointBefore(start)))
+                context = text.substring(start - Character.charCount(text.codePointBefore(start)), end);
+            if (!context.isEmpty() && !contexts.contains(context)) contexts.add(context);
+            if (contexts.size() > MAX_SEGMENTS) throw new IllegalArgumentException("Too many segments");
+        }
+        return contexts;
     }
 
     static String languageSample(String text) {
@@ -114,17 +155,35 @@ final class EditorTranslation {
         while (matcher.find()) java.util.Arrays.fill(protectedText, matcher.start(), matcher.end(), true);
         return protectedText;
     }
-    private static void protectKanaWords(String text, boolean[] protectedText) {
+    private static void protectKanaWords(String text, boolean[] protectedText, Set<String> chineseRuns) {
+        boolean[] technical = protectedText.clone();
         for (int at = 0; at < text.length();) {
             int code = text.codePointAt(at);
             if (!Character.isLetter(code)) { at += Character.charCount(code); continue; }
             int start = at;
             while (at < text.length() && (Character.isLetter(text.codePointAt(at)) || mark(text.codePointAt(at)))) at += Character.charCount(text.codePointAt(at));
-            if (hasKana(text.substring(start, at))) java.util.Arrays.fill(protectedText, start, at, true);
+            if (!hasKana(text.substring(start, at))) continue;
+            java.util.Arrays.fill(protectedText, start, at, true);
+            for (int run = start; run < at;) {
+                code = text.codePointAt(run);
+                if (!letter(code, "zh") || technical[run]) { run += Character.charCount(code); continue; }
+                int first = run;
+                while (run < at && letter(text.codePointAt(run), "zh") && !technical[run]) run += Character.charCount(text.codePointAt(run));
+                if (chineseRuns.contains(text.substring(first, run))) java.util.Arrays.fill(protectedText, first, run, false);
+            }
         }
     }
     private static boolean letter(int code, String source) {
         return Character.isLetter(code) && (!source.equals("zh") || Character.UnicodeScript.of(code) == Character.UnicodeScript.HAN);
+    }
+    private static boolean kana(int code) {
+        Character.UnicodeScript script = Character.UnicodeScript.of(code);
+        return script == Character.UnicodeScript.HIRAGANA || script == Character.UnicodeScript.KATAKANA;
+    }
+    private static boolean wordSpace(String text, int at, String source, boolean[] protectedText) {
+        return !source.equals("zh") && text.charAt(at) == ' ' && at > 0 && at + 1 < text.length() && !protectedText[at + 1]
+                && letter(text.codePointAt(at + 1), source)
+                && (letter(text.codePointBefore(at), source) || !source.equals("zh") && mark(text.codePointBefore(at)));
     }
     private static boolean mark(int code) {
         int type = Character.getType(code);

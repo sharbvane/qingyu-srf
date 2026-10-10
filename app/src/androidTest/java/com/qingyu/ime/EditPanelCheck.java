@@ -2,6 +2,7 @@ package com.qingyu.ime;
 
 import android.app.Activity;
 import android.app.Instrumentation;
+import android.graphics.Rect;
 import android.os.SystemClock;
 import android.view.MotionEvent;
 import android.view.View;
@@ -29,16 +30,23 @@ final class EditPanelCheck {
                 require(((TextView)status).getText().toString().equals("正在翻译，原文保持不变"),"Translation loading state is missing");
                 panels.editState(true,false,"翻译失败，请重试");panels.edit(false,true);
                 require(delete==panels.body.findViewById(R.id.edit_delete)&&translate==panels.body.findViewById(R.id.edit_translate)&&status==panels.body.findViewById(R.id.edit_status)&&selection==panels.body.findViewById(R.id.edit_select),"Edit-state updates rebuilt the controls");
-                require(((Button)selection).getText().toString().equals("结束选择"),"Selection state failed to update in place");
+                require(((Button)selection).getText().toString().equals("选择")&&selection.isSelected()&&selection.getContentDescription().toString().equals("结束选择"),"Dial selection state failed to update in place");
                 require(((TextView)status).getText().toString().equals("翻译失败，请重试"),"Translation failure disappeared on selection change");
                 panels.body.findViewById(R.id.edit_undo).performClick();translate.performClick();delete.performClick();
                 require(actions.toString().equals("[undo, edit_translate, DELETE]"),"Edit actions changed their service contract");actions.clear();
+                int[] directionIds={R.id.edit_up,R.id.edit_right,R.id.edit_down,R.id.edit_left,R.id.edit_home,R.id.edit_end};for(int id:directionIds)panels.body.findViewById(id).performClick();selection.performClick();
+                require(actions.toString().equals("[up, right, down, left, home, end, select]"),"Dial directions or selection changed the service contract");actions.clear();
                 float dp=panels.body.getResources().getDisplayMetrics().density;
-                for(int width:new int[]{320,480})for(int height:new int[]{252,112,90}){
+                for(int width:new int[]{320,480,600})for(int height:new int[]{314,252,112,90}){
                     panels.body.measure(View.MeasureSpec.makeMeasureSpec(Math.round(width*dp),View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(Math.round(height*dp),View.MeasureSpec.AT_MOST));panels.body.layout(0,0,panels.body.getMeasuredWidth(),panels.body.getMeasuredHeight());
                     require(panels.body.getHeight()<=Math.round(height*dp),"Edit panel escaped the keyboard's height");
-                    View scroll=panels.body.findViewById(R.id.edit_actions);require(scroll.getBottom()<=panels.body.getHeight(),"Edit tools overflowed the fixed panel");
-                    for(int id:new int[]{R.id.edit_left,R.id.edit_select,R.id.edit_clipboard,R.id.edit_undo,R.id.edit_translate,R.id.edit_delete})require(panels.body.findViewById(id).getMeasuredHeight()>=Math.round(48*dp),"An edit control lost its touch target in a short keyboard");
+                    View scroll=panels.body.findViewById(R.id.edit_actions);require(scroll.getBottom()<=panels.body.getHeight()&&((ViewGroup)scroll).getClipChildren(),"Edit tools overflowed the fixed panel");
+                    int[] ids={R.id.edit_up,R.id.edit_left,R.id.edit_right,R.id.edit_down,R.id.edit_select,R.id.edit_home,R.id.edit_end,R.id.edit_select_all,R.id.edit_delete,R.id.edit_copy,R.id.edit_undo,R.id.edit_paste,R.id.edit_translate,R.id.edit_cut,R.id.edit_clipboard};
+                    for(int id:ids){View control=panels.body.findViewById(id);require(control.getMeasuredHeight()>=Math.round(48*dp)&&control.getMeasuredWidth()>=Math.round(48*dp),"An edit control lost its touch target in a short keyboard");require(control.getContentDescription()!=null&&!control.getContentDescription().toString().isEmpty(),"An edit icon lost its accessible action name");}
+                    ViewGroup dial=(ViewGroup)selection.getParent();require(dial.getWidth()==dial.getHeight(),"Direction dial became an ellipse");
+                    for(int i=0;i<dial.getChildCount();i++)for(int j=i+1;j<dial.getChildCount();j++){View a=dial.getChildAt(i),b=dial.getChildAt(j);require(!Rect.intersects(new Rect(a.getLeft(),a.getTop(),a.getRight(),a.getBottom()),new Rect(b.getLeft(),b.getTop(),b.getRight(),b.getBottom())),"Dial direction targets overlap selection or each other");}
+                    int[] order={R.id.edit_select_all,R.id.edit_delete,R.id.edit_copy,R.id.edit_undo,R.id.edit_paste,R.id.edit_translate,R.id.edit_cut,R.id.edit_clipboard};ViewGroup tools=(ViewGroup)panels.body.findViewById(R.id.edit_select_all).getParent().getParent();require(tools.getChildCount()==4,"Edit tools are not four rows");
+                    for(int row=0;row<4;row++){ViewGroup line=(ViewGroup)tools.getChildAt(row);require(line.getChildCount()==2&&line.getChildAt(0).getId()==order[row*2]&&line.getChildAt(1).getId()==order[row*2+1],"Edit tools changed the reference's two-column order");for(int col=0;col<2;col++){Button key=(Button)line.getChildAt(col);require(key.getCompoundDrawables()[1]!=null,"Edit tool lost its icon");require(key.getCompoundDrawables()[1].getIntrinsicHeight()+key.getCompoundDrawablePadding()+key.getPaint().getFontMetricsInt(null)+key.getPaddingTop()+key.getPaddingBottom()<=key.getHeight(),"Icon and label overlap in a short edit key");}}
                 }
             });
             instrumentation.runOnMainSync(()->{float dp=panels.body.getResources().getDisplayMetrics().density;panels.body.measure(View.MeasureSpec.makeMeasureSpec(Math.round(360*dp),View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(Math.round(252*dp),View.MeasureSpec.EXACTLY));panels.body.layout(0,0,panels.body.getMeasuredWidth(),panels.body.getMeasuredHeight());});

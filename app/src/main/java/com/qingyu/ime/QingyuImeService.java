@@ -69,7 +69,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     private Runnable pendingTranslation;
     private final Map<String,String> activeGlosses=new HashMap<>();
     private final java.util.Set<String> activeModelWords=new LinkedHashSet<>();
-    private String glossPair="",detailTarget="",detailPos="",detailExample="",detailExampleTranslation="",detailExampleNote="";
+    private String glossPair="",glossBatchKey="",detailTarget="",detailPos="",detailExample="",detailExampleTranslation="",detailExampleNote="";
     private String engineError="",editorIdentity="",detailSource="",detailTranslated="",detailExplanation="",detailNote="",detailExplanationNote="";
     private String detailAnchorContext="";
     private int detailSelectedLength;
@@ -151,7 +151,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
         decoder.post(()->{if(token!=session.get())return;try{if(!engineOpen)openEngine(privateInput||!prefs.learning());resetWorker();engine.setLearningEnabled(!privateInput&&prefs.learning());if(inputDictionary!=null)inputDictionary.setLearningEnabled(!privateInput&&prefs.learning());}catch(Exception|LinkageError ignored){}});
         if(keyboard!=null)keyboard.resetModes();collapse();configureKeyboard();render();requestPrediction();
     }
-    @Override public void onStartInputView(EditorInfo info,boolean restarting){super.onStartInputView(info,restarting);inputViewActive=true;restoreComposingSpan();applyLearningPreference(info);configureKeyboard();long changed=prefs.store.getLong("models_revision",0);String language=prefs.glossLanguage();TranslationRepository.StateCallback ready=state->{if(inputViewActive&&language.equals(prefs.glossLanguage())&&state==TranslationRepository.State.READY)requestGlosses();};if(changed!=modelsRevision){modelsRevision=changed;glossRequest++;activeGlosses.clear();activeModelWords.clear();applyGlosses();translations.refreshAfterModelChange(language,ready);}else translations.refreshModels(language,ready);observeModels();render();if(root!=null)root.post(this::renderPinyinBubble);}
+    @Override public void onStartInputView(EditorInfo info,boolean restarting){super.onStartInputView(info,restarting);inputViewActive=true;restoreComposingSpan();applyLearningPreference(info);configureKeyboard();long changed=prefs.store.getLong("models_revision",0);String language=prefs.glossLanguage();TranslationRepository.StateCallback ready=state->{if(inputViewActive&&language.equals(prefs.glossLanguage())&&state==TranslationRepository.State.READY)requestGlosses();};if(changed!=modelsRevision){modelsRevision=changed;glossRequest++;glossBatchKey="";activeGlosses.clear();activeModelWords.clear();applyGlosses();translations.refreshAfterModelChange(language,ready);}else translations.refreshModels(language,ready);observeModels();render();if(root!=null)root.post(this::renderPinyinBubble);}
     private void applyLearningPreference(EditorInfo info){boolean privacy=sensitive||!prefs.learning()||(info.imeOptions&EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING)!=0;long token=session.get();decoder.post(()->{if(token!=session.get())return;if(engineOpen)engine.setLearningEnabled(!privacy);if(inputDictionary!=null)inputDictionary.setLearningEnabled(!privacy);});}
     private void restoreComposingSpan(){InputConnection ic=getCurrentInputConnection();if(ic==null||preview.isEmpty())return;CharSequence before=ic.getTextBeforeCursor(preview.length(),0);if(before==null||!before.toString().equals(preview))return;android.view.inputmethod.ExtractedText text=ic.getExtractedText(new android.view.inputmethod.ExtractedTextRequest(),0);if(text!=null&&text.selectionStart==text.selectionEnd){int end=text.startOffset+text.selectionEnd;if(end>=preview.length()){ic.setComposingRegion(end-preview.length(),end);composingActive=true;}}}
     private String currentMode(){return english?"english":prefs.nineKey()?"nine":"pinyin";}
@@ -166,6 +166,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
         keyboard.enterLabel(chineseComposition?currentMode().equals("nine")?"确认":"拼音":editorEnterLabel);
         keyboard.nineState(chineseComposition&&currentMode().equals("nine"),nineReadings,!nineVisibleReading.isEmpty()||!nineVisiblePrefix.isEmpty());renderPinyinBubble();
         candidates.setContentDescription("候选词，上方为释义；左右滑动浏览，长按查看详情，上滑输入翻译"+(chineseComposition?"；原始拼音 · "+rawPreview:""));
+        candidates.pending(visibleRevision!=revision);expandedCandidates.pending(visibleRevision!=revision);
         if(words.isEmpty()&&isCandidateExpanded())collapse();
         boolean predicting=!words.isEmpty()&&candidateMode.startsWith("predict");
         candidates.setVisibility(View.VISIBLE);candidates.setInteractiveComposition(!preview.isEmpty());candidates.setPredicting(predicting);candidates.setExpandIndicator(isCandidateExpanded());candidates.update(preview,words,prefs.translation()&&!sensitive,status);
@@ -205,39 +206,43 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
         int[] position=new int[2];root.getLocationOnScreen(position);int x=position[0]+root.getPaddingLeft()+dp(8),y=Math.max(dp(4),position[1]-pinyinText.getMeasuredHeight());
         try{if(pinyinBubble.isShowing())pinyinBubble.update(x,y,pinyinText.getMeasuredWidth(),pinyinText.getMeasuredHeight());else{pinyinBubble.setWidth(pinyinText.getMeasuredWidth());pinyinBubble.setHeight(pinyinText.getMeasuredHeight());pinyinBubble.showAtLocation(root,android.view.Gravity.TOP|android.view.Gravity.LEFT,x,y);}}catch(android.view.WindowManager.BadTokenException ignored){dismissPinyinBubble();}
     }
-    private boolean glossMatches(long token,long generation,String source,String target){return !destroyed&&inputViewActive&&session.get()==token&&revision==generation&&prefs.translation()&&!sensitive&&source.equals(english?"en":"zh")&&target.equals(english?"zh":prefs.glossLanguage());}
+    private boolean glossMatches(long token,String source,String target){return !destroyed&&inputViewActive&&session.get()==token&&prefs.translation()&&!sensitive&&source.equals(english?"en":"zh")&&target.equals(english?"zh":prefs.glossLanguage());}
     private void synchronizeGlossLanguage(){
         String pair=english?"en\nzh":"zh\n"+prefs.glossLanguage();
         if(pair.equals(glossPair))return;
-        glossPair=pair;glossRequest++;detailRequest++;activeGlosses.clear();activeModelWords.clear();applyGlosses();
+        glossPair=pair;glossRequest++;detailRequest++;glossBatchKey="";activeGlosses.clear();activeModelWords.clear();applyGlosses();
         detailTranslated="";detailExplanation="";detailExample="";detailExampleTranslation="";detailExampleNote="";
     }
     private void requestGlosses(){
-        if(candidates==null||destroyed||sensitive||visible.candidates.isEmpty())return;
+        if(candidates==null||destroyed||sensitive)return;if(visible.candidates.isEmpty()){glossBatchKey="";return;}
         synchronizeGlossLanguage();
         java.util.Set<String> currentWords=new LinkedHashSet<>();for(Candidate candidate:visible.candidates)currentWords.add(candidate.text);activeGlosses.keySet().retainAll(currentWords);activeModelWords.retainAll(currentWords);
-        if(pendingTranslation!=null)translation.removeCallbacks(pendingTranslation);long token=session.get(),generation=revision,request=++glossRequest;String source=english?"en":"zh",target=english?"zh":prefs.glossLanguage();boolean withGloss=prefs.translation();
+        long token=session.get();String source=english?"en":"zh",target=english?"zh":prefs.glossLanguage();boolean withGloss=prefs.translation();
         LinkedHashSet<String> viewport=new LinkedHashSet<>(candidates.visibleWords());if(isCandidateExpanded())viewport.addAll(expandedCandidates.visibleWords());
         List<String> words=new ArrayList<>(viewport);if(words.size()>24)words=new ArrayList<>(words.subList(0,24));final List<String> batch=words;
+        String batchKey=token+"\n"+source+"\n"+target+"\n"+withGloss+"\n"+translations.status(target.equals("zh")?source:target)+"\n"+String.join("\n",batch);
+        if(batchKey.equals(glossBatchKey))return;glossBatchKey=batchKey;
+        if(pendingTranslation!=null)translation.removeCallbacks(pendingTranslation);long request=++glossRequest;
         pendingTranslation=()->{
             if(token!=session.get())return;Map<String,String> found=new HashMap<>();List<String> missing=new ArrayList<>();
             Map<String,String> pos=Collections.emptyMap();try{if(source.equals("zh")&&inputDictionary!=null)pos=inputDictionary.partsOfSpeech(batch);}catch(Exception ignored){}Map<String,String> tags=pos;
             if(withGloss)for(String word:batch){String gloss="";try{gloss=translations.localGloss(word,source,target);}catch(Exception ignored){}if(!gloss.isEmpty())found.put(word,gloss);else missing.add(word);}
-            main.post(()->{if(destroyed||request!=glossRequest||token!=session.get()||generation!=revision)return;candidates.partsOfSpeech(tags);expandedCandidates.partsOfSpeech(tags);if(withGloss&&glossMatches(token,generation,source,target)){for(String word:found.keySet())activeModelWords.remove(word);activeGlosses.putAll(found);applyGlosses();
+            // Glosses belong to words and a language pair, not to a raw-input revision.
+            main.post(()->{if(destroyed||request!=glossRequest||token!=session.get())return;candidates.partsOfSpeech(tags);expandedCandidates.partsOfSpeech(tags);if(withGloss&&glossMatches(token,source,target)){for(String word:found.keySet())activeModelWords.remove(word);activeGlosses.putAll(found);applyGlosses();
                 // ponytail: at most 24 visible words in batches of four; inference never enters the decoder path.
-                missing.removeIf(activeGlosses::containsKey);requestModelGlosses(missing,0,token,generation,request,source,target);
+                missing.removeIf(activeGlosses::containsKey);requestModelGlosses(missing,0,token,request,source,target);
             }});
         };
         translation.postDelayed(pendingTranslation,150);
     }
     @Override public void visibleWordsChanged(){requestGlosses();}
-    private void requestModelGlosses(List<String> words,int offset,long token,long generation,long request,String source,String target){
-        if(request!=glossRequest||!glossMatches(token,generation,source,target)||offset>=words.size()||translations.status(target.equals("zh")?source:target)!=TranslationRepository.State.READY)return;
+    private void requestModelGlosses(List<String> words,int offset,long token,long request,String source,String target){
+        if(request!=glossRequest||!glossMatches(token,source,target)||offset>=words.size()||translations.status(target.equals("zh")?source:target)!=TranslationRepository.State.READY)return;
         int end=Math.min(offset+4,words.size());int[] left={end-offset};
         for(int i=offset;i<end;i++){String word=words.get(i);translations.translate(word,source,target,(value,note)->{
-            if(request!=glossRequest||!glossMatches(token,generation,source,target))return;
+            if(request!=glossRequest||!glossMatches(token,source,target))return;
             if(!value.isEmpty()){activeGlosses.put(word,value);if(note.startsWith("Google Translate"))activeModelWords.add(word);else activeModelWords.remove(word);applyGlosses();}
-            if(--left[0]==0)requestModelGlosses(words,end,token,generation,request,source,target);
+            if(--left[0]==0)requestModelGlosses(words,end,token,request,source,target);
         });}
     }
     private void applyGlosses(){Map<String,String> values=new HashMap<>(activeGlosses);candidates.glosses(values);expandedCandidates.glosses(values);candidates.modelWords(new LinkedHashSet<>(activeModelWords));expandedCandidates.modelWords(new LinkedHashSet<>(activeModelWords));}
@@ -268,6 +273,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     private interface DecoderAction{EngineSnapshot run()throws Exception;}
     private void submit(DecoderAction action,String suffix,String mode){
         long token=session.get(),generation=++revision;String context=contextBeforeComposition();
+        if(candidates!=null){candidates.pending(true);expandedCandidates.pending(true);}
         decoder.post(()->{
             if(token!=session.get())return;EngineSnapshot result;String committed=suffix;
             // Keep every ordered edit and commit; only an obsolete candidate calculation can be skipped.
@@ -327,10 +333,10 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
         });
     }
     private void resetPredictionChain(){predictionPicks=0;predictionSuppressed=false;predictionRequest++;}
-    @Override public void clearCandidates(){predictionSuppressed=true;predictionRequest++;glossRequest++;detailRequest++;if(pendingTranslation!=null)translation.removeCallbacks(pendingTranslation);visible=EngineSnapshot.empty();activeGlosses.clear();activeModelWords.clear();applyGlosses();collapse();render();}
+    @Override public void clearCandidates(){predictionSuppressed=true;predictionRequest++;glossRequest++;detailRequest++;if(pendingTranslation!=null)translation.removeCallbacks(pendingTranslation);visible=EngineSnapshot.empty();glossBatchKey="";activeGlosses.clear();activeModelWords.clear();applyGlosses();collapse();render();}
     private void updateComposing(InputConnection ic){if(!preview.isEmpty()){if(sensitive)ic.setComposingText(preview,1);else editHistory.compose(ic,preview);composingActive=true;}else{if(composingActive){if(sensitive)ic.setComposingText("",1);else editHistory.compose(ic,"");}if(sensitive)ic.finishComposingText();else editHistory.finishComposition(ic);composingActive=false;}refreshEditState();}
     private void clearPreview(){preview="";rawPreview="";nineRawPreview="";nineVisiblePrefix="";nineVisibleReading="";nineReadings=Collections.emptyList();}
-    private void showImmediate(){InputConnection ic=getCurrentInputConnection();if(ic!=null)updateComposing(ic);visible=EngineSnapshot.empty();render();}
+    private void showImmediate(){InputConnection ic=getCurrentInputConnection();if(ic!=null)updateComposing(ic);if(preview.isEmpty()||!candidateMode.equals(currentMode()))visible=EngineSnapshot.empty();render();}
     private void directCommit(String text){resetPredictionChain();String mode=currentMode();submit(this::finishWorker,text,mode);clearPreview();visible=EngineSnapshot.empty();render();collapse();}
     private void clearComposition(){resetPredictionChain();predictionSuppressed=true;clearPreview();showImmediate();collapse();submit(()->{resetWorker();return EngineSnapshot.empty();},"",currentMode());}
     private void undoNineSegment(){
@@ -394,13 +400,22 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
         submit(()->{if(!workerRaw.isEmpty()){if(workerMode.equals("pinyin")&&engineOpen)return engine.backspace();if(workerMode.equals("nine")&&!nineReading.isEmpty()&&LocalInputDictionary.nineKeySelectionOffset(workerRaw,nineReading)==workerRaw.length())nineReading=LocalInputDictionary.nineKeyUndoSelection(nineReading);else{workerRaw=workerRaw.substring(0,workerRaw.length()-1);nineReading=LocalInputDictionary.nineKeyTrimSelection(workerRaw,nineReading);}return searchWorker();}if(workerMode.equals("nine")&&!nineSegments.isEmpty()){undoNineSegment();return searchWorker();}main.post(()->{if(token!=session.get())return;InputConnection ic=getCurrentInputConnection();if(ic==null)return;changeEditor(ic,()->{CharSequence selected=ic.getSelectedText(0);if(selected!=null&&selected.length()>0)ic.commitText("",1);else ic.deleteSurroundingTextInCodePoints(1,0);});});return EngineSnapshot.empty();},"",mode);
     }
     @Override public void choose(int index){
-        if(visibleRevision!=revision||index<0||index>=visible.candidates.size())return;String kind=candidateMode,word=visible.candidates.get(index).text;int id=visible.candidates.get(index).id;String context=contextBeforeComposition();
+        if(index<0||index>=visible.candidates.size())return;boolean pending=visibleRevision!=revision;String kind=candidateMode,word=visible.candidates.get(index).text;int id=visible.candidates.get(index).id;String context=contextBeforeComposition();
+        if(pending&&(!kind.equals(currentMode())||preview.isEmpty()))return;
         if(kind.startsWith("predict"))predictionPicks++;else resetPredictionChain();visible=EngineSnapshot.empty();render();
         submit(()->{
+            int selectedId=id;
+            if(pending){
+                // Resolve the visible word after queued edits; never reuse an old decoder id.
+                boolean skipped=skipNineSearch;skipNineSearch=false;EngineSnapshot latest;
+                try{latest=searchWorker();}finally{skipNineSearch=skipped;}
+                boolean matched=false;for(Candidate candidate:latest.candidates)if(candidate.text.equals(word)){selectedId=candidate.id;matched=true;break;}
+                if(!matched)return latest;
+            }
             if(kind.startsWith("predict")){resetWorker();if(kind.equals("predict_en")&&inputDictionary!=null&&inputDictionary.english()!=null)inputDictionary.english().learn(word,context);return new EngineSnapshot("","",Collections.emptyList(),word+(kind.equals("predict_en")?" ":""));}
             if(kind.equals("english")){if(inputDictionary!=null&&inputDictionary.english()!=null)inputDictionary.english().learn(word,workerContext);resetWorker();return new EngineSnapshot("","",Collections.emptyList(),word+" ");}
-            if(kind.equals("nine")){if(id>=nineCandidates.size())return searchWorker();NineKeyCandidate c=nineCandidates.get(id);int consumed=Math.min(workerRaw.length(),c.consumedDigits);if(consumed<=0)return searchWorker();learnNineSegment(c,workerContext+ninePrefix);nineSegments.addLast(new String[]{workerRaw.substring(0,consumed),c.text,LocalInputDictionary.nineKeyTrimSelection(workerRaw.substring(0,consumed),nineReading),c.typedSpelling,c.pinyin});ninePrefix+=c.text;nineReading=LocalInputDictionary.nineKeyRemainingSelection(workerRaw,nineReading,consumed);workerRaw=workerRaw.substring(consumed);if(workerRaw.isEmpty()){String commit=ninePrefix;learnNineWhole(commit);resetWorker();return new EngineSnapshot("","",Collections.emptyList(),commit);}return searchWorker();}
-            return engineOpen?engine.select(id):EngineSnapshot.empty();
+            if(kind.equals("nine")){if(selectedId>=nineCandidates.size())return searchWorker();NineKeyCandidate c=nineCandidates.get(selectedId);int consumed=Math.min(workerRaw.length(),c.consumedDigits);if(consumed<=0)return searchWorker();learnNineSegment(c,workerContext+ninePrefix);nineSegments.addLast(new String[]{workerRaw.substring(0,consumed),c.text,LocalInputDictionary.nineKeyTrimSelection(workerRaw.substring(0,consumed),nineReading),c.typedSpelling,c.pinyin});ninePrefix+=c.text;nineReading=LocalInputDictionary.nineKeyRemainingSelection(workerRaw,nineReading,consumed);workerRaw=workerRaw.substring(consumed);if(workerRaw.isEmpty()){String commit=ninePrefix;learnNineWhole(commit);resetWorker();return new EngineSnapshot("","",Collections.emptyList(),commit);}return searchWorker();}
+            return engineOpen?engine.select(selectedId):EngineSnapshot.empty();
         },"",kind.equals("predict_en")?"english":kind.equals("predict_zh")?currentMode():kind);collapse();
     }
     private boolean isCandidateExpanded(){return panels!=null&&panels.active().equals("candidates");}
@@ -409,11 +424,14 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     private void openSettings(boolean modelManager){startActivity(new Intent(this,SettingsActivity.class).putExtra("model_manager",modelManager).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP));}
     private void checkUpdates(){startActivity(new Intent(this,SettingsActivity.class).putExtra("check_updates",true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP));}
     @Override public void settings(){openSettings(false);}
-    @Override public void toggleTranslation(){glossRequest++;prefs.store.edit().putBoolean("translation",!prefs.translation()).apply();activeGlosses.clear();activeModelWords.clear();if(candidates!=null)applyGlosses();render();}
+    @Override public void toggleTranslation(){glossRequest++;prefs.store.edit().putBoolean("translation",!prefs.translation()).apply();glossBatchKey="";activeGlosses.clear();activeModelWords.clear();if(candidates!=null)applyGlosses();render();}
     @Override public void punctuation(String text){key(english?text.replace('，',',').replace('。','.').replace('？','?').replace('！','!').replace('：',':'):text);}
     @Override public void cursor(int direction){
-        finishBeforeEditing();
-        int count=Math.min(12,Math.abs(direction)),code=direction<0?KeyEvent.KEYCODE_DPAD_LEFT:KeyEvent.KEYCODE_DPAD_RIGHT;editorAction(()->{InputConnection ic=getCurrentInputConnection();boolean extend=selecting;int meta=extend?KeyEvent.META_SHIFT_ON:0;if(extend)ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_SHIFT_LEFT));try{for(int i=0;i<count;i++){ic.sendKeyEvent(new KeyEvent(0,0,KeyEvent.ACTION_DOWN,code,0,meta));ic.sendKeyEvent(new KeyEvent(0,0,KeyEvent.ACTION_UP,code,0,meta));}}finally{if(extend)ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_SHIFT_LEFT));}requestPrediction();});
+        moveCursor(direction<0?KeyEvent.KEYCODE_DPAD_LEFT:KeyEvent.KEYCODE_DPAD_RIGHT,Math.min(12,Math.abs(direction)));
+    }
+    private void moveCursor(int code,int count){
+        finishBeforeEditing();boolean extend=selecting;
+        editorAction(()->{InputConnection ic=getCurrentInputConnection();int meta=extend?KeyEvent.META_SHIFT_ON:0;if(extend)ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,KeyEvent.KEYCODE_SHIFT_LEFT));try{for(int i=0;i<count;i++){ic.sendKeyEvent(new KeyEvent(0,0,KeyEvent.ACTION_DOWN,code,0,meta));ic.sendKeyEvent(new KeyEvent(0,0,KeyEvent.ACTION_UP,code,0,meta));}}finally{if(extend)ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,KeyEvent.KEYCODE_SHIFT_LEFT));}requestPrediction();});
     }
     @Override public void longKey(String value){
         if(value.startsWith("DIRECT_")){directCommit(value.substring(7));return;}
@@ -481,12 +499,13 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
             case "download_models":translations.ensureModels(prefs.glossLanguage(),state->{panels.modelStatus(modelStatus());if(state==TranslationRepository.State.READY)requestGlosses();});return;
             case "mode_full":changeMode(false,"full");return;case "mode_t9":changeMode(false,"t9");return;case "mode_english":changeMode(true,prefs.keyboardMode());return;
             case "left":cursor(-1);return;case "right":cursor(1);return;case "select":selecting=!selecting;panels.edit(sensitive,selecting);refreshEditState();return;
+            case "up":moveCursor(KeyEvent.KEYCODE_DPAD_UP,1);return;case "down":moveCursor(KeyEvent.KEYCODE_DPAD_DOWN,1);return;
             case "DELETE":cancelEditorTranslation();key("⌫");return;case "undo":undoEditor();return;case "edit_translate":translateEditorText();return;
             case "select_all":editContext(android.R.id.selectAll);return;case "copy":if(!sensitive)editContext(android.R.id.copy);return;case "cut":if(!sensitive)editContext(android.R.id.cut);return;case "paste":editContext(android.R.id.paste);return;
             case "clipboard":showClipboard();return;case "clear_clipboard":clipboard.clear();return;
-            case "home":case "end":finishBeforeEditing();int code=action.equals("home")?KeyEvent.KEYCODE_MOVE_HOME:KeyEvent.KEYCODE_MOVE_END;editorAction(()->{InputConnection ic=getCurrentInputConnection();ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN,code));ic.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP,code));requestPrediction();});return;
+            case "home":case "end":moveCursor(action.equals("home")?KeyEvent.KEYCODE_MOVE_HOME:KeyEvent.KEYCODE_MOVE_END,1);return;
             case "commit_translation":commitTranslation(detailTranslated);return;case "copy_translation":if(!detailTranslated.isEmpty())clipboard.copy(detailTranslated);return;
-            default:if(action.startsWith("language_")){detailRequest++;String lang=action.substring(9);if(!TranslationRepository.isGlossLanguage(lang))return;prefs.store.edit().putString("gloss_language",lang).putBoolean("translation",true).apply();activeGlosses.clear();activeModelWords.clear();applyGlosses();render();showLanguages();TranslationRepository.StateCallback changed=state->{if(!lang.equals(prefs.glossLanguage()))return;panels.modelStatus(modelStatus());if(state==TranslationRepository.State.READY)requestGlosses();};if(lang.equals("en"))translations.refreshModels(lang,changed);else translations.ensureModels(lang,changed);}else if(action.startsWith("style_")){prefs.store.edit().putString("style",action.substring(6)).apply();configureKeyboard();panels.styles();}else if(action.startsWith("emoji_"))directCommit(action.substring(6));
+            default:if(action.startsWith("language_")){detailRequest++;String lang=action.substring(9);if(!TranslationRepository.isGlossLanguage(lang))return;prefs.store.edit().putString("gloss_language",lang).putBoolean("translation",true).apply();glossBatchKey="";activeGlosses.clear();activeModelWords.clear();applyGlosses();render();showLanguages();TranslationRepository.StateCallback changed=state->{if(!lang.equals(prefs.glossLanguage()))return;panels.modelStatus(modelStatus());if(state==TranslationRepository.State.READY)requestGlosses();};if(lang.equals("en"))translations.refreshModels(lang,changed);else translations.ensureModels(lang,changed);}else if(action.startsWith("style_")){prefs.store.edit().putString("style",action.substring(6)).apply();configureKeyboard();panels.styles();}else if(action.startsWith("emoji_"))directCommit(action.substring(6));
         }
     }
     private void editContext(int id){if(sensitive&&(id==android.R.id.copy||id==android.R.id.cut||id==android.R.id.selectAll||id==android.R.id.paste))return;submit(this::finishWorker,"",currentMode());editorAction(()->{InputConnection ic=getCurrentInputConnection();Runnable edit=()->{boolean applied=ic.performContextMenuAction(id);if(!applied&&id==android.R.id.paste){String text=clipboard.currentText();if(!text.isEmpty())ic.commitText(text,1);}};if(id==android.R.id.cut||id==android.R.id.paste)changeEditor(ic,edit);else edit.run();if(id==android.R.id.copy||id==android.R.id.cut)clipboard.record(clipboard.currentText());requestPrediction();});}
@@ -505,7 +524,7 @@ public final class QingyuImeService extends InputMethodService implements Keyboa
     }
     @Override public boolean onKeyDown(int code,KeyEvent event){if(code==KeyEvent.KEYCODE_BACK&&panels!=null&&panels.isOpen()){collapse();return true;}return super.onKeyDown(code,event);}
     @Override public void onWindowHidden(){if(panels!=null)panels.cancelTouch();cancelEditorTranslation();super.onWindowHidden();}
-    @Override public void onFinishInputView(boolean finishing){inputViewActive=false;cancelEditorTranslation();dismissPinyinBubble();if(panels!=null)panels.cancelTouch();if(keyboard!=null)keyboard.cancelTouch();if(candidates!=null)candidates.cancelTouch();if(expandedCandidates!=null)expandedCandidates.cancelTouch();collapse();
+    @Override public void onFinishInputView(boolean finishing){inputViewActive=false;glossBatchKey="";glossRequest++;if(pendingTranslation!=null)translation.removeCallbacks(pendingTranslation);cancelEditorTranslation();dismissPinyinBubble();if(panels!=null)panels.cancelTouch();if(keyboard!=null)keyboard.cancelTouch();if(candidates!=null)candidates.cancelTouch();if(expandedCandidates!=null)expandedCandidates.cancelTouch();collapse();
         // Hiding the view may not finish input; persist queued choices before the next session.
         if(!finishing)decoder.post(()->{if(engineOpen&&!privateInput)engine.flush();if(inputDictionary!=null)try{inputDictionary.flush();}catch(Exception ignored){}});
         super.onFinishInputView(finishing);}

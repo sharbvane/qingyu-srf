@@ -18,6 +18,7 @@ import android.view.Gravity;
 import android.view.HapticFeedbackConstants;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
 import android.widget.FrameLayout;
@@ -140,23 +141,43 @@ final class ImePanels {
         editSecure=secure;
         if(active.equals("edit")&&editSelect!=null){setEditSelecting(selecting);updateEditState();return;}
         LinearLayout p=begin("edit","文本编辑");
-        editStatus=text("",11,colors.secondary);editStatus.setId(R.id.edit_status);editStatus.setPadding(dp(5),0,dp(5),0);editStatus.setSingleLine(true);editStatus.setEllipsize(android.text.TextUtils.TruncateAt.END);editStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);p.addView(editStatus,new LinearLayout.LayoutParams(-1,dp(24)));
-        ScrollView scroll=new ScrollView(context);scroll.setId(R.id.edit_actions);scroll.setFillViewport(true);LinearLayout grid=new LinearLayout(context);grid.setOrientation(LinearLayout.VERTICAL);scroll.addView(grid,new ScrollView.LayoutParams(-1,-2));p.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        editRow(grid,new String[]{"←","→","行首","行尾"},new String[]{"left","right","home","end"},new int[]{R.id.edit_left,R.id.edit_right,R.id.edit_home,R.id.edit_end});
-        editRow(grid,new String[]{"选择","全选","复制","剪切"},new String[]{"select","select_all","copy","cut"},new int[]{R.id.edit_select,R.id.edit_select_all,R.id.edit_copy,R.id.edit_cut});
-        editRow(grid,new String[]{"粘贴","剪贴板","撤回","翻译","退格"},new String[]{"paste","clipboard","undo","edit_translate","DELETE"},new int[]{R.id.edit_paste,R.id.edit_clipboard,R.id.edit_undo,R.id.edit_translate,R.id.edit_delete});
+        p.removeViewAt(0);p.setPadding(dp(12),dp(8),dp(12),dp(4));
+        ScrollView scroll=new ScrollView(context);scroll.setId(R.id.edit_actions);scroll.setFillViewport(true);scroll.setClipToPadding(true);scroll.addView(new EditControls(),new ScrollView.LayoutParams(-1,-2));p.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        editStatus=text("",11,colors.secondary);editStatus.setId(R.id.edit_status);editStatus.setPadding(dp(4),0,dp(4),0);editStatus.setSingleLine(true);editStatus.setEllipsize(android.text.TextUtils.TruncateAt.END);editStatus.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);p.addView(editStatus,new LinearLayout.LayoutParams(-1,dp(22)));
         editDelete=p.findViewById(R.id.edit_delete);editUndo=p.findViewById(R.id.edit_undo);editTranslate=p.findViewById(R.id.edit_translate);editSelect=p.findViewById(R.id.edit_select);editDelete.setOnTouchListener(this::deleteTouch);setEditSelecting(selecting);updateEditState();
     }
-    private void editRow(LinearLayout parent,String[] names,String[] commands,int[] ids){
-        LinearLayout row=new LinearLayout(context);row.setMinimumHeight(dp(54));
-        for(int i=0;i<names.length;i++){
-            String command=commands[i];Button b=button(names[i],()->{if(!command.equals("DELETE")||!deleteTouchClick)action.accept(command);});b.setId(ids[i]);b.setMinWidth(0);b.setMinimumWidth(0);b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setMaxLines(2);
-            if(command.equals("left"))b.setContentDescription("向左移动光标");else if(command.equals("right"))b.setContentDescription("向右移动光标");
-            LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);lp.setMargins(dp(3),dp(3),dp(3),dp(3));row.addView(b,lp);
-        }
-        parent.addView(row,new LinearLayout.LayoutParams(-1,0,1));
+    private Button editButton(String title,String command,int id,int icon,boolean boundary){
+        Button b=button(title,()->{if(!command.equals("DELETE")||!deleteTouchClick)action.accept(command);});b.setId(id);b.setTextSize(12);b.setIncludeFontPadding(false);b.setGravity(Gravity.CENTER);b.setMinWidth(dp(48));b.setMinimumWidth(dp(48));b.setMinHeight(dp(48));b.setMinimumHeight(dp(48));b.setMaxLines(1);b.setPadding(dp(2),dp(2),dp(2),dp(2));b.setStateListAnimator(null);b.setElevation(0);b.setCompoundDrawablePadding(dp(2));
+        b.setCompoundDrawablesWithIntrinsicBounds(null,new EditIcon(icon,colors.text,dp(boundary?36:20),boundary?colors.key:0),null,null);
+        GradientDrawable background=new GradientDrawable();background.setColor(boundary?android.graphics.Color.TRANSPARENT:colors.key);background.setCornerRadius(dp(12));b.setBackground(new RippleDrawable(ColorStateList.valueOf((colors.accent&0x00ffffff)|0x24000000),background,null));return b;
     }
-    private void setEditSelecting(boolean selecting){editSelect.setText(selecting?"结束选择":"选择");editSelect.setContentDescription(editSelect.getText());editSelect.setSelected(selecting);editSelect.setTextColor(selecting?colors.accent:colors.text);}
+    private final class EditControls extends ViewGroup {
+        private final FrameLayout dial;
+        private final Button home,end;
+        private final LinearLayout tools;
+        private int leftWidth,dialSize;
+        EditControls(){
+            super(ImePanels.this.context);dial=new FrameLayout(context){
+                @Override protected void onMeasure(int width,int height){super.onMeasure(width,height);int size=MeasureSpec.getSize(width);for(int i=0;i<getChildCount();i++){int target=i==4?Math.max(dp(48),size/3):dp(48);getChildAt(i).measure(MeasureSpec.makeMeasureSpec(target,MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(target,MeasureSpec.EXACTLY));}}
+                @Override protected void onLayout(boolean changed,int l,int t,int r,int b){int size=r-l;for(int i=0;i<getChildCount();i++){View child=getChildAt(i);int target=child.getMeasuredWidth(),x=(size-target)/2,y=x;if(i==0)y=0;else if(i==1)x=size-target;else if(i==2)y=size-target;else if(i==3)x=0;child.layout(x,y,x+target,y+target);}}
+            };GradientDrawable circle=new GradientDrawable();circle.setShape(GradientDrawable.OVAL);circle.setColor(colors.key);dial.setBackground(circle);
+            String[] commands={"up","right","down","left"},names={"向上移动光标","向右移动光标","向下移动光标","向左移动光标"};int[] ids={R.id.edit_up,R.id.edit_right,R.id.edit_down,R.id.edit_left};
+            for(int i=0;i<commands.length;i++){String command=commands[i];ImageButton arrow=new ImageButton(context);arrow.setId(ids[i]);arrow.setContentDescription(names[i]);arrow.setImageDrawable(new EditIcon(i,colors.text,dp(23),0));arrow.setPadding(dp(12),dp(12),dp(12),dp(12));GradientDrawable mask=new GradientDrawable();mask.setShape(GradientDrawable.OVAL);mask.setColor(android.graphics.Color.WHITE);arrow.setBackground(new RippleDrawable(ColorStateList.valueOf((colors.accent&0x00ffffff)|0x24000000),null,mask));arrow.setOnClickListener(v->action.accept(command));dial.addView(arrow);}
+            Button select=button("选择",()->action.accept("select"));select.setId(R.id.edit_select);select.setTextSize(12);select.setIncludeFontPadding(false);select.setGravity(Gravity.CENTER);select.setMinWidth(0);select.setMinHeight(0);select.setMinimumWidth(0);select.setMinimumHeight(0);select.setPadding(dp(2),0,dp(2),0);select.setStateListAnimator(null);select.setElevation(0);dial.addView(select);addView(dial);
+            home=editButton("行首","home",R.id.edit_home,4,true);end=editButton("行尾","end",R.id.edit_end,5,true);addView(home);addView(end);
+            tools=new LinearLayout(context);tools.setOrientation(LinearLayout.VERTICAL);
+            String[] titles={"全选","退格","复制","撤回","粘贴","翻译","剪切","剪贴板"},actions={"select_all","DELETE","copy","undo","paste","edit_translate","cut","clipboard"};int[] toolIds={R.id.edit_select_all,R.id.edit_delete,R.id.edit_copy,R.id.edit_undo,R.id.edit_paste,R.id.edit_translate,R.id.edit_cut,R.id.edit_clipboard};
+            for(int i=0;i<4;i++){LinearLayout row=new LinearLayout(context);for(int j=0;j<2;j++){int index=i*2+j;Button tool=editButton(titles[index],actions[index],toolIds[index],index+6,false);LinearLayout.LayoutParams key=new LinearLayout.LayoutParams(0,-1,1);if(j==0)key.rightMargin=dp(4);else key.leftMargin=dp(4);row.addView(tool,key);}LinearLayout.LayoutParams line=new LinearLayout.LayoutParams(-1,0,1);if(i<3)line.bottomMargin=dp(8);tools.addView(row,line);}addView(tools);
+        }
+        @Override protected void onMeasure(int widthSpec,int heightSpec){
+            int width=MeasureSpec.getSize(widthSpec),height=Math.max(dp(216),MeasureSpec.getMode(heightSpec)==MeasureSpec.EXACTLY?MeasureSpec.getSize(heightSpec):0);setMeasuredDimension(width,height);
+            leftWidth=Math.min(width-dp(120),Math.max(dp(144),Math.round(width*.46f)));dialSize=Math.min(leftWidth,height-dp(72));dial.measure(MeasureSpec.makeMeasureSpec(dialSize,MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(dialSize,MeasureSpec.EXACTLY));int boundaryWidth=(leftWidth-dp(8))/2;
+            home.measure(MeasureSpec.makeMeasureSpec(boundaryWidth,MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(dp(64),MeasureSpec.EXACTLY));end.measure(MeasureSpec.makeMeasureSpec(boundaryWidth,MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(dp(64),MeasureSpec.EXACTLY));tools.measure(MeasureSpec.makeMeasureSpec(width-leftWidth-dp(8),MeasureSpec.EXACTLY),MeasureSpec.makeMeasureSpec(height,MeasureSpec.EXACTLY));
+        }
+        @Override protected void onLayout(boolean changed,int l,int t,int r,int b){int top=(getMeasuredHeight()-dialSize-dp(72))/2,x=(leftWidth-dialSize)/2;dial.layout(x,top,x+dialSize,top+dialSize);int y=top+dialSize+dp(8);home.layout(0,y,home.getMeasuredWidth(),y+dp(64));end.layout(leftWidth-end.getMeasuredWidth(),y,leftWidth,y+dp(64));tools.layout(leftWidth+dp(8),0,getMeasuredWidth(),getMeasuredHeight());}
+        @Override protected LayoutParams generateDefaultLayoutParams(){return new LayoutParams(-2,-2);}
+    }
+    private void setEditSelecting(boolean selecting){editSelect.setText("选择");editSelect.setContentDescription(selecting?"结束选择":"选择");editSelect.setSelected(selecting);editSelect.setTextColor(selecting?colors.accent:colors.text);GradientDrawable circle=new GradientDrawable();circle.setShape(GradientDrawable.OVAL);circle.setColor(selecting?colors.function:colors.key);circle.setStroke(dp(1),selecting?colors.accent:colors.border);editSelect.setBackground(new RippleDrawable(ColorStateList.valueOf((colors.accent&0x00ffffff)|0x24000000),circle,null));}
     void editState(boolean undoAvailable,boolean busy,String status){canUndo=undoAvailable;translateBusy=busy;editMessage=status==null||status.isEmpty()?"撤回仅作用于当前输入框":status;if(active.equals("edit"))updateEditState();}
     private void updateEditState(){
         if(editUndo==null)return;
@@ -224,6 +245,31 @@ final class ImePanels {
         boolean modelExample=realExample&&exampleTranslation!=null&&!exampleTranslation.isEmpty()&&exampleNote!=null&&exampleNote.startsWith("Google Translate");detailExampleBadge.setImageResource(prefs.dark(context)?R.drawable.google_translate_badge_dark:R.drawable.google_translate_badge);detailExampleBadge.setVisibility(modelExample?View.VISIBLE:View.GONE);detailCommit.setText(google?"Translate with Google":"输入译文");detailCommit.setContentDescription(detailCommit.getText());detailActions(!detailTranslation.isEmpty());
     }
     private String partOfSpeech(String tag){if(tag==null||tag.isEmpty())return "";switch(tag.charAt(0)){case 'n':return "名词";case 'v':return "动词";case 'a':return "形容词";case 'd':return "副词";case 'r':return "代词";case 'p':return "介词";case 'c':return "连词";case 'u':return "助词";case 'm':return "数词";case 'q':return "量词";case 'e':return "叹词";case 'y':return "语气词";default:return tag;}}
+    private static final class EditIcon extends Drawable {
+        private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final android.graphics.Path path=new android.graphics.Path();
+        private final int kind,size,background;
+        EditIcon(int kind,int color,int size,int background){this.kind=kind;this.size=size;this.background=background;paint.setColor(color);paint.setStrokeWidth(1.65f);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStrokeJoin(Paint.Join.ROUND);paint.setStyle(Paint.Style.STROKE);}
+        @Override public void draw(Canvas canvas){
+            canvas.save();canvas.translate(getBounds().left,getBounds().top);canvas.scale(getBounds().width()/24f,getBounds().height()/24f);
+            if(background!=0){int color=paint.getColor();paint.setStyle(Paint.Style.FILL);paint.setColor(background);canvas.drawCircle(12,12,12,paint);paint.setColor(color);paint.setStyle(Paint.Style.STROKE);}
+            if(kind<4){canvas.rotate(kind*90,12,12);canvas.drawLine(6,15,12,9,paint);canvas.drawLine(12,9,18,15,paint);}
+            else if(kind==4||kind==5){if(kind==5)canvas.rotate(180,12,12);canvas.drawLine(6,6,6,18,paint);canvas.drawLine(17,12,9,12,paint);canvas.drawLine(9,12,13,8,paint);canvas.drawLine(9,12,13,16,paint);}
+            else if(kind==6){for(int i=0;i<4;i++){canvas.drawLine(4,8,4,4,paint);canvas.drawLine(4,4,8,4,paint);canvas.rotate(90,12,12);}}
+            else if(kind==7){path.rewind();path.moveTo(8,5);path.lineTo(21,5);path.lineTo(21,19);path.lineTo(8,19);path.lineTo(2,12);path.close();canvas.drawPath(path,paint);canvas.drawLine(11,9,17,15,paint);canvas.drawLine(17,9,11,15,paint);}
+            else if(kind==8){canvas.drawRoundRect(3,3,15,15,2,2,paint);canvas.drawRoundRect(9,9,21,21,2,2,paint);}
+            else if(kind==9){path.rewind();path.moveTo(4,9);path.lineTo(14,9);path.cubicTo(24,9,24,20,14,20);path.lineTo(8,20);canvas.drawPath(path,paint);canvas.drawLine(4,9,8,5,paint);canvas.drawLine(4,9,8,13,paint);}
+            else if(kind==10||kind==13){canvas.drawRoundRect(5,5,19,21,2,2,paint);canvas.drawRoundRect(8,3,16,7,1,1,paint);if(kind==13){for(int y=11;y<=17;y+=3){canvas.drawPoint(8,y,paint);canvas.drawLine(11,y,16,y,paint);}}}
+            else if(kind==11){canvas.drawRoundRect(1,3,14,17,2,2,paint);canvas.drawRoundRect(10,9,23,22,2,2,paint);canvas.drawLine(4,7,11,7,paint);canvas.drawLine(7.5f,5,7.5f,7,paint);canvas.drawLine(5,9,10,13,paint);canvas.drawLine(10,9,5,13,paint);canvas.drawLine(14,18,17,12,paint);canvas.drawLine(17,12,20,18,paint);canvas.drawLine(15,16,19,16,paint);}
+            else if(kind==12){canvas.drawCircle(6,18,3,paint);canvas.drawCircle(18,18,3,paint);canvas.drawLine(7.5f,15.5f,19,3,paint);canvas.drawLine(16.5f,15.5f,5,3,paint);}
+            canvas.restore();
+        }
+        @Override public void setAlpha(int alpha){paint.setAlpha(alpha);}
+        @Override public void setColorFilter(ColorFilter filter){paint.setColorFilter(filter);}
+        @Override public int getOpacity(){return PixelFormat.TRANSLUCENT;}
+        @Override public int getIntrinsicWidth(){return size;}
+        @Override public int getIntrinsicHeight(){return size;}
+    }
     private static final class NavIcon extends Drawable {
         private final Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG);private final int kind,size;
         NavIcon(int kind,int color,int size){this.kind=kind;this.size=size;paint.setColor(color);paint.setStrokeWidth(1.65f);paint.setStrokeCap(Paint.Cap.ROUND);paint.setStyle(Paint.Style.STROKE);}
