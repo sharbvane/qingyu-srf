@@ -17,6 +17,12 @@
 
 **轻语首先是一款正常的中文输入法。** 像平常一样输入拼音、选择中文；候选上方会安静地出现所选语言的释义，默认英语、本地词典优先。点「开发」，上屏的仍然只有「开发」。
 
+## 产品演示 / Demo Video
+
+<p align="center"><a href="docs/media/qingyu-demo.mp4"><img src="docs/images/qingyu-demo-preview.gif" width="300" alt="轻语输入法宣传片动态预览，点击观看完整视频" /></a></p>
+
+<p align="center"><a href="docs/media/qingyu-demo.mp4">▶ 观看完整 30 秒宣传片（1080 × 1920 · MP4 · 8.1 MB）</a></p>
+
 ## 看看它
 
 | 文本编辑 | 深色九键 |

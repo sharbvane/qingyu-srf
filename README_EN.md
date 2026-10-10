@@ -19,6 +19,12 @@
 
 **Qingyu v0.7.1 editor and candidate stability update is now released:** [GitHub Release and APK](https://github.com/sharbvane/qingyu-srf/releases/tag/v0.7.1), [SHA-256 file](https://github.com/sharbvane/qingyu-srf/releases/download/v0.7.1/Qingyu-0.7.1.apk.sha256), [installation notes](releases/README-v0.7.1.md), and [validation](docs/validation-v0.7.1.md). Nine-key preedit shows inferred pinyin. The left rail scrolls through all syllable alternatives and advances after each selection; backtracking reopens previous choices without committing text. Holding a letter group opens a slide-to-select uppercase/lowercase/number picker.
 
+## Demo Video
+
+<p align="center"><a href="docs/media/qingyu-demo.mp4"><img src="docs/images/qingyu-demo-preview.gif" width="300" alt="Animated preview of the Qingyu Input Method demo; click to watch the full video" /></a></p>
+
+<p align="center"><a href="docs/media/qingyu-demo.mp4">▶ Watch the full 30-second demo (1080 × 1920 · MP4 · 8.1 MB)</a></p>
+
 ## Preview
 
 | Text editing | Dark nine-key |
