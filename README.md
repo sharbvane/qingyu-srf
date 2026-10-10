@@ -19,9 +19,9 @@
 
 ## 产品演示 / Demo Video
 
-<p align="center"><a href="docs/media/qingyu-demo.mp4"><img src="docs/images/qingyu-demo-preview.gif" width="300" alt="轻语输入法宣传片动态预览，点击观看完整视频" /></a></p>
+<p align="center"><a href="https://raw.githubusercontent.com/sharbvane/qingyu-srf/main/docs/media/qingyu-demo.mp4"><img src="docs/images/qingyu-demo-preview.gif" width="300" alt="轻语输入法宣传片动态预览，点击下载完整视频" /></a></p>
 
-<p align="center"><a href="docs/media/qingyu-demo.mp4">▶ 观看完整 30 秒宣传片（1080 × 1920 · MP4 · 8.1 MB）</a></p>
+<p align="center"><a href="https://raw.githubusercontent.com/sharbvane/qingyu-srf/main/docs/media/qingyu-demo.mp4">▶ 下载完整宣传片（30 秒 · 1080 × 1920 · MP4 · 8.1 MB）</a></p>
 
 ## 看看它
 
